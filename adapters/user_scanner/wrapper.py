@@ -125,8 +125,11 @@ def _run_live(payload: dict) -> int:
         }
     )
 
+    # check_all is async (returns coroutine); drive it via asyncio.run().
+    import asyncio  # noqa: PLC0415
+
     try:
-        results = engine.check_all(email, is_email=True)
+        results = asyncio.run(engine.check_all(email, is_email=True))
     except Exception as exc:
         _emit(
             {
