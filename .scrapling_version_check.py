@@ -4,17 +4,20 @@ Fetches PyPI / npm JSON registries (no scraping needed for these — they're JSO
 plus Scrapling-driven page fetches for nextjs.org / ui.shadcn.com to catch any
 "2026 Q2 breaking change" notes that the JSON APIs don't surface.
 """
+
 from __future__ import annotations
+
 import json
 import sys
+import tomllib  # py3.11+
 from datetime import datetime
 from pathlib import Path
+
+from scrapling.fetchers import Fetcher
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # Pinned versions in our scaffold (read from disk to stay honest)
-import tomllib  # py3.11+
-
 pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 package_json = json.loads(Path("package.json").read_text(encoding="utf-8"))
 
@@ -36,8 +39,6 @@ ours["pnpm"] = package_json["packageManager"]
 ours["biome"] = package_json["devDependencies"]["@biomejs/biome"]
 
 # Fetch upstream latest
-from scrapling.fetchers import Fetcher
-
 upstream = {}
 queries = [
     ("ruff", "https://pypi.org/pypi/ruff/json", "pypi"),
@@ -61,7 +62,11 @@ for name, url, kind in queries:
     try:
         r = Fetcher.get(url, stealthy_headers=True, follow_redirects=True, timeout=15)
         # Adaptor body-capture gap: .text can be empty; .body is bytes
-        raw = r.text if r.text else (r.body.decode("utf-8") if isinstance(r.body, (bytes, bytearray)) else str(r.body))
+        raw = (
+            r.text
+            if r.text
+            else (r.body.decode("utf-8") if isinstance(r.body, bytes | bytearray) else str(r.body))
+        )
         data = json.loads(raw)
         if kind == "pypi":
             upstream[name] = {
@@ -71,9 +76,7 @@ for name, url, kind in queries:
         else:
             upstream[name] = {
                 "latest": data["version"],
-                "released": data.get("time", {}).get("modified", "?")
-                if "time" in data
-                else "?",
+                "released": data.get("time", {}).get("modified", "?") if "time" in data else "?",
             }
     except Exception as e:
         upstream[name] = {"error": f"{e.__class__.__name__}: {str(e)[:100]}"}
@@ -84,9 +87,24 @@ print(f"Scaffold version-check vs upstream — {datetime.utcnow().isoformat()}Z"
 print("=" * 70)
 print(f"{'package':<20} {'our pin':<20} {'upstream latest':<20} {'released'}")
 print("-" * 80)
-for name in ["ruff", "mypy", "pytest", "pytest-asyncio", "pre-commit",
-            "fastapi", "pydantic", "dramatiq", "scrapling", "followthemoney",
-            "uv", "pnpm", "biome", "next", "react", "shadcn"]:
+for name in [
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-asyncio",
+    "pre-commit",
+    "fastapi",
+    "pydantic",
+    "dramatiq",
+    "scrapling",
+    "followthemoney",
+    "uv",
+    "pnpm",
+    "biome",
+    "next",
+    "react",
+    "shadcn",
+]:
     our = ours.get(name, "—")
     up = upstream.get(name, {})
     latest = up.get("latest", up.get("error", "—"))

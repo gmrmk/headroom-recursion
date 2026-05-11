@@ -10,6 +10,7 @@ Marked xfail for Sprint 1 — the real ranker lands in WI-0606. This test:
 3. xfail-asserts each case routes through a placeholder ranker (currently
    raises NotImplementedError); flips to plain assert in WI-0606.
 """
+
 from __future__ import annotations
 
 import json
@@ -92,8 +93,11 @@ def test_each_case_ranks_expected_top(case_index: int) -> None:
         pytest.skip(f"case {case_index} out of range ({len(cases)} cases)")
     case = cases[case_index]
     candidates = f["candidates"]
-    context = {"subject": case.get("context_subject"), "warm": case.get("warm", False),
-               "opsec_state": case.get("opsec_state", "green")}
+    context = {
+        "subject": case.get("context_subject"),
+        "warm": case.get("warm", False),
+        "opsec_state": case.get("opsec_state", "green"),
+    }
 
     ranked = rank_placeholder(case["query"], candidates, context)
 

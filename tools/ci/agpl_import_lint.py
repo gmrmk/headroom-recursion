@@ -13,6 +13,7 @@ CLI:
   python tools/ci/agpl_import_lint.py            # lint packages/ + apps/
   python tools/ci/agpl_import_lint.py PATHS...   # lint a fixture set
 """
+
 from __future__ import annotations
 
 import ast
@@ -71,15 +72,14 @@ def lint_file(path: Path) -> list[str]:
                         f"{path.as_posix()}:{node.lineno}: forbidden import '{alias.name}'"
                         + (f" as '{alias.asname}'" if alias.asname else "")
                     )
-        elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                top = node.module.split(".")[0]
-                if top in AGPL_FORBIDDEN:
-                    for alias in node.names:
-                        violations.append(
-                            f"{path.as_posix()}:{node.lineno}: forbidden 'from {node.module} "
-                            f"import {alias.name}'"
-                        )
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            top = node.module.split(".")[0]
+            if top in AGPL_FORBIDDEN:
+                for alias in node.names:
+                    violations.append(
+                        f"{path.as_posix()}:{node.lineno}: forbidden 'from {node.module} "
+                        f"import {alias.name}'"
+                    )
     return violations
 
 
@@ -88,10 +88,7 @@ def lint_paths(paths: list[Path]) -> int:
     for root in paths:
         if not root.exists():
             continue
-        if root.is_file():
-            files = [root]
-        else:
-            files = list(root.rglob("*.py"))
+        files = [root] if root.is_file() else list(root.rglob("*.py"))
         for f in files:
             for msg in lint_file(f):
                 print(msg, file=sys.stderr)
@@ -100,10 +97,7 @@ def lint_paths(paths: list[Path]) -> int:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) > 1:
-        roots = [Path(a) for a in argv[1:]]
-    else:
-        roots = [Path("packages"), Path("apps")]
+    roots = [Path(a) for a in argv[1:]] if len(argv) > 1 else [Path("packages"), Path("apps")]
     return lint_paths(roots)
 
 
