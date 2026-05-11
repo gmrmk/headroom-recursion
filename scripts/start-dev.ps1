@@ -1,4 +1,4 @@
-# start-dev.ps1 — Win11 native one-command dev launcher for OSINT GOBLIN.
+# start-dev.ps1 -- Win11 native one-command dev launcher for OSINT GOBLIN.
 #
 # What it does (idempotent):
 #   1. Verifies prerequisites (Python 3.13, Node 20+, pnpm, Memurai or Redis).
@@ -10,8 +10,8 @@
 #   4. Syncs Python deps via `uv sync` (falls back to `pip install -e ".[dev]"`).
 #   5. Ensures pnpm install is up to date for apps/web.
 #   6. Mode-aware storage substrate:
-#        - m0 (default, Win11 brief §6): SQLite + Memurai + local-fs MinIO,
-#          no Docker required for inner loop. Aligns with Boris D2 §11.1.
+#        - m0 (default, Win11 brief sec6): SQLite + Memurai + local-fs MinIO,
+#          no Docker required for inner loop. Aligns with Boris D2 sec11.1.
 #        - m1: docker compose up (Postgres+AGE + MinIO + Memurai sibling);
 #          opt-in once Docker Desktop is installed.
 #   7. Boots three foreground panes in one Windows Terminal window:
@@ -25,29 +25,29 @@
 #   - Re-running NEVER spawns a second uvicorn / dramatiq / next-dev if one is
 #     already bound to its expected port. The wt invocation is skipped instead.
 #   - Re-running is safe under partial-failure: if pnpm install crashed last
-#     time, the next run resumes from `pnpm install` — no half-state.
+#     time, the next run resumes from `pnpm install` -- no half-state.
 #   - -Init is also idempotent: it only creates directories that don't already
 #     exist; never overwrites existing files.
 #
 # Exit codes:
-#   0 — all three services reachable
-#   2 — prerequisite missing (Python / Node / pnpm)
-#   3 — Memurai not installed and no fallback Redis found
-#   4 — venv creation or `uv sync` failed
-#   5 — pnpm install failed
-#   6 — service did not become healthy within HealthTimeoutSeconds
-#   7 — Init requested but a repo-marker is missing AND the script can't
+#   0 -- all three services reachable
+#   2 -- prerequisite missing (Python / Node / pnpm)
+#   3 -- Memurai not installed and no fallback Redis found
+#   4 -- venv creation or `uv sync` failed
+#   5 -- pnpm install failed
+#   6 -- service did not become healthy within HealthTimeoutSeconds
+#   7 -- Init requested but a repo-marker is missing AND the script can't
 #       guess where to scaffold (e.g. no pyproject.toml AND no .git AND no
 #       INIT_REPO_ROOT env override)
-#   8 — Mode=m1 requested but Docker Desktop not reachable
+#   8 -- Mode=m1 requested but Docker Desktop not reachable
 #
 # Cross-team contract:
-#   - The committed app namespace is `osint_goblin_*` per Sora §3.1
-#     (MANUFACTURING-PLAN §1). This script imports `osint_goblin_api.main:app`
+#   - The committed app namespace is `osint_goblin_*` per Sora sec3.1
+#     (MANUFACTURING-PLAN sec1). This script imports `osint_goblin_api.main:app`
 #     and runs the worker as `osint_goblin_workers`.
-#   - Mode contract aligns with Boris D2 / phase4/02-devops.md §11.1-§11.2.
+#   - Mode contract aligns with Boris D2 / phase4/02-devops.md sec11.1-sec11.2.
 #   - --reload-dir src and --processes 1 --threads 4 are Priya's locked
-#     decisions per phase4/05-devx.md §7.1-§7.2. Both are Win11 SIGINT-load-bearing.
+#     decisions per phase4/05-devx.md sec7.1-sec7.2. Both are Win11 SIGINT-load-bearing.
 
 [CmdletBinding()]
 param(
@@ -66,7 +66,7 @@ param(
     [switch]$SkipHealth,
     [int]$HealthTimeoutSeconds = 60,
 
-    # m1 only — passed through to docker compose --profile
+    # m1 only -- passed through to docker compose --profile
     [ValidateSet('age','memgraph')]
     [string]$GraphTier = 'age'
 )
@@ -99,13 +99,13 @@ function Resolve-Tool($name) {
 }
 
 # ----------------------------------------------------------------------------
-# 0. -Init — Day-1 scaffold (idempotent; never overwrites)
+# 0. -Init -- Day-1 scaffold (idempotent; never overwrites)
 # ----------------------------------------------------------------------------
 function Invoke-Init {
     Write-Step "Init: ensuring Day-1 scaffold exists (idempotent)"
 
     # Hard repo-root anchor: presence of .git OR pyproject.toml OR justfile.
-    # If none exist and we aren't given INIT_REPO_ROOT, bail early — running
+    # If none exist and we aren't given INIT_REPO_ROOT, bail early -- running
     # Init from a wrong CWD is a destructive footgun.
     $anchors = @('.git','pyproject.toml','justfile','.editorconfig') |
         Where-Object { Test-Path (Join-Path $RepoRoot $_) }
@@ -115,7 +115,7 @@ function Invoke-Init {
         exit 7
     }
 
-    # Scaffold directories — only created if missing. This is the minimum the
+    # Scaffold directories -- only created if missing. This is the minimum the
     # rest of the script and the M0 spike require to not crash.
     $dirs = @(
         '.dev-logs',
@@ -145,7 +145,7 @@ function Invoke-Init {
         'apps/api/osint_goblin_api/__init__.py' = "__version__ = '0.0.0'`n"
         'apps/api/osint_goblin_api/main.py' = @'
 """Day-1 placeholder FastAPI app. Replace with the real entrypoint
-(packages/osint_goblin_api per Sora §3.1) once Sprint-1 lands the real
+(packages/osint_goblin_api per Sora sec3.1) once Sprint-1 lands the real
 modules. This stub exists only so start-dev.ps1's health check is meaningful
 on the very first fresh-clone boot."""
 from fastapi import FastAPI
@@ -160,7 +160,7 @@ def healthz() -> dict[str, str]:
         'apps/workers/osint_goblin_workers/__init__.py' = "__version__ = '0.0.0'`n"
         'apps/workers/osint_goblin_workers/__main__.py' = @'
 """Day-1 placeholder Dramatiq actor module. Replace with the real
-tool_runner actor (MANUFACTURING-PLAN §1, apps/workers per Sora §3.1)
+tool_runner actor (MANUFACTURING-PLAN sec1, apps/workers per Sora sec3.1)
 once Sprint-1 lands evidence_pipeline."""
 import dramatiq
 from dramatiq.brokers.redis import RedisBroker
@@ -265,7 +265,7 @@ if ($uv -and $pyprojectExists) {
     & $VenvPython -m pip install -e ".[dev]"
     if ($LASTEXITCODE -ne 0) { Write-Err "pip install failed"; exit 4 }
 } else {
-    Write-Warn2 "no pyproject.toml found — installing Day-1 placeholder deps only"
+    Write-Warn2 "no pyproject.toml found -- installing Day-1 placeholder deps only"
     & $VenvPython -m pip install --upgrade pip | Out-Null
     & $VenvPython -m pip install "fastapi>=0.115" "uvicorn[standard]>=0.32" `
                                  "dramatiq[redis,watch]>=1.17" "redis>=5.1"
@@ -278,9 +278,9 @@ Write-Ok "Python deps synced"
 # ----------------------------------------------------------------------------
 $webPackageJson = Join-Path $WebDir "package.json"
 if (-not (Test-Path $WebDir)) {
-    Write-Warn2 "apps/web missing — skipping frontend bootstrap. Run with -Init to scaffold."
+    Write-Warn2 "apps/web missing -- skipping frontend bootstrap. Run with -Init to scaffold."
 } elseif (-not (Test-Path $webPackageJson)) {
-    Write-Warn2 "apps/web exists but has no package.json yet — Sprint-1 WI-0103 not landed. Skipping pnpm install."
+    Write-Warn2 "apps/web exists but has no package.json yet -- Sprint-1 WI-0103 not landed. Skipping pnpm install."
 } else {
     Write-Step "pnpm install (apps/web)"
     Push-Location $WebDir
@@ -324,10 +324,10 @@ if (Test-Port $RedisPort) {
 }
 
 # ----------------------------------------------------------------------------
-# 5b. Mode-dependent storage substrate (Boris D2 §11.1 alignment)
+# 5b. Mode-dependent storage substrate (Boris D2 sec11.1 alignment)
 # ----------------------------------------------------------------------------
 if ($Mode -eq 'm0') {
-    Write-Step "Mode M0 — SQLite + Memurai + local-fs MinIO (no Docker)"
+    Write-Step "Mode M0 -- SQLite + Memurai + local-fs MinIO (no Docker)"
     New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot 'data') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $RepoRoot 'data/minio-fs') | Out-Null
     $env:OSINT_RUN_MODE         = 'm0'
@@ -338,7 +338,7 @@ if ($Mode -eq 'm0') {
     $env:OSINT_MINIO_SECRET_KEY = 'local'
     $env:OSINT_GRAPH_TIER       = 'none'
 } elseif ($Mode -eq 'm1') {
-    Write-Step "Mode M1 — Postgres+AGE + MinIO + Memurai (Docker required)"
+    Write-Step "Mode M1 -- Postgres+AGE + MinIO + Memurai (Docker required)"
     try { & docker info | Out-Null } catch {
         Write-Err "Docker Desktop unreachable. Install Docker Desktop or run -Mode m0."
         exit 8
@@ -350,7 +350,7 @@ if ($Mode -eq 'm0') {
     )
     $missing = $composeFiles | Where-Object { -not (Test-Path (Join-Path $RepoRoot $_)) }
     if ($missing.Count -gt 0) {
-        Write-Err "Missing compose files: $($missing -join ', '). Boris's infra/ not landed yet — fall back to -Mode m0."
+        Write-Err "Missing compose files: $($missing -join ', '). Boris's infra/ not landed yet -- fall back to -Mode m0."
         exit 8
     }
     $composeArgs = @()
@@ -377,12 +377,12 @@ $env:PYTHONDONTWRITEBYTECODE = '1'
 # ----------------------------------------------------------------------------
 # `--reload-dir` is load-bearing on Win11. Without it uvicorn watches CWD,
 # which picks up .dev-logs/, .next/, node_modules/, .venv/, data/ writes and
-# enters an infinite restart loop (Priya §7.1). We hand it BOTH the apps/ and
+# enters an infinite restart loop (Priya sec7.1). We hand it BOTH the apps/ and
 # packages/ directories so edits in either tree fire HMR.
 #
 # Day-1 paranoia: if neither apps/ nor packages/ exists yet (no -Init and no
 # Sprint-1), we degrade to --reload-dir apps with the dirs Init created. We
-# never fall back to bare `--reload` — that's the infinite-restart-loop bomb.
+# never fall back to bare `--reload` -- that's the infinite-restart-loop bomb.
 $reloadDirs = @()
 foreach ($d in @('apps','packages')) {
     $abs = Join-Path $RepoRoot $d
@@ -403,7 +403,7 @@ $apiUp = Test-Port $ApiPort
 $webUp = Test-Port $WebPort
 
 if ($apiUp -and $webUp) {
-    Write-Ok "API and Web already running — nothing to spawn"
+    Write-Ok "API and Web already running -- nothing to spawn"
 } elseif ($wt) {
     Write-Step "Launching dev panes in Windows Terminal"
     $wtArgs = @()
@@ -419,7 +419,7 @@ if ($apiUp -and $webUp) {
     Start-Process -FilePath $wt -ArgumentList ($wtArgs -join " ")
     Write-Ok "Spawned"
 } else {
-    Write-Warn2 "Windows Terminal (wt) not found — falling back to background jobs"
+    Write-Warn2 "Windows Terminal (wt) not found -- falling back to background jobs"
     if (-not $apiUp) { Start-Job -Name osint-api -ScriptBlock { param($c) Invoke-Expression $c } -ArgumentList $cmdApi | Out-Null }
     if (-not $webUp) { Start-Job -Name osint-web -ScriptBlock { param($c) Invoke-Expression $c } -ArgumentList $cmdWeb | Out-Null }
     Start-Job -Name osint-worker -ScriptBlock { param($c) Invoke-Expression $c } -ArgumentList $cmdWorker | Out-Null
@@ -460,4 +460,4 @@ if (-not $apiOk -or ($webPackageExists -and -not $webOk)) {
 
 if (-not $NoBrowser -and $webOk) { Start-Process "http://localhost:$WebPort/" }
 Write-Host ""
-Write-Host "Dev stack ready — close the Windows Terminal panes to stop." -ForegroundColor Green
+Write-Host "Dev stack ready -- close the Windows Terminal panes to stop." -ForegroundColor Green
