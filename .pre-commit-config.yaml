@@ -24,7 +24,9 @@ repos:
         name: Module DAG lint (import-linter, Sora ADR-0022 / Camille phase6)
         # Runs ALONGSIDE module-dag-lint for one sprint to validate parity.
         # Retire the home-grown lint once the two have agreed for a sprint.
-        entry: lint-imports --config .importlinter
+        # Invoked via a Python shim because pre-commit's language: system
+        # subprocess doesn't have the venv Scripts/ dir on PATH.
+        entry: python tools/ci/run_import_linter.py
         language: system
         pass_filenames: false
         types: [python]
