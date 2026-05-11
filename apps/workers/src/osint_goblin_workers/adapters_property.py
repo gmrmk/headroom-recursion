@@ -34,10 +34,12 @@ rather than nuking the whole IP if abused.
 
 from __future__ import annotations
 
+import csv
 import os
 import re
 import socket
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -380,7 +382,202 @@ def _hibp_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# 4. + 5. Stub registrations: TruePeopleSearch, TinEye
+# 4. Inside Airbnb listings CSV (Sprint 3 advance)
+# ---------------------------------------------------------------------------
+# Inside Airbnb publishes city-level Airbnb listing snapshots quarterly at
+# http://insideairbnb.com/get-the-data/. The data is a CSV per city; each
+# row is one Airbnb listing with host_id, host_name, host_listings_count,
+# room_type, neighbourhood, etc. For property-vetting the load-bearing
+# question is "does this host operate one listing or 20?" -- the
+# commercial-operator-vs-genuine-host signal.
+#
+# Design choice: we do NOT download the CSV from inside this adapter.
+# Each city CSV is 5-50 MB; downloading on every adapter call would be
+# wasteful, and the quarterly update cadence means a per-call fetch is
+# also stale relative to actual freshness. Instead the investigator
+# downloads the city CSV once a month into data/inside-airbnb/<city>.csv
+# and the adapter parses it. Cache-management lives one level up.
+
+
+def inside_airbnb_listings(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Search a pre-downloaded Inside Airbnb CSV for matching listings.
+
+    Payload (at least one of host_name / host_id / listing_url required):
+      {"csv_path": "data/inside-airbnb/springfield-il.csv",
+       "host_name": "Alice S",         # optional, partial match
+       "host_id": "12345",             # optional, exact match
+       "listing_url": "https://www.airbnb.com/rooms/...",  # optional
+       "limit": 50}                    # optional cap on matches, default 20
+
+    Emits one `listing-match` event per matching row + one
+    `tool-run-result` summary. The matched rows carry the
+    commercial-operator signal in payload (host_total_listings,
+    room_type, last_review date).
+    """
+    csv_path_str = payload.get("csv_path")
+    if not csv_path_str or not isinstance(csv_path_str, str):
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": "missing 'csv_path' in payload (download city CSV first)",
+                    "suggest": "http://insideairbnb.com/get-the-data/",
+                },
+            }
+        ]
+    csv_path = Path(csv_path_str)
+    if not csv_path.is_file():
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"CSV not found at {csv_path}",
+                    "suggest": "Download from http://insideairbnb.com/get-the-data/",
+                },
+            }
+        ]
+
+    host_name = (payload.get("host_name") or "").strip().lower()
+    host_id = (payload.get("host_id") or "").strip()
+    listing_url = (payload.get("listing_url") or "").strip()
+    limit = int(payload.get("limit", 20))
+
+    # Listing URL -> extract listing id from /rooms/<id> pattern
+    listing_id = ""
+    if listing_url:
+        m = re.search(r"/rooms/(\d+)", listing_url)
+        if m:
+            listing_id = m.group(1)
+
+    if not (host_name or host_id or listing_id):
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": "must provide at least one of host_name, host_id, listing_url",
+                },
+            }
+        ]
+
+    matches: list[dict[str, Any]] = []
+    try:
+        with csv_path.open("r", encoding="utf-8", newline="") as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                # Match logic: any of the three predicates matches.
+                row_host_id = (row.get("host_id") or "").strip()
+                row_host_name = (row.get("host_name") or "").strip().lower()
+                row_listing_id = (row.get("id") or "").strip()
+
+                matched = False
+                if (
+                    host_id
+                    and row_host_id == host_id
+                    or listing_id
+                    and row_listing_id == listing_id
+                    or host_name
+                    and host_name in row_host_name
+                ):
+                    matched = True
+
+                if matched:
+                    matches.append(row)
+                    if len(matches) >= limit:
+                        break
+    except (OSError, UnicodeDecodeError, csv.Error) as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": f"CSV read error: {type(exc).__name__}: {exc}"},
+            }
+        ]
+
+    events: list[dict[str, Any]] = []
+    for row in matches:
+        # Surface the commercial-operator signal explicitly.
+        try:
+            host_total = int(row.get("host_listings_count") or 0)
+        except (TypeError, ValueError):
+            host_total = 0
+        events.append(
+            {
+                "event_type": "listing-match",
+                "payload": {
+                    "listing_id": row.get("id", ""),
+                    "listing_url": row.get("listing_url", "")
+                    or f"https://www.airbnb.com/rooms/{row.get('id', '')}",
+                    "name": row.get("name", ""),
+                    "host_id": row.get("host_id", ""),
+                    "host_name": row.get("host_name", ""),
+                    "host_total_listings": host_total,
+                    "neighbourhood": row.get("neighbourhood", "")
+                    or row.get("neighbourhood_cleansed", ""),
+                    "room_type": row.get("room_type", ""),
+                    "last_review": row.get("last_review", ""),
+                    "commercial_operator": host_total >= 2,
+                },
+            }
+        )
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "csv_path": str(csv_path),
+                "matches": len(matches),
+                "host_name": host_name,
+                "host_id": host_id,
+                "listing_id": listing_id,
+            },
+        }
+    )
+    return events
+
+
+def _inside_airbnb_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Synthetic: one fake match exercising the wire shape + the
+    commercial-operator flag both true and false."""
+    return [
+        {
+            "event_type": "listing-match",
+            "payload": {
+                "listing_id": "12345",
+                "listing_url": "https://www.airbnb.com/rooms/12345",
+                "name": "Cozy synthetic apartment downtown",
+                "host_id": "99999",
+                "host_name": "Synthetic Host",
+                "host_total_listings": 3,
+                "neighbourhood": "Synthetic Heights",
+                "room_type": "Entire home/apt",
+                "last_review": "2025-12-01",
+                "commercial_operator": True,
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "listing-match",
+            "payload": {
+                "listing_id": "67890",
+                "listing_url": "https://www.airbnb.com/rooms/67890",
+                "name": "Synthetic guest room",
+                "host_id": "11111",
+                "host_name": "Single Host",
+                "host_total_listings": 1,
+                "neighbourhood": "Old Town",
+                "room_type": "Private room",
+                "last_review": "2025-08-15",
+                "commercial_operator": False,
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {"matches": 2, "synthetic": True},
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
+# 5. + 6. Stub registrations: TruePeopleSearch, TinEye
 # ---------------------------------------------------------------------------
 # These two require Scrapling (anti-scraping bypass) or signed API
 # access. Per the R-5 honest-scope split, we ship them as registered
@@ -488,6 +685,14 @@ _REGISTRY.register(
     synthetic_mode=_hibp_synthetic,
     in_process=True,
     description="HIBP breaches by domain. R-5 Sprint 2.",
+)
+
+_REGISTRY.register(
+    "inside_airbnb_listings",
+    inside_airbnb_listings,
+    synthetic_mode=_inside_airbnb_synthetic,
+    in_process=True,
+    description="Inside Airbnb city-CSV search (Sprint 3). Commercial-operator fingerprint.",
 )
 
 _REGISTRY.register(

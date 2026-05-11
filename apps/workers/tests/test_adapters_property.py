@@ -20,10 +20,12 @@ from osint_goblin_workers.adapters import get_registry
 from osint_goblin_workers.adapters_property import (
     _email_mx_synthetic,
     _hibp_synthetic,
+    _inside_airbnb_synthetic,
     _nominatim_synthetic,
     _tineye_synthetic,
     _true_people_synthetic,
     email_mx_validate,
+    inside_airbnb_listings,
     nominatim_geocode,
 )
 
@@ -38,6 +40,7 @@ from osint_goblin_workers.adapters_property import (
         "nominatim_geocode",
         "email_mx_validate",
         "hibp_breach_check",
+        "inside_airbnb_listings",
         "true_people_search",
         "tineye_image",
     ],
@@ -162,3 +165,107 @@ def test_nominatim_missing_query_returns_error() -> None:
     events = nominatim_geocode({})
     assert events[0]["event_type"] == "tool-run-error"
     assert "missing" in events[0]["payload"]["reason"]
+
+
+# ---------------------------------------------------------------------------
+# Inside Airbnb CSV adapter (Sprint 3)
+# ---------------------------------------------------------------------------
+
+
+def test_inside_airbnb_synthetic_shape() -> None:
+    events = _inside_airbnb_synthetic({})
+    # Two listing-matches + summary
+    assert len(events) == 3
+    assert events[0]["event_type"] == "listing-match"
+    assert events[1]["event_type"] == "listing-match"
+    assert events[2]["event_type"] == "tool-run-result"
+    # The first is flagged commercial; the second is not -- exercises both flows
+    assert events[0]["payload"]["commercial_operator"] is True
+    assert events[1]["payload"]["commercial_operator"] is False
+
+
+def test_inside_airbnb_missing_csv_path() -> None:
+    events = inside_airbnb_listings({"host_name": "alice"})
+    assert events[0]["event_type"] == "tool-run-error"
+    assert "csv_path" in events[0]["payload"]["reason"]
+
+
+def test_inside_airbnb_csv_not_found(tmp_path) -> None:
+    events = inside_airbnb_listings(
+        {"csv_path": str(tmp_path / "nonexistent.csv"), "host_name": "alice"}
+    )
+    assert events[0]["event_type"] == "tool-run-error"
+    assert "not found" in events[0]["payload"]["reason"]
+
+
+def test_inside_airbnb_missing_predicate(tmp_path) -> None:
+    csv = tmp_path / "city.csv"
+    csv.write_text("id,host_id,host_name\n", encoding="utf-8")
+    events = inside_airbnb_listings({"csv_path": str(csv)})
+    assert events[0]["event_type"] == "tool-run-error"
+    assert "host_name" in events[0]["payload"]["reason"]
+
+
+def test_inside_airbnb_host_name_match(tmp_path) -> None:
+    """Host-name partial match returns the row + correct commercial signal."""
+    csv = tmp_path / "city.csv"
+    csv.write_text(
+        "id,host_id,host_name,host_listings_count,neighbourhood,room_type,last_review,name\n"
+        "100,9,Alice Smith,3,Downtown,Entire home/apt,2025-12-01,Alice place\n"
+        "200,10,Bob Jones,1,Suburb,Private room,2025-08-15,Bob room\n"
+        "300,9,Alice Smith,3,Riverside,Entire home/apt,2025-11-20,Alice loft\n",
+        encoding="utf-8",
+    )
+    events = inside_airbnb_listings({"csv_path": str(csv), "host_name": "alice"})
+    matches = [e for e in events if e["event_type"] == "listing-match"]
+    assert len(matches) == 2
+    for m in matches:
+        assert m["payload"]["host_name"] == "Alice Smith"
+        assert m["payload"]["commercial_operator"] is True
+        assert m["payload"]["host_total_listings"] == 3
+    summary = events[-1]
+    assert summary["event_type"] == "tool-run-result"
+    assert summary["payload"]["matches"] == 2
+
+
+def test_inside_airbnb_host_id_match(tmp_path) -> None:
+    """Exact host_id match takes precedence over name."""
+    csv = tmp_path / "city.csv"
+    csv.write_text(
+        "id,host_id,host_name,host_listings_count\n" "100,42,Alice,1\n" "200,99,Bob,5\n",
+        encoding="utf-8",
+    )
+    events = inside_airbnb_listings({"csv_path": str(csv), "host_id": "99"})
+    matches = [e for e in events if e["event_type"] == "listing-match"]
+    assert len(matches) == 1
+    assert matches[0]["payload"]["host_id"] == "99"
+    assert matches[0]["payload"]["commercial_operator"] is True  # 5 listings
+
+
+def test_inside_airbnb_listing_url_match(tmp_path) -> None:
+    """URL extraction parses /rooms/<id> and matches the listing row."""
+    csv = tmp_path / "city.csv"
+    csv.write_text(
+        "id,host_id,host_name,host_listings_count\n123456,7,Carol,1\n",
+        encoding="utf-8",
+    )
+    events = inside_airbnb_listings(
+        {
+            "csv_path": str(csv),
+            "listing_url": "https://www.airbnb.com/rooms/123456?adults=2",
+        }
+    )
+    matches = [e for e in events if e["event_type"] == "listing-match"]
+    assert len(matches) == 1
+    assert matches[0]["payload"]["listing_id"] == "123456"
+
+
+def test_inside_airbnb_limit_caps_matches(tmp_path) -> None:
+    csv_lines = ["id,host_id,host_name,host_listings_count"]
+    for i in range(50):
+        csv_lines.append(f"{i},99,SameHost,50")
+    csv = tmp_path / "city.csv"
+    csv.write_text("\n".join(csv_lines) + "\n", encoding="utf-8")
+    events = inside_airbnb_listings({"csv_path": str(csv), "host_id": "99", "limit": 10})
+    matches = [e for e in events if e["event_type"] == "listing-match"]
+    assert len(matches) == 10
