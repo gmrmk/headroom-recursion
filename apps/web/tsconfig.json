@@ -19,6 +19,10 @@
     "incremental": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "baseUrl": "src",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "plugins": [
       {
         "name": "next"
