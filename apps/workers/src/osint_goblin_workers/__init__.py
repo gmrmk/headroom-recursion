@@ -5,6 +5,7 @@
 # that dispatches against the new adapter ids resolve.
 from . import (
     adapters_image,  # noqa: F401
+    adapters_phone,  # noqa: F401
     adapters_property,  # noqa: F401
 )
 from .adapters import AdapterEntry, AdapterRegistry

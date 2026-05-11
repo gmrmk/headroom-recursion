@@ -10,6 +10,7 @@ export type AdapterGroup =
   | "workflow"
   | "addrgeo"
   | "email"
+  | "phone"
   | "person"
   | "social"
   | "image"
@@ -27,6 +28,7 @@ export const GROUP_LABELS: Record<AdapterGroup, string> = {
   workflow: "Workflows (ADR-0017 §3)",
   addrgeo: "Address / Geo",
   email: "Email",
+  phone: "Phone",
   person: "Person — name-based",
   social: "Social handle",
   image: "Image",
@@ -37,6 +39,7 @@ export const GROUP_ORDER: ReadonlyArray<AdapterGroup> = [
   "workflow",
   "addrgeo",
   "email",
+  "phone",
   "person",
   "social",
   "image",
@@ -58,6 +61,13 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     label: "W2 — Email Lookup",
     hint: "MX validate → HIBP breaches → email-to-account pivot.",
     examplePayload: '{\n  "email": "alice@example.com"\n}',
+    group: "workflow",
+  },
+  {
+    id: "w3.ph",
+    label: "W3 — Phone Pivot",
+    hint: "Format + carrier + timezone + Google-SERP mention scan.",
+    examplePayload: '{\n  "phone": "+1 217 555 0123",\n  "region": "US"\n}',
     group: "workflow",
   },
   {
@@ -120,6 +130,35 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     hint: "Open street-level imagery. No API key.",
     examplePayload: '{\n  "lat": 39.78,\n  "lon": -89.65,\n  "radius_m": 200\n}',
     group: "addrgeo",
+  },
+  // Phone
+  {
+    id: "phone_format_validate",
+    label: "Phone — format + classify (libphonenumber)",
+    hint: "Parse + valid + region + line type (mobile / VoIP / fixed-line).",
+    examplePayload: '{\n  "phone": "+1 217 555 0123",\n  "region": "US"\n}',
+    group: "phone",
+  },
+  {
+    id: "phone_carrier_lookup",
+    label: "Phone — carrier + geocode",
+    hint: "Carrier name + region geocode from libphonenumber prefix DB.",
+    examplePayload: '{\n  "phone": "+1 217 555 0123",\n  "region": "US"\n}',
+    group: "phone",
+  },
+  {
+    id: "phone_timezone_lookup",
+    label: "Phone — timezone(s)",
+    hint: "Timezone for the number's region. Claim-vs-region check.",
+    examplePayload: '{\n  "phone": "+1 217 555 0123",\n  "region": "US"\n}',
+    group: "phone",
+  },
+  {
+    id: "google_serp_phone",
+    label: "Google SERP — phone mentions",
+    hint: "Search Google for public mentions of the number.",
+    examplePayload: '{\n  "phone": "+1 217 555 0123"\n}',
+    group: "phone",
   },
   // Email
   {

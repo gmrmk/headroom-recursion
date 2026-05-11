@@ -144,11 +144,28 @@ WORKFLOWS: dict[str, Workflow] = {
     "w3.ph": Workflow(
         id="w3.ph",
         name="Phone Pivot",
-        description="Carrier lookup + SMS-account pivot + social handle scan.",
+        description="Format validate + carrier + timezone + Google-SERP mention scan.",
         steps=[
-            # Phone adapters not yet shipped; placeholder for the registry
-            # surface. Adding the phone-vet adapters is itself a Sprint-4
-            # work item.
+            WorkflowStep(
+                "phone_format_validate",
+                {"phone": "{phone}", "region": "{region}"},
+                required_seed_keys=("phone",),
+            ),
+            WorkflowStep(
+                "phone_carrier_lookup",
+                {"phone": "{phone}", "region": "{region}"},
+                required_seed_keys=("phone",),
+            ),
+            WorkflowStep(
+                "phone_timezone_lookup",
+                {"phone": "{phone}", "region": "{region}"},
+                required_seed_keys=("phone",),
+            ),
+            WorkflowStep(
+                "google_serp_phone",
+                {"phone": "{phone}"},
+                required_seed_keys=("phone",),
+            ),
         ],
     ),
     "w4.im": Workflow(

@@ -32,6 +32,7 @@ export function RunToolForm({ investigationId }: RunToolFormProps) {
       workflow: [],
       addrgeo: [],
       email: [],
+      phone: [],
       person: [],
       social: [],
       image: [],

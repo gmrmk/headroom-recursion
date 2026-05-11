@@ -16,6 +16,7 @@ dependencies = [
   "numpy>=2.0",                   # ELA pixel-difference math
   "exifread>=3.0",                # deeper EXIF than Pillow alone (still in-process)
   "imagehash>=4.3",               # pHash dedupe across an investigation (Tomas gap)
+  "phonenumbers>=9.0",            # libphonenumber port for W3.ph (Sprint-4 phone-vet)
 ]
 
 [build-system]
