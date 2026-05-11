@@ -256,8 +256,11 @@ $pyprojectExists = Test-Path (Join-Path $RepoRoot 'pyproject.toml')
 
 $uv = Resolve-Tool "uv"
 if ($uv -and $pyprojectExists) {
-    Write-Step "uv sync"
-    & $uv sync --python $VenvPython
+    Write-Step "uv sync --all-packages"
+    # --all-packages installs every workspace member as editable; bare `uv sync`
+    # only installs the root pyproject's deps and leaves the 9 packages + 2 apps
+    # missing from .venv. Verified bug Phase 6 round 2026-05-11 (Priya P0).
+    & $uv sync --all-packages --python $VenvPython
     if ($LASTEXITCODE -ne 0) { Write-Err "uv sync failed"; exit 4 }
 } elseif ($pyprojectExists) {
     Write-Step "pip install -e .[dev] (uv not found, install via 'pip install uv' for 10x speed)"

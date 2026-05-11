@@ -43,3 +43,25 @@ select = ["E", "F", "I", "B", "UP", "RUF", "SIM"]
 strict = true
 warn_unused_ignores = true
 warn_return_any = true
+
+[tool.pytest.ini_options]
+# Yuki P0 / Phase 6 2026-05-11: importmode=importlib resolves test modules by
+# filesystem path via importlib.util.spec_from_file_location, so duplicate
+# basenames (test_health.py in apps/api/tests AND apps/workers/tests) no
+# longer collide on module name. Required for cross-package `pytest` from
+# workspace root. The existing `tests/__init__.py` markers in forensics +
+# fetcher + tests/agpl_containment are no longer load-bearing and should be
+# dropped in the same change (see follow-up commit).
+minversion = "8"
+# --import-mode=importlib resolves test modules by filesystem path (not module
+# name) so duplicate basenames across packages don't collide. This is the
+# canonical fix for cross-package pytest collection in src-layout monorepos.
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+testpaths = ["packages", "apps", "tests"]
+asyncio_mode = "auto"
+markers = [
+    "slow: long-running tests; excluded from <5min fast loop",
+    "real_network: hits real external endpoints; weekly only",
+    "postgres: requires live Postgres (Docker Compose)",
+    "agpl_subprocess: exercises the AGPL subprocess boundary",
+]
