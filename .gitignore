@@ -26,3 +26,6 @@ Thumbs.db
 # uv/pnpm reproducible state IS tracked
 !uv.lock
 !pnpm-lock.yaml
+
+# Runtime artifacts
+.dev-logs/
