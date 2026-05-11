@@ -2606,6 +2606,93 @@ _REGISTRY.register(
     ),
 )
 
+# user-scanner subprocess wrapper (ship #4 of the free-stack). Runs in
+# the empirical venv where `pip install user-scanner` lives. 95+ service
+# probes; pure-httpx, no Playwright. Fallback to in-process stub when the
+# wrapper or empirical venv aren't present.
+_USER_SCANNER_WRAPPER = _REPO_ROOT_PROP / "adapters" / "user_scanner" / "wrapper.py"
+
+
+def _user_scanner_in_process_stub(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """In-process fallback when the empirical venv or wrapper is absent."""
+    email = payload.get("email", "user@example.com")
+    return [
+        {
+            "event_type": "tool-run-error",
+            "payload": {
+                "reason": (
+                    "user_scanner wrapper or empirical venv not present; "
+                    "live mode unavailable. Install user-scanner via "
+                    "`pip install user-scanner` in the empirical venv."
+                ),
+                "email": email,
+            },
+        }
+    ]
+
+
+def _user_scanner_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """In-process synthetic for unit-test paths that don't fork."""
+    email = payload.get("email", "user@example.com")
+    return [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "user_scanner",
+                "email": email,
+                "platform": "github",
+                "category": "Development",
+                "profile_url": "https://github.com",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "user_scanner",
+                "email": email,
+                "checked": 95,
+                "found": 1,
+                "errored": 0,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+if _USER_SCANNER_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
+    _REGISTRY.register(
+        "user_scanner",
+        make_subprocess_adapter(
+            _USER_SCANNER_WRAPPER,
+            timeout_s=180.0,
+            python_executable=str(_EMPIRICAL_PY),
+        ),
+        synthetic_mode=make_subprocess_adapter(
+            _USER_SCANNER_WRAPPER,
+            timeout_s=15.0,
+            python_executable=str(_EMPIRICAL_PY),
+            extra_env={"OSINT_ADAPTER_MODE": "synthetic"},
+        ),
+        in_process=False,
+        description=(
+            "user-scanner (holehe successor) via subprocess. 95+ services "
+            "probed from a single email. Wrapper in adapters/user_scanner/, "
+            "package in the empirical venv."
+        ),
+    )
+else:
+    _REGISTRY.register(
+        "user_scanner",
+        _user_scanner_in_process_stub,
+        synthetic_mode=_user_scanner_synthetic,
+        in_process=True,
+        description=(
+            "user_scanner -- empirical venv or wrapper missing; in-process stub only. "
+            "Install user-scanner in the empirical venv to unlock live mode."
+        ),
+    )
+
 _REGISTRY.register(
     "github_profile",
     github_profile,

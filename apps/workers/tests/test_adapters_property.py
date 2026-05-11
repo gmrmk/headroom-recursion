@@ -28,6 +28,7 @@ from osint_goblin_workers.adapters_property import (
     _nominatim_synthetic,
     _tineye_synthetic,
     _true_people_synthetic,
+    _user_scanner_synthetic,
     email_mx_validate,
     github_commit_email_search,
     gravatar_profile_lookup,
@@ -52,6 +53,7 @@ from osint_goblin_workers.adapters_property import (
         "gravatar_profile_lookup",
         "github_commit_email_search",
         "hudson_rock_email_check",
+        "user_scanner",
         "inside_airbnb_listings",
         "true_people_search",
         "tineye_image",
@@ -502,6 +504,22 @@ def test_hudson_rock_empty_stealers_returns_summary_only(
     assert all(e["event_type"] != "breach-hit" for e in events)
     assert events[-1]["event_type"] == "tool-run-result"
     assert events[-1]["payload"]["stealer_count"] == 0
+
+
+def test_user_scanner_synthetic_emits_person_match_and_summary() -> None:
+    """user-scanner synthetic locks the subprocess wire shape: one
+    person-match per found platform + tool-run-result summary with
+    checked/found/errored counts."""
+    events = _user_scanner_synthetic({"email": "u@example.com"})
+    types = [e["event_type"] for e in events]
+    assert "person-match" in types
+    assert types[-1] == "tool-run-result"
+    for e in events:
+        assert e["payload"].get("source") == "user_scanner"
+    summary = events[-1]["payload"]
+    assert "checked" in summary
+    assert "found" in summary
+    assert "errored" in summary
 
 
 def test_intelbase_redacts_credential_fields(

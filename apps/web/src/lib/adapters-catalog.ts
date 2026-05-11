@@ -288,6 +288,13 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     examplePayload: '{\n  "email": "user@example.com"\n}',
     group: "email",
   },
+  {
+    id: "user_scanner",
+    label: "user-scanner — 95+ service probe (holehe successor)",
+    hint: "Subprocess; probes 95+ services from one email. Requires `pip install user-scanner` in the empirical venv.",
+    examplePayload: '{\n  "email": "user@example.com"\n}',
+    group: "email",
+  },
   // Person — name-based
   {
     id: "true_people_search",

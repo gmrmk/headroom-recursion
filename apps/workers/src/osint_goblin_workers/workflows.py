@@ -324,6 +324,12 @@ WORKFLOWS: dict[str, Workflow] = {
                 required_seed_keys=("email",),
                 description="Infostealer log lookup (30M+ machines)",
             ),
+            WorkflowStep(
+                "user_scanner",
+                {"email": "{email}"},
+                required_seed_keys=("email",),
+                description="95+ service probe (holehe successor)",
+            ),
         ],
     ),
     "w10.ip": Workflow(
