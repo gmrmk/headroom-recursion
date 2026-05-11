@@ -1,0 +1,47 @@
+; Sora P1 phase6 / ADR-0022: DAG enforcement via import-linter.
+;
+; This config runs ALONGSIDE tools/ci/module_dag_lint.py for one sprint while
+; we validate the two agree. Once the Layered contract proves it covers
+; every check module_dag_lint already enforces (no false-negatives in a
+; full sprint), the home-grown lint can be retired -- but not in this
+; commit, per Kaizen reversibility.
+;
+; Current contracts:
+;   1. Layered  -- L0 -> L1 -> L2 -> L3 -> L4 DAG (mirrors module_dag_lint.py)
+;
+; Deferred contracts (called out by Sora phase6 but not enforceable yet):
+;   - Independence across the 11 AGPL adapter wrappers: deferred because the
+;     wrappers at adapters/<id>/wrapper.py are NOT imported as Python modules,
+;     they are invoked as standalone subprocess scripts. import-linter cannot
+;     enforce a contract on scripts that don't appear in the import graph.
+;     The AGPL containment lint at tools/ci/agpl_import_lint.py covers this
+;     surface directly via path-exempt AST inspection.
+;   - Forbidden db.evidence <-> db.sock (Camille phase6): db.sock and
+;     db.evidence are not yet split into separate submodules; add when the
+;     split lands (M1).
+
+[importlinter]
+root_packages =
+    osint_goblin_schemas
+    osint_goblin_forensics
+    osint_goblin_db
+    osint_goblin_ftm
+    osint_goblin_opsec
+    osint_goblin_fetcher
+    osint_goblin_adapters
+    osint_goblin_attestation
+    osint_goblin_evidence_pipeline
+    osint_goblin_api
+    osint_goblin_workers
+
+[importlinter:contract:layered]
+name = OSINT GOBLIN layered architecture (L0 -> L1 -> L2 -> L3 -> L4)
+type = layers
+layers =
+    osint_goblin_api | osint_goblin_workers
+    osint_goblin_evidence_pipeline
+    osint_goblin_adapters | osint_goblin_attestation
+    osint_goblin_db | osint_goblin_ftm | osint_goblin_opsec | osint_goblin_fetcher
+    osint_goblin_schemas | osint_goblin_forensics
+; Pipe-separated packages on a single layer are siblings -- no peer imports.
+; Layers are top -> bottom (top imports bottom, never the reverse).

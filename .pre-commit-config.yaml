@@ -15,8 +15,16 @@ repos:
         pass_filenames: false
         types: [python]
       - id: module-dag-lint
-        name: Module DAG lint
+        name: Module DAG lint (home-grown, Sora ADR-0002)
         entry: python tools/ci/module_dag_lint.py packages
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: import-linter-layered
+        name: Module DAG lint (import-linter, Sora ADR-0022 / Camille phase6)
+        # Runs ALONGSIDE module-dag-lint for one sprint to validate parity.
+        # Retire the home-grown lint once the two have agreed for a sprint.
+        entry: lint-imports --config .importlinter
         language: system
         pass_filenames: false
         types: [python]
