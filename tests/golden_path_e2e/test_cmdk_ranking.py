@@ -70,23 +70,14 @@ def test_expected_tops_reference_real_candidates() -> None:
             assert top in candidate_ids, f"case {case['id']}: expected_top '{top}' not a candidate"
 
 
-# --- Ranker contract (xfail until WI-0606 lands the real one) ---
+# --- Ranker contract (WI-0606 ADR-0017 §4) ---
+
+from osint_goblin_schemas.cmdk_rank import rank  # noqa: E402
 
 
-def rank_placeholder(query: str, candidates: list[dict], context: dict | None) -> list[dict]:
-    """Placeholder ranker. Real impl lands in WI-0606.
-
-    Even the placeholder enforces the ADR-0017 contract shape (returns a list
-    sorted by descending score) — so the test harness can validate ordering
-    once the real impl arrives without redesigning fixture or test.
-    """
-    raise NotImplementedError("ADR-0017 ranker lands in WI-0606")
-
-
-@pytest.mark.xfail(reason="ADR-0017 ranker not implemented yet; lands in WI-0606")
 @pytest.mark.parametrize("case_index", range(35))
 def test_each_case_ranks_expected_top(case_index: int) -> None:
-    """One parametrized assertion per case. xfail-marked until WI-0606."""
+    """One parametrized assertion per fixture case."""
     f = load_fixture()
     cases = f["cases"]
     if case_index >= len(cases):
@@ -99,25 +90,33 @@ def test_each_case_ranks_expected_top(case_index: int) -> None:
         "opsec_state": case.get("opsec_state", "green"),
     }
 
-    ranked = rank_placeholder(case["query"], candidates, context)
+    ranked = rank(case["query"], candidates, context)
 
     # Expected forms:
-    #  - expected_top: "id"       — single deterministic winner
-    #  - expected_top_in: [...]   — any of these wins (ambiguity acceptable)
-    #  - expected_top_after: "id" — winner after applying opsec_penalty sorting
-    #  - expected_top: null       — no result / palette shows empty
+    #  - expected_top: "id"       -- single deterministic winner
+    #  - expected_top_in: [...]   -- any of these wins (ambiguity acceptable)
+    #  - expected_top_after: "id" -- winner after applying opsec_penalty sorting
+    #  - expected_top: null       -- no result / palette shows empty
     if "expected_top_in" in case:
-        assert ranked[0]["id"] in case["expected_top_in"]
+        assert ranked and ranked[0]["id"] in case["expected_top_in"], (
+            f"case {case['id']}: top={ranked[0] if ranked else None} "
+            f"not in {case['expected_top_in']}"
+        )
     elif "expected_top_after" in case:
         # When opsec red, item ranks last but is still in the list
         assert case["expected_top_after"] in {c["id"] for c in ranked}
     elif case.get("expected_top") is None:
-        assert ranked == [] or all(r["score"] < 0.1 for r in ranked)
+        assert ranked == [] or all(
+            r["score"] < 0.1 for r in ranked
+        ), f"case {case['id']}: expected empty/low-score; got {ranked[:3]}"
     else:
-        assert ranked[0]["id"] == case["expected_top"]
+        assert ranked, f"case {case['id']}: empty result; expected {case['expected_top']}"
+        assert ranked[0]["id"] == case["expected_top"], (
+            f"case {case['id']}: top={ranked[0]['id']} score={ranked[0]['score']:.2f}; "
+            f"expected {case['expected_top']}"
+        )
 
 
-@pytest.mark.xfail(reason="ADR-0017 negative-case rejection lands in WI-0606")
 @pytest.mark.parametrize("neg_index", range(3))
 def test_negative_cases_return_empty(neg_index: int) -> None:
     """Lucene-style operators (type:, tier:, from:) must NOT match."""
@@ -125,5 +124,5 @@ def test_negative_cases_return_empty(neg_index: int) -> None:
     if neg_index >= len(f["negative_cases"]):
         pytest.skip("neg_case out of range")
     case = f["negative_cases"][neg_index]
-    ranked = rank_placeholder(case["query"], f["candidates"], context=None)
+    ranked = rank(case["query"], f["candidates"], context=None)
     assert ranked == [], f"Negative case {case['id']} returned matches: {ranked}"
