@@ -399,7 +399,14 @@ if ($reloadDirs.Count -eq 0) {
 $wt = Resolve-Tool "wt"
 $reloadDirsStr = ($reloadDirs -join ' ')
 $cmdApi    = "`"$VenvPython`" -m uvicorn osint_goblin_api.main:app --reload $reloadDirsStr --port $ApiPort --app-dir apps/api"
-$cmdWorker = "`"$VenvPython`" -m dramatiq osint_goblin_workers --watch apps --processes 1 --threads 4"
+# Dramatiq Win11 startup flags:
+#   --processes 1 --threads 4   Priya's locked decision; minimizes Win11 process-creation overhead
+#                                + dodges the `_winapi.CreateProcess` thread-safety bug (Boris Q3, phase6).
+#   --use-spawn                  Defensive against Python 3.14's forkserver default migration.
+#                                Win11 has no fork(), so spawn is already required; making it explicit
+#                                ensures no silent breakage if the worker is ever invoked under a
+#                                Python where the default flips. Boris P0 phase6.
+$cmdWorker = "`"$VenvPython`" -m dramatiq osint_goblin_workers --watch apps --processes 1 --threads 4 --use-spawn"
 $cmdWeb    = "pnpm --dir `"$WebDir`" dev --port $WebPort"
 
 $apiUp = Test-Port $ApiPort
