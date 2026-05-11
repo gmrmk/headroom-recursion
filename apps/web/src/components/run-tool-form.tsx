@@ -78,6 +78,24 @@ const ADAPTERS: ReadonlyArray<{
     examplePayload: '{\n  "name": "Alice Smith",\n  "company": "Acme Corp"\n}',
   },
   {
+    id: "twitter_public",
+    label: "Twitter/X — public profile",
+    hint: "Bio + counts + joined date via nitter mirror or x.com fallback.",
+    examplePayload: '{\n  "handle": "username"\n}',
+  },
+  {
+    id: "instagram_public",
+    label: "Instagram — public profile",
+    hint: "Bio + counts + is_private flag. No login, no follower list.",
+    examplePayload: '{\n  "handle": "username"\n}',
+  },
+  {
+    id: "tiktok_public",
+    label: "TikTok — public profile",
+    hint: "Bio + follower/like/video counts. Public-view only.",
+    examplePayload: '{\n  "handle": "username"\n}',
+  },
+  {
     id: "tineye_image",
     label: "TinEye — reverse image",
     hint: "URL-based reverse-image search via Scrapling.",

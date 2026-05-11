@@ -999,6 +999,38 @@ if _LINKEDIN_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
         description="LinkedIn public-profile fetch via Scrapling (no login).",
     )
 
+# Public-profile social adapters (Twitter/X, Instagram, TikTok).
+# Public-bio + count surfaces only -- no follower-list extraction, no
+# private-account access, no login. Each wrapper falls back to a nitter
+# mirror (Twitter) or fails honestly (Instagram, TikTok) if the primary
+# host blocks the stealth fetcher.
+for _social_id, _social_dir in (
+    ("twitter_public", "twitter_public"),
+    ("instagram_public", "instagram_public"),
+    ("tiktok_public", "tiktok_public"),
+):
+    _wrapper_path = _REPO_ROOT_PROP / "adapters" / _social_dir / "wrapper.py"
+    if _wrapper_path.is_file() and _EMPIRICAL_PY.is_file():
+        _REGISTRY.register(
+            _social_id,
+            make_subprocess_adapter(
+                _wrapper_path,
+                timeout_s=60.0,
+                python_executable=str(_EMPIRICAL_PY),
+            ),
+            synthetic_mode=make_subprocess_adapter(
+                _wrapper_path,
+                timeout_s=30.0,
+                python_executable=str(_EMPIRICAL_PY),
+                extra_env={"OSINT_ADAPTER_MODE": "synthetic"},
+            ),
+            in_process=False,
+            description=(
+                f"{_social_id} -- public bio + counts via Scrapling "
+                "(no login, no follower-list)."
+            ),
+        )
+
 # Google SERP for LinkedIn profile URLs: name-based search shim that
 # closes the gap linkedin_profile (URL-only) leaves open. Pinned to the
 # empirical venv via Scrapling.
