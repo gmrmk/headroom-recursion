@@ -1,10 +1,79 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 interface RunToolFormProps {
   investigationId: string;
 }
+
+// Iris-IA accept (2026-05-11 wave-3): partition adapters by the
+// six-primitive scope anchor she locked in her persona §104-122 so
+// dropdown grouping mirrors the dossier's entity-model taxonomy.
+// Half-life test: an adapter's primitive doesn't change over time; its
+// reliability tier and domain might. Re-open trigger (Iris): adapter
+// count >50 OR any single primitive >12. Image is already at 11.
+type AdapterGroup = "addrgeo" | "email" | "person" | "social" | "image" | "smoke";
+
+const GROUP_LABELS: Record<AdapterGroup, string> = {
+  addrgeo: "Address / Geo",
+  email: "Email",
+  person: "Person — name-based",
+  social: "Social handle",
+  image: "Image",
+  smoke: "Smoke / test",
+};
+
+// Order in which optgroups render -- mirrors the dossier event facet
+// ordering (Triage/Disprove first, image+smoke last).
+const GROUP_ORDER: ReadonlyArray<AdapterGroup> = [
+  "addrgeo",
+  "email",
+  "person",
+  "social",
+  "image",
+  "smoke",
+];
+
+const GROUP_FOR: Record<string, AdapterGroup> = {
+  nominatim_geocode: "addrgeo",
+  inside_airbnb_listings: "addrgeo",
+  kartaview_nearby: "addrgeo",
+  email_mx_validate: "email",
+  hibp_breach_check: "email",
+  true_people_search: "person",
+  rocketreach_search: "person",
+  google_serp_linkedin: "person",
+  wayback_linkedin: "person",
+  linkedin_profile: "social",
+  github_profile: "social",
+  twitter_public: "social",
+  twitter_followers: "social",
+  instagram_public: "social",
+  instagram_followers: "social",
+  tiktok_public: "social",
+  tiktok_followers: "social",
+  github_followers: "social",
+  bluesky_followers: "social",
+  mastodon_followers: "social",
+  twstalker: "social",
+  bluesky_post_likes: "social",
+  mastodon_post_likes: "social",
+  tineye_image: "image",
+  yandex_image_reverse: "image",
+  bing_visual_reverse: "image",
+  reverse_image_aggregator: "image",
+  image_flip_check: "image",
+  exiftool_full: "image",
+  image_ela_check: "image",
+  image_provenance_check: "image",
+  ai_image_detection: "image",
+  c2pa_verify: "image",
+  phash_dedupe: "image",
+  seasonal_metadata_check: "image",
+  wayback_snapshot: "image",
+  echo: "smoke",
+  m0_gate_stress: "smoke",
+};
 
 // The eight property-vetting + smoke adapters wired in apps/workers.
 // Names mirror osint_goblin_workers.adapters + adapters_property.
@@ -269,6 +338,26 @@ export function RunToolForm({ investigationId }: RunToolFormProps) {
 
   const selectedAdapter = ADAPTERS.find((a) => a.id === adapterId) ?? ADAPTERS[0]!;
 
+  // Partition once per render-pass; preserves Iris-IA's optgroup order
+  // and keeps adapters with no explicit GROUP_FOR mapping in a fallback
+  // bucket (visible as "Other" rather than silently dropping them).
+  const grouped = useMemo(() => {
+    type Bucket = Array<(typeof ADAPTERS)[number]>;
+    const buckets: Record<AdapterGroup, Bucket> = {
+      addrgeo: [],
+      email: [],
+      person: [],
+      social: [],
+      image: [],
+      smoke: [],
+    };
+    for (const a of ADAPTERS) {
+      const g = GROUP_FOR[a.id] ?? "smoke";
+      buckets[g].push(a);
+    }
+    return buckets;
+  }, []);
+
   function selectAdapter(next: string) {
     setAdapterId(next);
     const adapter = ADAPTERS.find((a) => a.id === next);
@@ -347,11 +436,17 @@ export function RunToolForm({ investigationId }: RunToolFormProps) {
             fontSize: 12,
           }}
         >
-          {ADAPTERS.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.label}
-            </option>
-          ))}
+          {GROUP_ORDER.map((g) =>
+            grouped[g].length === 0 ? null : (
+              <optgroup key={g} label={GROUP_LABELS[g]}>
+                {grouped[g].map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}
+                  </option>
+                ))}
+              </optgroup>
+            ),
+          )}
         </select>
       </div>
       <p style={{ color: "#525252", fontSize: 11, margin: 0 }}>{selectedAdapter.hint}</p>

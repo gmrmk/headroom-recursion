@@ -634,11 +634,25 @@ def _exiftool_full_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def ai_image_detection(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Submit an image URL to Sightengine's `genai` model.
+    """⚠ THIRD-PARTY UPLOAD: forwards image_url to sightengine.com (US-hosted
+    SaaS, Sightengine SAS). The URL string is transmitted; Sightengine
+    fetches and analyzes the image server-side. Not for private/auth'd
+    URLs (presigned S3, Discord CDN, internal corp domains LEAK the
+    bucket on transmission).
+
+    Submit an image URL to Sightengine's `genai` model.
 
     Requires OSINT_SIGHTENGINE_API_USER + OSINT_SIGHTENGINE_API_SECRET env
     vars. Free tier is 500 requests/day. Without keys, returns honest
-    tool-run-error.
+    tool-run-error (no upload happens).
+
+    Consent contract (Camille security review 2026-05-11):
+      - Setting the env keys IS consent to use the service at the
+        operator-account level.
+      - This adapter does NOT add per-call consent prompts at the current
+        single-investigator personal-use scope; the warning above is the
+        contract. See Camille's re-open gates in commit message for the
+        scope-change triggers that would require a per-call modal.
 
     Payload:
       {"image_url": "https://example.com/photo.jpg"}
@@ -1687,7 +1701,10 @@ _REGISTRY.register(
     ai_image_detection,
     synthetic_mode=_ai_image_detection_synthetic,
     in_process=True,
-    description="Sightengine GenAI-detection free tier. Requires API keys env.",
+    description=(
+        "AI-image detection (uploads URL to sightengine.com -- US SaaS). "
+        "Sightengine GenAI free tier; requires API keys env."
+    ),
 )
 _REGISTRY.register(
     "c2pa_verify",

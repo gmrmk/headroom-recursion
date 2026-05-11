@@ -90,9 +90,74 @@ function matchesFacet(event: InvestigationEvent, facet: Facet): boolean {
   return typeof p === "object" && p !== null && ("contradicts" in p || "mismatch" in p);
 }
 
+// Hideo-IxD accept (2026-05-11 wave-3): collapse image-match events that
+// share the same payload.image_url so a single "scan this photo" action
+// renders as one accordion row instead of 5-20 stream lines. Threshold
+// (>=2 events sharing image_url) is a candidate pending the 50-event
+// empirical trace per Hideo's measurement-before-commitment principle.
+const COLLAPSE_THRESHOLD = 2;
+
+type RenderItem =
+  | { kind: "event"; event: InvestigationEvent }
+  | { kind: "group"; imageUrl: string; events: ReadonlyArray<InvestigationEvent> };
+
+function buildRenderItems(ordered: ReadonlyArray<InvestigationEvent>): ReadonlyArray<RenderItem> {
+  // Pass 1: bucket image-match events by payload.image_url.
+  const groups = new Map<string, InvestigationEvent[]>();
+  for (const e of ordered) {
+    if (e.event_type !== "image-match") {
+      continue;
+    }
+    const url = typeof e.payload?.image_url === "string" ? e.payload.image_url : "";
+    if (!url) {
+      continue;
+    }
+    const arr = groups.get(url) ?? [];
+    arr.push(e);
+    groups.set(url, arr);
+  }
+  // URLs that meet the collapse threshold.
+  const collapsed = new Set<string>();
+  for (const [url, evs] of groups.entries()) {
+    if (evs.length >= COLLAPSE_THRESHOLD) {
+      collapsed.add(url);
+    }
+  }
+  // Pass 2: walk ordered, emit groups in first-event position.
+  const out: RenderItem[] = [];
+  const emitted = new Set<string>();
+  for (const e of ordered) {
+    if (e.event_type === "image-match") {
+      const url = typeof e.payload?.image_url === "string" ? e.payload.image_url : "";
+      if (url && collapsed.has(url)) {
+        if (!emitted.has(url)) {
+          out.push({ kind: "group", imageUrl: url, events: groups.get(url)! });
+          emitted.add(url);
+        }
+        continue;
+      }
+    }
+    out.push({ kind: "event", event: e });
+  }
+  return out;
+}
+
 export function EventStream({ investigationId }: EventStreamProps) {
   const { events, status } = useInvestigationStream(investigationId);
   const [facet, setFacet] = useState<Facet>("all");
+  const [expandedUrls, setExpandedUrls] = useState<ReadonlySet<string>>(new Set());
+
+  function toggleExpanded(url: string) {
+    setExpandedUrls((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) {
+        next.delete(url);
+      } else {
+        next.add(url);
+      }
+      return next;
+    });
+  }
 
   // Filter then reverse: facet is the user-selected slice, then newest-first
   // for the rendered list. The API guarantees monotonic sequence so
@@ -101,6 +166,8 @@ export function EventStream({ investigationId }: EventStreamProps) {
     const filtered = events.filter((e) => matchesFacet(e, facet));
     return [...filtered].reverse();
   }, [events, facet]);
+
+  const renderItems = useMemo(() => buildRenderItems(ordered), [ordered]);
 
   return (
     <div>
@@ -149,7 +216,7 @@ export function EventStream({ investigationId }: EventStreamProps) {
         />
       </div>
 
-      {ordered.length === 0 ? (
+      {renderItems.length === 0 ? (
         <p style={{ color: "#525252", fontSize: 12 }}>
           {events.length === 0
             ? "No events yet. Trigger a tool run from the Tools tab to see live attestation events."
@@ -166,33 +233,19 @@ export function EventStream({ investigationId }: EventStreamProps) {
             gap: 6,
           }}
         >
-          {ordered.map((evt) => (
-            <li
-              key={evt.sequence}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "44px 1fr auto",
-                gap: 12,
-                padding: "8px 12px",
-                background: "#0f0f0f",
-                border: "1px solid #1f1f1f",
-                borderRadius: 4,
-                fontSize: 12,
-                fontFamily: "ui-monospace, SFMono-Regular, monospace",
-              }}
-            >
-              <span style={{ color: "#525252" }}>#{evt.sequence}</span>
-              <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ color: EVENT_COLORS[evt.event_type], fontWeight: 600 }}>
-                  {evt.event_type}
-                </span>
-                {Object.keys(evt.payload).length > 0 ? (
-                  <span style={{ color: "#737373" }}>{summarizePayload(evt.payload)}</span>
-                ) : null}
-              </span>
-              <span style={{ color: "#525252", whiteSpace: "nowrap" }}>{formatTs(evt.ts)}</span>
-            </li>
-          ))}
+          {renderItems.map((item) =>
+            item.kind === "event" ? (
+              <EventRow key={item.event.sequence} event={item.event} />
+            ) : (
+              <ImageMatchGroup
+                key={`group:${item.imageUrl}`}
+                imageUrl={item.imageUrl}
+                events={item.events}
+                expanded={expandedUrls.has(item.imageUrl)}
+                onToggle={() => toggleExpanded(item.imageUrl)}
+              />
+            ),
+          )}
         </ul>
       )}
     </div>
@@ -242,3 +295,145 @@ function formatTs(iso: string): string {
   }
   return d.toLocaleTimeString("en-US", { hour12: false });
 }
+
+const ROW_STYLE: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "44px 1fr auto",
+  gap: 12,
+  padding: "8px 12px",
+  background: "#0f0f0f",
+  border: "1px solid #1f1f1f",
+  borderRadius: 4,
+  fontSize: 12,
+  fontFamily: "ui-monospace, SFMono-Regular, monospace",
+};
+
+function EventRow({ event }: { event: InvestigationEvent }) {
+  // Mei-Lan-frontend accept (2026-05-11 wave-3): if the event carries a
+  // local flipped_path, render a clickable file:// link next to the
+  // payload summary. M0 surface only; M1 will swap for an inline
+  // thumbnail when the data/ static-serve path lands + Camille signs
+  // off on path-traversal containment.
+  const flippedPath =
+    typeof event.payload?.flipped_path === "string" ? event.payload.flipped_path : "";
+  return (
+    <li style={ROW_STYLE}>
+      <span style={{ color: "#525252" }}>#{event.sequence}</span>
+      <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ color: EVENT_COLORS[event.event_type], fontWeight: 600 }}>
+          {event.event_type}
+        </span>
+        {Object.keys(event.payload).length > 0 ? (
+          <span style={{ color: "#737373" }}>{summarizePayload(event.payload)}</span>
+        ) : null}
+        {flippedPath ? (
+          <a
+            href={`file:///${flippedPath.replace(/\\/g, "/")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#60a5fa", fontSize: 11 }}
+          >
+            open flipped variant
+          </a>
+        ) : null}
+      </span>
+      <span style={{ color: "#525252", whiteSpace: "nowrap" }}>{formatTs(event.ts)}</span>
+    </li>
+  );
+}
+
+interface ImageMatchGroupProps {
+  imageUrl: string;
+  events: ReadonlyArray<InvestigationEvent>;
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+function ImageMatchGroup({ imageUrl, events, expanded, onToggle }: ImageMatchGroupProps) {
+  // Engine count = distinct payload.source values.
+  const sources = new Set<string>();
+  for (const e of events) {
+    if (typeof e.payload?.source === "string") {
+      sources.add(e.payload.source);
+    }
+  }
+  const ts = events[0]?.ts ?? "";
+  const sourceList = Array.from(sources).join(", ") || "—";
+  return (
+    <li
+      style={{
+        background: "#0f0f0f",
+        border: "1px solid #1f1f1f",
+        borderRadius: 4,
+        overflow: "hidden",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "44px 1fr auto",
+          gap: 12,
+          width: "100%",
+          padding: "8px 12px",
+          background: "transparent",
+          border: "none",
+          color: "inherit",
+          fontSize: 12,
+          fontFamily: "ui-monospace, SFMono-Regular, monospace",
+          textAlign: "left",
+          cursor: "pointer",
+        }}
+      >
+        <span style={{ color: "#525252" }}>{expanded ? "▾" : "▸"}</span>
+        <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ color: "#fbbf24", fontWeight: 600 }}>
+            image-match × {events.length} ({sources.size}{" "}
+            {sources.size === 1 ? "engine" : "engines"}: {sourceList})
+          </span>
+          <span style={{ color: "#737373", wordBreak: "break-all" }}>{imageUrl}</span>
+        </span>
+        <span style={{ color: "#525252", whiteSpace: "nowrap" }}>{formatTs(ts)}</span>
+      </button>
+      {expanded ? (
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: "0 0 6px 0",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            borderTop: "1px solid #1f1f1f",
+            background: "#0a0a0a",
+          }}
+        >
+          {events.map((e) => (
+            <li
+              key={e.sequence}
+              style={{
+                ...ROW_STYLE,
+                background: "transparent",
+                border: "none",
+                marginLeft: 24,
+                padding: "6px 12px",
+              }}
+            >
+              <span style={{ color: "#525252" }}>#{e.sequence}</span>
+              <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ color: "#737373", fontSize: 11 }}>
+                  source: {String(e.payload?.source ?? "?")}
+                </span>
+                <span style={{ color: "#a3a3a3" }}>{summarizePayload(e.payload)}</span>
+              </span>
+              <span style={{ color: "#525252", whiteSpace: "nowrap" }}>{formatTs(e.ts)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
+
