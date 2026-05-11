@@ -1,4 +1,5 @@
 import { EventStream } from "@/components/event-stream";
+import { RunToolForm } from "@/components/run-tool-form";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -15,6 +16,7 @@ export default async function DossierPage({ params }: PageProps) {
         </p>
       </header>
 
+      <RunToolForm investigationId={id} />
       <EventStream investigationId={id} />
     </section>
   );
