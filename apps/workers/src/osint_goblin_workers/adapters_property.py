@@ -616,6 +616,835 @@ def _wayback_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# 3d. Public follower-list adapters (articulating-link investigation)
+# ---------------------------------------------------------------------------
+# These adapters list a public account's followers so the investigator can
+# scan for known names (e.g. the property's legal owner per public records).
+# Strict scope: PUBLIC accounts only. Private profile -> tool-run-error,
+# never bypass. The walled platforms (Twitter/Instagram/TikTok) live in
+# adapters/<id>/wrapper.py with Scrapling; the cooperative ones here use
+# plain httpx.
+
+
+def github_followers(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """List a GitHub user's public followers via REST v3.
+
+    Payload:
+      {"username": "octocat"}  # one of these is required
+      {"profile_url": "https://github.com/octocat"}
+      {"limit": 100}           # optional, cap (default 100; max 300)
+
+    Emits one `person-match` per follower + a summary. GitHub follower
+    lists are public by API design (no login flow); rate-limited at
+    60 req/hour unauth.
+    """
+    username = (payload.get("username") or "").strip()
+    profile_url = (payload.get("profile_url") or "").strip()
+    if not username and profile_url:
+        m = re.search(r"github\.com/([A-Za-z0-9\-]+)/?$", profile_url)
+        if m:
+            username = m.group(1)
+    if not username:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'username' or 'profile_url'"},
+            }
+        ]
+    limit = min(int(payload.get("limit", 100)), 300)
+    per_page = 100
+
+    followers: list[dict[str, Any]] = []
+    try:
+        with _client(timeout_s=10.0) as c:
+            page_num = 1
+            while len(followers) < limit:
+                r = c.get(
+                    f"https://api.github.com/users/{username}/followers",
+                    params={"per_page": per_page, "page": page_num},
+                )
+                if r.status_code == 404:
+                    return [
+                        {
+                            "event_type": "tool-run-result",
+                            "payload": {"username": username, "followers": 0},
+                        }
+                    ]
+                if r.status_code != 200:
+                    return [
+                        {
+                            "event_type": "tool-run-error",
+                            "payload": {
+                                "reason": f"github HTTP {r.status_code}",
+                                "username": username,
+                            },
+                        }
+                    ]
+                batch = r.json()
+                if not isinstance(batch, list) or not batch:
+                    break
+                followers.extend(batch)
+                if len(batch) < per_page:
+                    break
+                page_num += 1
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"github {type(exc).__name__}: {exc}",
+                    "username": username,
+                },
+            }
+        ]
+
+    followers = followers[:limit]
+    events: list[dict[str, Any]] = []
+    for f in followers:
+        if not isinstance(f, dict):
+            continue
+        events.append(
+            {
+                "event_type": "person-match",
+                "payload": {
+                    "source": "github-follower",
+                    "of_user": username,
+                    "follower_login": f.get("login", ""),
+                    "follower_url": f.get("html_url") or f"https://github.com/{f.get('login', '')}",
+                    "photo_url": f.get("avatar_url", ""),
+                },
+            }
+        )
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"username": username, "followers": len(events) - 0},
+        }
+    )
+    return events
+
+
+def _github_followers_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    username = payload.get("username") or "octocat-synthetic"
+    fixtures = [
+        ("alice-synthetic", "Alice Synthetic"),
+        ("bob-synthetic", "Bob Synthetic"),
+        ("carol-synthetic", "Carol Synthetic"),
+    ]
+    events = [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "github-follower",
+                "of_user": username,
+                "follower_login": login,
+                "follower_url": f"https://github.com/{login}",
+                "photo_url": f"https://avatars.githubusercontent.com/{login}.jpg",
+                "synthetic": True,
+            },
+        }
+        for login, _ in fixtures
+    ]
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"username": username, "followers": len(fixtures), "synthetic": True},
+        }
+    )
+    return events
+
+
+def bluesky_followers(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """List a Bluesky handle's followers via the public AT Protocol API.
+
+    Payload:
+      {"handle": "alice.bsky.social"}  # bare or with @ prefix; one required
+      {"profile_url": "https://bsky.app/profile/alice.bsky.social"}
+      {"limit": 100}                   # default 100, max 300
+
+    Public API at public.api.bsky.app -- no auth required for public reads.
+    """
+    handle = (payload.get("handle") or "").strip().lstrip("@")
+    if not handle:
+        url = (payload.get("profile_url") or "").strip()
+        m = re.search(r"bsky\.app/profile/([A-Za-z0-9.\-_]+)", url)
+        if m:
+            handle = m.group(1)
+    if not handle:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'handle' or 'profile_url'"},
+            }
+        ]
+    limit = min(int(payload.get("limit", 100)), 300)
+    page_size = 100
+
+    followers: list[dict[str, Any]] = []
+    cursor: str | None = None
+    try:
+        with _client(timeout_s=10.0) as c:
+            while len(followers) < limit:
+                params: dict[str, str] = {"actor": handle, "limit": str(page_size)}
+                if cursor:
+                    params["cursor"] = cursor
+                r = c.get(
+                    "https://public.api.bsky.app/xrpc/app.bsky.graph.getFollowers",
+                    params=params,
+                )
+                if r.status_code != 200:
+                    return [
+                        {
+                            "event_type": "tool-run-error",
+                            "payload": {
+                                "reason": f"bluesky HTTP {r.status_code}",
+                                "handle": handle,
+                            },
+                        }
+                    ]
+                data = r.json() or {}
+                batch = data.get("followers") or []
+                if not batch:
+                    break
+                followers.extend(batch)
+                cursor = data.get("cursor")
+                if not cursor or len(batch) < page_size:
+                    break
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"bluesky {type(exc).__name__}: {exc}",
+                    "handle": handle,
+                },
+            }
+        ]
+
+    followers = followers[:limit]
+    events: list[dict[str, Any]] = []
+    for f in followers:
+        if not isinstance(f, dict):
+            continue
+        f_handle = f.get("handle", "")
+        events.append(
+            {
+                "event_type": "person-match",
+                "payload": {
+                    "source": "bluesky-follower",
+                    "of_handle": handle,
+                    "follower_handle": f_handle,
+                    "follower_did": f.get("did", ""),
+                    "display_name": f.get("displayName", ""),
+                    "follower_url": f"https://bsky.app/profile/{f_handle}" if f_handle else "",
+                    "photo_url": f.get("avatar", ""),
+                },
+            }
+        )
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"handle": handle, "followers": len(events) - 0},
+        }
+    )
+    return events
+
+
+def _bluesky_followers_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    handle = payload.get("handle") or "alice.bsky.social"
+    fixtures = [
+        ("bob.bsky.social", "Bob Synthetic"),
+        ("carol.bsky.social", "Carol Synthetic"),
+    ]
+    events = [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "bluesky-follower",
+                "of_handle": handle,
+                "follower_handle": fh,
+                "follower_did": f"did:plc:synthetic-{i}",
+                "display_name": name,
+                "follower_url": f"https://bsky.app/profile/{fh}",
+                "synthetic": True,
+            },
+        }
+        for i, (fh, name) in enumerate(fixtures)
+    ]
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"handle": handle, "followers": len(fixtures), "synthetic": True},
+        }
+    )
+    return events
+
+
+def mastodon_followers(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """List a Mastodon account's followers via the public REST API.
+
+    Payload (one of):
+      {"acct": "alice@mastodon.social"}        # webfinger-style handle
+      {"profile_url": "https://mastodon.social/@alice"}
+      {"limit": 80}                            # default 80, max 240
+
+    Mastodon's `/api/v1/accounts/<id>/followers` is public on most
+    instances; the wrapper does the account-id lookup first.
+    """
+    acct = (payload.get("acct") or "").strip().lstrip("@")
+    profile_url = (payload.get("profile_url") or "").strip()
+    instance = ""
+    handle = ""
+    if acct and "@" in acct:
+        handle, instance = acct.split("@", 1)
+    elif profile_url:
+        m = re.match(r"https?://([^/]+)/@([A-Za-z0-9_]+)/?", profile_url)
+        if m:
+            instance = m.group(1)
+            handle = m.group(2)
+            acct = f"{handle}@{instance}"
+    if not instance or not handle:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": ("need 'acct' (e.g. alice@mastodon.social) or " "full 'profile_url'"),
+                },
+            }
+        ]
+    limit = min(int(payload.get("limit", 80)), 240)
+
+    try:
+        with _client(timeout_s=10.0) as c:
+            # Step 1: account-id lookup
+            lookup = c.get(
+                f"https://{instance}/api/v1/accounts/lookup",
+                params={"acct": acct},
+            )
+            if lookup.status_code == 404:
+                return [
+                    {
+                        "event_type": "tool-run-result",
+                        "payload": {"acct": acct, "followers": 0},
+                    }
+                ]
+            if lookup.status_code != 200:
+                return [
+                    {
+                        "event_type": "tool-run-error",
+                        "payload": {
+                            "reason": f"mastodon lookup HTTP {lookup.status_code}",
+                            "acct": acct,
+                        },
+                    }
+                ]
+            account = lookup.json()
+            account_id = account.get("id", "")
+            if not account_id:
+                return [
+                    {
+                        "event_type": "tool-run-error",
+                        "payload": {"reason": "mastodon lookup returned no id", "acct": acct},
+                    }
+                ]
+            # Step 2: followers list
+            r = c.get(
+                f"https://{instance}/api/v1/accounts/{account_id}/followers",
+                params={"limit": min(limit, 80)},
+            )
+            if r.status_code != 200:
+                return [
+                    {
+                        "event_type": "tool-run-error",
+                        "payload": {
+                            "reason": f"mastodon followers HTTP {r.status_code}",
+                            "acct": acct,
+                        },
+                    }
+                ]
+            followers = r.json() or []
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"mastodon {type(exc).__name__}: {exc}",
+                    "acct": acct,
+                },
+            }
+        ]
+
+    if not isinstance(followers, list):
+        followers = []
+    followers = followers[:limit]
+    events: list[dict[str, Any]] = []
+    for f in followers:
+        if not isinstance(f, dict):
+            continue
+        events.append(
+            {
+                "event_type": "person-match",
+                "payload": {
+                    "source": "mastodon-follower",
+                    "of_acct": acct,
+                    "follower_acct": f.get("acct", ""),
+                    "follower_username": f.get("username", ""),
+                    "display_name": f.get("display_name", ""),
+                    "follower_url": f.get("url", ""),
+                    "photo_url": f.get("avatar", ""),
+                    "created_at": f.get("created_at", ""),
+                    "follower_followers_count": f.get("followers_count", 0),
+                },
+            }
+        )
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"acct": acct, "followers": len(events) - 0},
+        }
+    )
+    return events
+
+
+def _mastodon_followers_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    acct = payload.get("acct") or "alice@mastodon.social"
+    fixtures = [
+        ("bob@mastodon.social", "Bob Synthetic"),
+        ("carol@hachyderm.io", "Carol Synthetic"),
+    ]
+    events = [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "mastodon-follower",
+                "of_acct": acct,
+                "follower_acct": fa,
+                "follower_username": fa.split("@")[0],
+                "display_name": name,
+                "follower_url": f"https://{fa.split('@')[1]}/@{fa.split('@')[0]}",
+                "synthetic": True,
+            },
+        }
+        for fa, name in fixtures
+    ]
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"acct": acct, "followers": len(fixtures), "synthetic": True},
+        }
+    )
+    return events
+
+
+# ---------------------------------------------------------------------------
+# 3e. Post-likes adapters (who-liked-this articulating-link)
+# ---------------------------------------------------------------------------
+# Point at a social-media post URL, get back the names of users who liked it.
+# Tedious to do by hand; load-bearing for property-vetting because property
+# owners sometimes liked a listing-related post under their real name.
+#
+# Public-data reality:
+#   - Bluesky: post-likes are public via the AT Protocol getLikes endpoint.
+#   - Mastodon: status favourites are public via /api/v1/statuses/<id>/favourited_by.
+#   - Twitter/X: likes were made private in 2024. Cannot scrape; even logged
+#     in users can only see their own. We do NOT ship a Twitter post-likes
+#     adapter because the data is no longer public.
+#   - Instagram + TikTok: post likes were never publicly visible at scale;
+#     same situation. No adapter.
+#   - YouTube + Reddit: upvotes private. No adapter.
+
+
+def bluesky_post_likes(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """List users who liked a Bluesky post.
+
+    Payload (one of):
+      {"post_url": "https://bsky.app/profile/<handle>/post/<rkey>"}
+      {"at_uri": "at://did:plc:<did>/app.bsky.feed.post/<rkey>"}
+      {"limit": 100}  # default 100, max 300
+
+    The web URL form is what investigators usually have; the adapter
+    resolves handle -> DID -> AT URI -> getLikes.
+    """
+    post_url = (payload.get("post_url") or "").strip()
+    at_uri = (payload.get("at_uri") or "").strip()
+    limit = min(int(payload.get("limit", 100)), 300)
+
+    if not at_uri and post_url:
+        m = re.match(
+            r"https?://bsky\.app/profile/([A-Za-z0-9.\-_]+)/post/([A-Za-z0-9]+)/?", post_url
+        )
+        if m:
+            handle, rkey = m.group(1), m.group(2)
+            # Resolve handle to DID via the public identity service
+            try:
+                with _client(timeout_s=8.0) as c:
+                    rid = c.get(
+                        "https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle",
+                        params={"handle": handle},
+                    )
+                if rid.status_code != 200:
+                    return [
+                        {
+                            "event_type": "tool-run-error",
+                            "payload": {
+                                "reason": f"bluesky handle-resolve HTTP {rid.status_code}",
+                                "handle": handle,
+                            },
+                        }
+                    ]
+                did = (rid.json() or {}).get("did", "")
+                if not did:
+                    return [
+                        {
+                            "event_type": "tool-run-error",
+                            "payload": {"reason": "no DID for handle", "handle": handle},
+                        }
+                    ]
+                at_uri = f"at://{did}/app.bsky.feed.post/{rkey}"
+            except httpx.RequestError as exc:
+                return [
+                    {
+                        "event_type": "tool-run-error",
+                        "payload": {
+                            "reason": f"bluesky resolve {type(exc).__name__}: {exc}",
+                            "handle": handle,
+                        },
+                    }
+                ]
+    if not at_uri:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "need 'post_url' (bsky.app) or 'at_uri'"},
+            }
+        ]
+
+    likers: list[dict[str, Any]] = []
+    cursor: str | None = None
+    try:
+        with _client(timeout_s=10.0) as c:
+            while len(likers) < limit:
+                params: dict[str, str] = {"uri": at_uri, "limit": "100"}
+                if cursor:
+                    params["cursor"] = cursor
+                r = c.get(
+                    "https://public.api.bsky.app/xrpc/app.bsky.feed.getLikes",
+                    params=params,
+                )
+                if r.status_code != 200:
+                    return [
+                        {
+                            "event_type": "tool-run-error",
+                            "payload": {
+                                "reason": f"bluesky getLikes HTTP {r.status_code}",
+                                "at_uri": at_uri,
+                            },
+                        }
+                    ]
+                data = r.json() or {}
+                batch = data.get("likes") or []
+                if not batch:
+                    break
+                likers.extend(batch)
+                cursor = data.get("cursor")
+                if not cursor or len(batch) < 100:
+                    break
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"bluesky {type(exc).__name__}: {exc}",
+                    "at_uri": at_uri,
+                },
+            }
+        ]
+
+    likers = likers[:limit]
+    events: list[dict[str, Any]] = []
+    for like in likers:
+        actor = (like or {}).get("actor") or {}
+        if not isinstance(actor, dict):
+            continue
+        a_handle = actor.get("handle", "")
+        events.append(
+            {
+                "event_type": "person-match",
+                "payload": {
+                    "source": "bluesky-liker",
+                    "of_post": at_uri,
+                    "follower_handle": a_handle,
+                    "follower_did": actor.get("did", ""),
+                    "display_name": actor.get("displayName", ""),
+                    "follower_url": f"https://bsky.app/profile/{a_handle}" if a_handle else "",
+                    "photo_url": actor.get("avatar", ""),
+                    "liked_at": (like or {}).get("createdAt", ""),
+                },
+            }
+        )
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"at_uri": at_uri, "likers": len(events) - 0},
+        }
+    )
+    return events
+
+
+def _bluesky_post_likes_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    at_uri = payload.get("at_uri") or "at://did:plc:synthetic/app.bsky.feed.post/abc"
+    fixtures = [
+        ("alice.bsky.social", "Alice Smith"),
+        ("bob.bsky.social", "Bob Jones"),
+        ("carol.bsky.social", "Carol Wong"),
+    ]
+    events = [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "bluesky-liker",
+                "of_post": at_uri,
+                "follower_handle": fh,
+                "display_name": name,
+                "follower_url": f"https://bsky.app/profile/{fh}",
+                "synthetic": True,
+            },
+        }
+        for fh, name in fixtures
+    ]
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"at_uri": at_uri, "likers": len(fixtures), "synthetic": True},
+        }
+    )
+    return events
+
+
+def mastodon_post_likes(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """List users who favourited a Mastodon status.
+
+    Payload:
+      {"post_url": "https://mastodon.social/@alice/112345678901234567"}
+      {"limit": 80}  # default 80, max 240
+
+    Parses instance + status-id from the URL, hits the public
+    /api/v1/statuses/<id>/favourited_by endpoint.
+    """
+    post_url = (payload.get("post_url") or "").strip()
+    if not post_url:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'post_url'"},
+            }
+        ]
+    m = re.match(
+        r"https?://([^/]+)/(?:@[A-Za-z0-9_]+|notice|users/[A-Za-z0-9_]+/statuses)/(\d+)/?",
+        post_url,
+    )
+    if not m:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": (
+                        "post_url must look like https://<instance>/@<user>/<id> "
+                        "or .../notice/<id>"
+                    ),
+                    "got": post_url,
+                },
+            }
+        ]
+    instance, status_id = m.group(1), m.group(2)
+    limit = min(int(payload.get("limit", 80)), 240)
+
+    try:
+        with _client(timeout_s=10.0) as c:
+            r = c.get(
+                f"https://{instance}/api/v1/statuses/{status_id}/favourited_by",
+                params={"limit": min(limit, 80)},
+            )
+        if r.status_code != 200:
+            return [
+                {
+                    "event_type": "tool-run-error",
+                    "payload": {
+                        "reason": f"mastodon HTTP {r.status_code}",
+                        "url": post_url,
+                    },
+                }
+            ]
+        accounts = r.json() or []
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"mastodon {type(exc).__name__}: {exc}",
+                    "url": post_url,
+                },
+            }
+        ]
+
+    if not isinstance(accounts, list):
+        accounts = []
+    accounts = accounts[:limit]
+    events: list[dict[str, Any]] = []
+    for a in accounts:
+        if not isinstance(a, dict):
+            continue
+        events.append(
+            {
+                "event_type": "person-match",
+                "payload": {
+                    "source": "mastodon-liker",
+                    "of_post": post_url,
+                    "follower_acct": a.get("acct", ""),
+                    "follower_username": a.get("username", ""),
+                    "display_name": a.get("display_name", ""),
+                    "follower_url": a.get("url", ""),
+                    "photo_url": a.get("avatar", ""),
+                    "created_at": a.get("created_at", ""),
+                },
+            }
+        )
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"post_url": post_url, "likers": len(events) - 0},
+        }
+    )
+    return events
+
+
+def _mastodon_post_likes_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    post_url = payload.get("post_url") or "https://mastodon.social/@synthetic/123"
+    fixtures = [
+        ("alice@mastodon.social", "Alice Smith"),
+        ("bob@hachyderm.io", "Bob Jones"),
+    ]
+    events = [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "mastodon-liker",
+                "of_post": post_url,
+                "follower_acct": fa,
+                "display_name": name,
+                "follower_url": f"https://{fa.split('@')[1]}/@{fa.split('@')[0]}",
+                "synthetic": True,
+            },
+        }
+        for fa, name in fixtures
+    ]
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {"post_url": post_url, "likers": len(fixtures), "synthetic": True},
+        }
+    )
+    return events
+
+
+def wayback_snapshot(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Generalized Wayback availability lookup for any URL.
+
+    Payload:
+      {"url": "https://www.instagram.com/<handle>/followers"}
+
+    Use case: the walled-platform follower lists (Twitter, Instagram,
+    TikTok) used to be public; the Wayback Machine has snapshots from
+    that era. This adapter checks if such a snapshot exists for any
+    URL and returns the snapshot URL + timestamp. The investigator
+    opens the snapshot in a browser; the wrapper does NOT scrape the
+    snapshot's contents.
+
+    For LinkedIn URLs specifically, wayback_linkedin is the named
+    convenience alias; wayback_snapshot accepts any URL.
+    """
+    url = (payload.get("url") or "").strip()
+    if not url:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'url' in payload"},
+            }
+        ]
+
+    try:
+        with _client(timeout_s=8.0) as c:
+            r = c.get(
+                "http://archive.org/wayback/available",
+                params={"url": url},
+            )
+        if r.status_code != 200:
+            return [
+                {
+                    "event_type": "tool-run-error",
+                    "payload": {"reason": f"wayback HTTP {r.status_code}", "url": url},
+                }
+            ]
+        data = r.json()
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"wayback {type(exc).__name__}: {exc}",
+                    "url": url,
+                },
+            }
+        ]
+
+    closest = (data.get("archived_snapshots") or {}).get("closest") or {}
+    if not closest or not closest.get("available"):
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {"url": url, "snapshots": 0},
+            }
+        ]
+    return [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "wayback-snapshot",
+                "url": url,
+                "snapshot_url": closest.get("url", ""),
+                "snapshot_timestamp": closest.get("timestamp", ""),
+                "snapshot_status": closest.get("status", ""),
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {"url": url, "snapshots": 1},
+        },
+    ]
+
+
+def _wayback_snapshot_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    url = payload.get("url") or "https://www.instagram.com/synthetic/followers"
+    return [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "wayback-snapshot",
+                "url": url,
+                "snapshot_url": "https://web.archive.org/web/20200115120000/" + url,
+                "snapshot_timestamp": "20200115120000",
+                "snapshot_status": "200",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {"url": url, "snapshots": 1, "synthetic": True},
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 4. Inside Airbnb listings CSV (Sprint 3 advance)
 # ---------------------------------------------------------------------------
 # Inside Airbnb publishes city-level Airbnb listing snapshots quarterly at
@@ -937,6 +1766,51 @@ _REGISTRY.register(
     description="Wayback snapshot of a LinkedIn URL (availability fallback).",
 )
 
+# Public-follower-list adapters (articulating-link investigation).
+# Strict: PUBLIC accounts only; private profile -> tool-run-error.
+_REGISTRY.register(
+    "github_followers",
+    github_followers,
+    synthetic_mode=_github_followers_synthetic,
+    in_process=True,
+    description="GitHub public followers via REST v3.",
+)
+_REGISTRY.register(
+    "bluesky_followers",
+    bluesky_followers,
+    synthetic_mode=_bluesky_followers_synthetic,
+    in_process=True,
+    description="Bluesky public followers via AT Protocol (no auth).",
+)
+_REGISTRY.register(
+    "mastodon_followers",
+    mastodon_followers,
+    synthetic_mode=_mastodon_followers_synthetic,
+    in_process=True,
+    description="Mastodon public followers via the instance REST API.",
+)
+_REGISTRY.register(
+    "wayback_snapshot",
+    wayback_snapshot,
+    synthetic_mode=_wayback_snapshot_synthetic,
+    in_process=True,
+    description="Generalized Wayback availability for any URL (snapshot of pre-wall pages).",
+)
+_REGISTRY.register(
+    "bluesky_post_likes",
+    bluesky_post_likes,
+    synthetic_mode=_bluesky_post_likes_synthetic,
+    in_process=True,
+    description="Bluesky who-liked-this-post via AT Protocol getLikes (public).",
+)
+_REGISTRY.register(
+    "mastodon_post_likes",
+    mastodon_post_likes,
+    synthetic_mode=_mastodon_post_likes_synthetic,
+    in_process=True,
+    description="Mastodon who-favourited-this-status via public REST API.",
+)
+
 _REGISTRY.register(
     "inside_airbnb_listings",
     inside_airbnb_listings,
@@ -999,15 +1873,19 @@ if _LINKEDIN_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
         description="LinkedIn public-profile fetch via Scrapling (no login).",
     )
 
-# Public-profile social adapters (Twitter/X, Instagram, TikTok).
-# Public-bio + count surfaces only -- no follower-list extraction, no
-# private-account access, no login. Each wrapper falls back to a nitter
-# mirror (Twitter) or fails honestly (Instagram, TikTok) if the primary
-# host blocks the stealth fetcher.
+# Public-profile + public-follower-list social adapters.
+# - *_public: bio + counts via Scrapling.
+# - *_followers: follower-list articulating-link investigation. Private
+#   accounts are blocked by design; walled-platform follower lists
+#   surface as honest tool-run-error pointing at wayback_snapshot when
+#   the auth wall holds.
 for _social_id, _social_dir in (
     ("twitter_public", "twitter_public"),
     ("instagram_public", "instagram_public"),
     ("tiktok_public", "tiktok_public"),
+    ("twitter_followers", "twitter_followers"),
+    ("instagram_followers", "instagram_followers"),
+    ("tiktok_followers", "tiktok_followers"),
 ):
     _wrapper_path = _REPO_ROOT_PROP / "adapters" / _social_dir / "wrapper.py"
     if _wrapper_path.is_file() and _EMPIRICAL_PY.is_file():

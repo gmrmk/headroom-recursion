@@ -96,6 +96,63 @@ const ADAPTERS: ReadonlyArray<{
     examplePayload: '{\n  "handle": "username"\n}',
   },
   {
+    id: "github_followers",
+    label: "GitHub — public followers",
+    hint: "REST v3 follower-list (public, no login).",
+    examplePayload: '{\n  "username": "octocat",\n  "limit": 100\n}',
+  },
+  {
+    id: "bluesky_followers",
+    label: "Bluesky — public followers",
+    hint: "AT Protocol getFollowers (no auth, public reads).",
+    examplePayload: '{\n  "handle": "alice.bsky.social",\n  "limit": 100\n}',
+  },
+  {
+    id: "mastodon_followers",
+    label: "Mastodon — public followers",
+    hint: "Instance REST API. Handle format: user@instance.tld",
+    examplePayload: '{\n  "acct": "alice@mastodon.social",\n  "limit": 80\n}',
+  },
+  {
+    id: "wayback_snapshot",
+    label: "Wayback — any-URL snapshot",
+    hint: "Generalized archive.org availability check. Pre-wall follower pages.",
+    examplePayload:
+      '{\n  "url": "https://www.instagram.com/username/followers/"\n}',
+  },
+  {
+    id: "bluesky_post_likes",
+    label: "Bluesky — who liked a post",
+    hint: "AT Protocol getLikes. Post URL or at:// URI.",
+    examplePayload:
+      '{\n  "post_url": "https://bsky.app/profile/alice.bsky.social/post/abc123",\n  "limit": 100\n}',
+  },
+  {
+    id: "mastodon_post_likes",
+    label: "Mastodon — who favourited a post",
+    hint: "Instance REST API. Public favourites list.",
+    examplePayload:
+      '{\n  "post_url": "https://mastodon.social/@alice/112345678901234567",\n  "limit": 80\n}',
+  },
+  {
+    id: "twitter_followers",
+    label: "Twitter/X — public followers (nitter)",
+    hint: "Via nitter mirror. Private accounts blocked by design.",
+    examplePayload: '{\n  "handle": "username",\n  "limit": 50\n}',
+  },
+  {
+    id: "instagram_followers",
+    label: "Instagram — public followers (auth-walled)",
+    hint: "Honest: auth wall. Surfaces error pointing at wayback_snapshot.",
+    examplePayload: '{\n  "handle": "username"\n}',
+  },
+  {
+    id: "tiktok_followers",
+    label: "TikTok — public followers (auth-walled)",
+    hint: "Honest: auth wall. Surfaces error pointing at wayback_snapshot.",
+    examplePayload: '{\n  "handle": "username"\n}',
+  },
+  {
     id: "tineye_image",
     label: "TinEye — reverse image",
     hint: "URL-based reverse-image search via Scrapling.",
