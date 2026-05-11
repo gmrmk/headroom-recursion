@@ -54,6 +54,24 @@ const ADAPTERS: ReadonlyArray<{
     examplePayload: '{\n  "profile_url": "https://www.linkedin.com/in/alice-smith"\n}',
   },
   {
+    id: "google_serp_linkedin",
+    label: "Google SERP — LinkedIn URL discovery",
+    hint: "site:linkedin.com/in name search. Feeds linkedin_profile.",
+    examplePayload: '{\n  "name": "Alice Smith",\n  "company": "Acme Corp"\n}',
+  },
+  {
+    id: "wayback_linkedin",
+    label: "Wayback — LinkedIn snapshot",
+    hint: "archive.org snapshot of a LinkedIn URL (use when LinkedIn 429s).",
+    examplePayload: '{\n  "profile_url": "https://www.linkedin.com/in/alice-smith"\n}',
+  },
+  {
+    id: "github_profile",
+    label: "GitHub — public profile",
+    hint: "GitHub REST v3. Free, 60 req/h unauth. Tech-host verification.",
+    examplePayload: '{\n  "username": "octocat"\n}',
+  },
+  {
     id: "rocketreach_search",
     label: "RocketReach — name search",
     hint: "Free-tier name search (no email/phone). Scrapling subprocess.",

@@ -393,6 +393,229 @@ def _hibp_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# 3b. GitHub public profile (LinkedIn-alt for tech hosts)
+# ---------------------------------------------------------------------------
+
+
+def github_profile(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Fetch a public GitHub profile via the v3 REST API.
+
+    Payload (one of):
+      {"username": "octocat"}
+      {"profile_url": "https://github.com/octocat"}
+
+    GitHub's free unauth rate limit is 60 req/hour per IP -- generous
+    for personal investigation. Returns a single person-match with the
+    public profile fields: name, bio, current company, location, blog,
+    public-repo count, follower count, account creation date.
+    """
+    username = (payload.get("username") or "").strip()
+    profile_url = (payload.get("profile_url") or "").strip()
+    if not username and profile_url:
+        m = re.search(r"github\.com/([A-Za-z0-9\-]+)/?$", profile_url)
+        if m:
+            username = m.group(1)
+    if not username:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'username' or 'profile_url'"},
+            }
+        ]
+
+    try:
+        with _client(timeout_s=8.0) as c:
+            r = c.get(f"https://api.github.com/users/{username}")
+        if r.status_code == 404:
+            return [
+                {
+                    "event_type": "tool-run-result",
+                    "payload": {"username": username, "matches": 0},
+                }
+            ]
+        if r.status_code != 200:
+            return [
+                {
+                    "event_type": "tool-run-error",
+                    "payload": {
+                        "reason": f"github HTTP {r.status_code}",
+                        "username": username,
+                    },
+                }
+            ]
+        u = r.json()
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"github {type(exc).__name__}: {exc}",
+                    "username": username,
+                },
+            }
+        ]
+
+    return [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "github",
+                "username": username,
+                "name": u.get("name") or "",
+                "bio": u.get("bio") or "",
+                "current_company": u.get("company") or "",
+                "location": u.get("location") or "",
+                "blog": u.get("blog") or "",
+                "profile_url": u.get("html_url") or f"https://github.com/{username}",
+                "photo_url": u.get("avatar_url") or "",
+                "public_repos": u.get("public_repos", 0),
+                "followers": u.get("followers", 0),
+                "created_at": u.get("created_at") or "",
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {"username": username, "matches": 1},
+        },
+    ]
+
+
+def _github_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    username = payload.get("username") or "octocat-synthetic"
+    return [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "github",
+                "username": username,
+                "name": "Alice Synthetic",
+                "bio": "Engineer. Coffee enthusiast.",
+                "current_company": "@Synthetic-Co",
+                "location": "Springfield, IL",
+                "blog": "https://example.com",
+                "profile_url": f"https://github.com/{username}",
+                "photo_url": "https://avatars.githubusercontent.com/synthetic.jpg",
+                "public_repos": 42,
+                "followers": 100,
+                "created_at": "2018-03-15T09:00:00Z",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {"username": username, "matches": 1, "synthetic": True},
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
+# 3c. Wayback Machine snapshot of a LinkedIn URL (LinkedIn-availability fallback)
+# ---------------------------------------------------------------------------
+
+
+def wayback_linkedin(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Check the Wayback Machine for a snapshot of a LinkedIn profile URL.
+
+    Payload:
+      {"profile_url": "https://www.linkedin.com/in/<handle>"}
+
+    Uses archive.org's free availability API
+    (http://archive.org/wayback/available?url=<URL>). Emits one
+    `person-match` per available snapshot (typically the closest one)
+    with the wayback-snapshot URL + timestamp. The investigator then
+    opens the snapshot URL in a browser to view the historical
+    profile state -- load-bearing when LinkedIn directly is blocking.
+
+    Does NOT scrape the snapshot's contents here. Browsers handle the
+    Wayback rendering better than a stealth fetcher would, and the
+    snapshot URL is the durable artifact.
+    """
+    profile_url = (payload.get("profile_url") or "").strip()
+    if not profile_url:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'profile_url' in payload"},
+            }
+        ]
+
+    try:
+        with _client(timeout_s=8.0) as c:
+            r = c.get(
+                "http://archive.org/wayback/available",
+                params={"url": profile_url},
+            )
+        if r.status_code != 200:
+            return [
+                {
+                    "event_type": "tool-run-error",
+                    "payload": {
+                        "reason": f"wayback HTTP {r.status_code}",
+                        "url": profile_url,
+                    },
+                }
+            ]
+        data = r.json()
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"wayback {type(exc).__name__}: {exc}",
+                    "url": profile_url,
+                },
+            }
+        ]
+
+    closest = (data.get("archived_snapshots") or {}).get("closest") or {}
+    if not closest or not closest.get("available"):
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {"profile_url": profile_url, "snapshots": 0},
+            }
+        ]
+
+    return [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "wayback-linkedin",
+                "profile_url": profile_url,
+                "snapshot_url": closest.get("url", ""),
+                "snapshot_timestamp": closest.get("timestamp", ""),
+                "snapshot_status": closest.get("status", ""),
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {"profile_url": profile_url, "snapshots": 1},
+        },
+    ]
+
+
+def _wayback_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    profile_url = payload.get("profile_url") or "https://www.linkedin.com/in/synthetic"
+    return [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "wayback-linkedin",
+                "profile_url": profile_url,
+                "snapshot_url": "https://web.archive.org/web/20241001120000/" + profile_url,
+                "snapshot_timestamp": "20241001120000",
+                "snapshot_status": "200",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {"profile_url": profile_url, "snapshots": 1, "synthetic": True},
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 4. Inside Airbnb listings CSV (Sprint 3 advance)
 # ---------------------------------------------------------------------------
 # Inside Airbnb publishes city-level Airbnb listing snapshots quarterly at
@@ -699,6 +922,22 @@ _REGISTRY.register(
 )
 
 _REGISTRY.register(
+    "github_profile",
+    github_profile,
+    synthetic_mode=_github_synthetic,
+    in_process=True,
+    description="GitHub public profile via REST v3 (LinkedIn-alt for tech hosts).",
+)
+
+_REGISTRY.register(
+    "wayback_linkedin",
+    wayback_linkedin,
+    synthetic_mode=_wayback_synthetic,
+    in_process=True,
+    description="Wayback snapshot of a LinkedIn URL (availability fallback).",
+)
+
+_REGISTRY.register(
     "inside_airbnb_listings",
     inside_airbnb_listings,
     synthetic_mode=_inside_airbnb_synthetic,
@@ -758,6 +997,28 @@ if _LINKEDIN_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
         ),
         in_process=False,
         description="LinkedIn public-profile fetch via Scrapling (no login).",
+    )
+
+# Google SERP for LinkedIn profile URLs: name-based search shim that
+# closes the gap linkedin_profile (URL-only) leaves open. Pinned to the
+# empirical venv via Scrapling.
+_GOOGLE_SERP_WRAPPER = _REPO_ROOT_PROP / "adapters" / "google_serp_linkedin" / "wrapper.py"
+if _GOOGLE_SERP_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
+    _REGISTRY.register(
+        "google_serp_linkedin",
+        make_subprocess_adapter(
+            _GOOGLE_SERP_WRAPPER,
+            timeout_s=60.0,
+            python_executable=str(_EMPIRICAL_PY),
+        ),
+        synthetic_mode=make_subprocess_adapter(
+            _GOOGLE_SERP_WRAPPER,
+            timeout_s=30.0,
+            python_executable=str(_EMPIRICAL_PY),
+            extra_env={"OSINT_ADAPTER_MODE": "synthetic"},
+        ),
+        in_process=False,
+        description="Google SERP -> LinkedIn profile URLs (name-search shim).",
     )
 
 # RocketReach name search: free-tier public results only (no API key).
