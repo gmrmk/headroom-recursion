@@ -1,1 +1,5 @@
-export default function Page() { return <main>OSINT Goblin</main>; }
+import { redirect } from "next/navigation";
+
+export default function RootPage(): never {
+  redirect("/investigations");
+}
