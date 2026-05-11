@@ -367,6 +367,252 @@ def hibp_breach_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return events
 
 
+# ---------------------------------------------------------------------------
+# 3a. IntelBase email lookup -- POST https://api.intelbase.is/lookup/email
+#
+# IntelBase aggregates 40B+ breach records + real-time infostealer log
+# intelligence + cross-platform account fanout from a single email. Far
+# richer than HIBP for the property-vetting use case: "does this owner's
+# email show up in the kind of breaches/logs we'd expect for a legitimate
+# user, or for a churn account behind dozens of fraudulent listings?"
+#
+# Auth: x-api-key header. Key + IP whitelist managed at
+# https://intelbase.is/dashboard/account. Env-gated on
+# OSINT_INTELBASE_API_KEY; absent key -> synthetic mode so dev/dry runs
+# still see the wire shape.
+#
+# Safety: infostealer logs include credential rows. We NEVER propagate
+# password/hash/plaintext/credential_data fields into the event stream --
+# they get filtered defensively before emit. The investigator gets the
+# fact-of-the-breach without the credential payload.
+# ---------------------------------------------------------------------------
+
+
+_INTELBASE_URL = "https://api.intelbase.is/lookup/email"
+
+# Defense-in-depth: keys we never emit even if upstream returns them.
+# Match case-insensitively; the substring catches name variants
+# (password_hash, hashed_password, raw_plaintext, etc.).
+_CREDENTIAL_FIELD_SUBSTRINGS: tuple[str, ...] = (
+    "password",
+    "hash",
+    "plaintext",
+    "credential",
+    "secret",
+    "token",
+)
+
+
+def _redact_credentials(obj: Any) -> Any:
+    """Strip credential-shaped fields from any nested dict/list. Returns
+    a new structure -- never mutates input. Numbers/strings/bools pass
+    through unchanged."""
+    if isinstance(obj, dict):
+        return {
+            k: _redact_credentials(v)
+            for k, v in obj.items()
+            if not any(s in k.lower() for s in _CREDENTIAL_FIELD_SUBSTRINGS)
+        }
+    if isinstance(obj, list):
+        return [_redact_credentials(v) for v in obj]
+    return obj
+
+
+def intelbase_email_lookup(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """IntelBase /lookup/email: breach + account fanout from a single email.
+
+    Payload:
+      {"email": "user@example.com",
+       "timeout_ms": 15000,             # optional, default 15000
+       "include_data_breaches": true,    # optional, default true
+       "exclude_modules": []}            # optional, default []
+
+    Env:
+      OSINT_INTELBASE_API_KEY  -- required for live mode; absent -> synthetic
+
+    Wire shape:
+      One `breach-hit` per breach surfaced (credential fields stripped).
+      One `person-match` per linked account surfaced.
+      One `tool-run-result` summary with counts.
+    """
+    email = payload.get("email", "")
+    if not isinstance(email, str) or "@" not in email:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing or malformed 'email'"},
+            }
+        ]
+
+    api_key = os.environ.get("OSINT_INTELBASE_API_KEY", "").strip()
+    if not api_key:
+        return _intelbase_synthetic(payload)
+
+    timeout_ms = int(payload.get("timeout_ms", 15000))
+    body: dict[str, Any] = {"email": email, "timeout_ms": timeout_ms}
+    if "include_data_breaches" in payload:
+        body["include_data_breaches"] = bool(payload["include_data_breaches"])
+    if "exclude_modules" in payload:
+        body["exclude_modules"] = list(payload["exclude_modules"])
+
+    try:
+        # Use a fresh client (not _client) so we can pin the auth header
+        # without leaking it to the shared module config.
+        with httpx.Client(
+            timeout=(timeout_ms / 1000.0) + 5.0,
+            headers={
+                "User-Agent": _USER_AGENT,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "x-api-key": api_key,
+            },
+            follow_redirects=False,
+        ) as c:
+            r = c.post(_INTELBASE_URL, json=body)
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"intelbase {type(exc).__name__}: {exc}",
+                    "email": email,
+                },
+            }
+        ]
+
+    if r.status_code != 200:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"intelbase HTTP {r.status_code}",
+                    "email": email,
+                },
+            }
+        ]
+
+    try:
+        data = r.json()
+    except ValueError:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "intelbase non-JSON response", "email": email},
+            }
+        ]
+    if not isinstance(data, dict):
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "intelbase unexpected response shape", "email": email},
+            }
+        ]
+
+    # Response shape is undocumented in the OpenAPI spec, so we read
+    # common field names defensively. `breaches`, `accounts`, `linked_accounts`
+    # are the names IntelBase's site/docs use.
+    breaches_raw = data.get("breaches") or data.get("data_breaches") or []
+    accounts_raw = data.get("accounts") or data.get("linked_accounts") or data.get("modules") or []
+
+    events: list[dict[str, Any]] = []
+    # Dossier-noise cap: 25 breaches + 25 accounts is plenty for a single
+    # email lookup; the rest stay in the summary count.
+    if isinstance(breaches_raw, list):
+        for b in breaches_raw[:25]:
+            if not isinstance(b, dict):
+                continue
+            redacted = _redact_credentials(b)
+            events.append(
+                {
+                    "event_type": "breach-hit",
+                    "payload": {
+                        "source": "intelbase",
+                        "email": email,
+                        "name": redacted.get("name") or redacted.get("breach") or "",
+                        "domain": redacted.get("domain", ""),
+                        "breach_date": redacted.get("breach_date") or redacted.get("date", ""),
+                        "data_classes": redacted.get("data_classes") or redacted.get("fields", []),
+                    },
+                }
+            )
+    if isinstance(accounts_raw, list):
+        for a in accounts_raw[:25]:
+            if not isinstance(a, dict):
+                continue
+            redacted = _redact_credentials(a)
+            events.append(
+                {
+                    "event_type": "person-match",
+                    "payload": {
+                        "source": "intelbase",
+                        "email": email,
+                        "platform": redacted.get("platform")
+                        or redacted.get("module")
+                        or redacted.get("service", ""),
+                        "username": redacted.get("username") or redacted.get("handle", ""),
+                        "profile_url": redacted.get("profile_url") or redacted.get("url", ""),
+                    },
+                }
+            )
+
+    breach_count = sum(1 for e in events if e["event_type"] == "breach-hit")
+    account_count = sum(1 for e in events if e["event_type"] == "person-match")
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "intelbase",
+                "email": email,
+                "breaches": breach_count,
+                "accounts": account_count,
+            },
+        }
+    )
+    return events
+
+
+def _intelbase_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Synthetic: one breach + one account + summary. Locks the wire
+    shape the live path emits so frontend/dossier consumers can be
+    tested without hitting the real API."""
+    email = payload.get("email") or "user@example.com"
+    return [
+        {
+            "event_type": "breach-hit",
+            "payload": {
+                "source": "intelbase",
+                "email": email,
+                "name": "SyntheticIntelBaseBreach",
+                "domain": "example.com",
+                "breach_date": "2024-01-01",
+                "data_classes": ["Email addresses", "Usernames"],
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "intelbase",
+                "email": email,
+                "platform": "github",
+                "username": "synthetic-user",
+                "profile_url": "https://github.com/synthetic-user",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "intelbase",
+                "email": email,
+                "breaches": 1,
+                "accounts": 1,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
 def _hibp_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Synthetic: a single fake breach to exercise the wire shape."""
     email = payload.get("email", "")
@@ -1748,6 +1994,18 @@ _REGISTRY.register(
     synthetic_mode=_hibp_synthetic,
     in_process=True,
     description="HIBP breaches by domain. R-5 Sprint 2.",
+)
+
+_REGISTRY.register(
+    "intelbase_email_lookup",
+    intelbase_email_lookup,
+    synthetic_mode=_intelbase_synthetic,
+    in_process=True,
+    description=(
+        "IntelBase /lookup/email: breach + account fanout from a single email "
+        "(40B+ breach records, infostealer logs). Env-gated on "
+        "OSINT_INTELBASE_API_KEY."
+    ),
 )
 
 _REGISTRY.register(

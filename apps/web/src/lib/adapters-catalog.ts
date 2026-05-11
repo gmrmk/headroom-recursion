@@ -253,6 +253,13 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     examplePayload: '{\n  "email": "user@example.com"\n}',
     group: "email",
   },
+  {
+    id: "intelbase_email_lookup",
+    label: "IntelBase — breach + account fanout",
+    hint: "40B+ breach records + infostealer logs + cross-platform accounts. Env-gated on OSINT_INTELBASE_API_KEY (synthetic mode without key).",
+    examplePayload: '{\n  "email": "user@example.com",\n  "include_data_breaches": true\n}',
+    group: "email",
+  },
   // Person — name-based
   {
     id: "true_people_search",

@@ -127,7 +127,10 @@ WORKFLOWS: dict[str, Workflow] = {
     "w2.em": Workflow(
         id="w2.em",
         name="Email Lookup",
-        description="MX validate -> HIBP breaches -> email-to-account pivot.",
+        description=(
+            "MX validate -> HIBP domain breaches -> IntelBase breach + account "
+            "fanout (40B+ records, infostealer logs)."
+        ),
         steps=[
             WorkflowStep(
                 "email_mx_validate",
@@ -138,6 +141,12 @@ WORKFLOWS: dict[str, Workflow] = {
                 "hibp_breach_check",
                 {"email": "{email}"},
                 required_seed_keys=("email",),
+            ),
+            WorkflowStep(
+                "intelbase_email_lookup",
+                {"email": "{email}"},
+                required_seed_keys=("email",),
+                description="IntelBase: breach + cross-platform account fanout",
             ),
         ],
     ),

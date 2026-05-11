@@ -21,11 +21,13 @@ from osint_goblin_workers.adapters_property import (
     _email_mx_synthetic,
     _hibp_synthetic,
     _inside_airbnb_synthetic,
+    _intelbase_synthetic,
     _nominatim_synthetic,
     _tineye_synthetic,
     _true_people_synthetic,
     email_mx_validate,
     inside_airbnb_listings,
+    intelbase_email_lookup,
     nominatim_geocode,
 )
 
@@ -40,6 +42,7 @@ from osint_goblin_workers.adapters_property import (
         "nominatim_geocode",
         "email_mx_validate",
         "hibp_breach_check",
+        "intelbase_email_lookup",
         "inside_airbnb_listings",
         "true_people_search",
         "tineye_image",
@@ -85,6 +88,91 @@ def test_hibp_synthetic_emits_breach_hit() -> None:
     assert events[0]["event_type"] == "breach-hit"
     assert events[0]["payload"]["domain"] == "example.com"
     assert events[0]["payload"]["synthetic"] is True
+
+
+def test_intelbase_synthetic_emits_mixed_breach_and_match() -> None:
+    """Synthetic intelbase: one breach-hit + one person-match + summary,
+    exercising the full multi-event wire shape the live path emits."""
+    events = _intelbase_synthetic({"email": "u@example.com"})
+    types = [e["event_type"] for e in events]
+    assert "breach-hit" in types
+    assert "person-match" in types
+    assert types[-1] == "tool-run-result"
+    for e in events:
+        assert e["payload"].get("synthetic") is True
+        assert e["payload"].get("source") in ("intelbase", None) or "synthetic" in e["payload"]
+
+
+def test_intelbase_missing_email_returns_error() -> None:
+    events = intelbase_email_lookup({})
+    assert events[0]["event_type"] == "tool-run-error"
+    assert "email" in events[0]["payload"]["reason"].lower()
+
+
+def test_intelbase_without_api_key_falls_back_to_synthetic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Adapter is env-gated on OSINT_INTELBASE_API_KEY. Absent key ->
+    synthetic-mode wire shape so investigators see the surface without
+    needing a paid key for local dev / dry runs."""
+    monkeypatch.delenv("OSINT_INTELBASE_API_KEY", raising=False)
+    events = intelbase_email_lookup({"email": "user@example.com"})
+    types = [e["event_type"] for e in events]
+    assert "tool-run-result" in types
+    # Synthetic must NOT make a network call; presence of the synthetic
+    # marker is the contract.
+    assert any(e["payload"].get("synthetic") is True for e in events)
+
+
+def test_intelbase_redacts_credential_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Defense in depth: even if the upstream returns infostealer rows
+    with `password` / `hash` / `plaintext` fields, the adapter must never
+    propagate them into the event stream (which gets persisted, exported,
+    etc.). Strip them before emit."""
+    monkeypatch.setenv("OSINT_INTELBASE_API_KEY", "test-key")
+
+    fake_response = {
+        "breaches": [
+            {
+                "name": "TestBreach",
+                "domain": "example.com",
+                "breach_date": "2024-01-01",
+                "password": "hunter2",
+                "hash": "deadbeef",
+                "plaintext": "should-never-appear",
+            }
+        ],
+        "accounts": [
+            {
+                "platform": "github",
+                "username": "alice",
+                "profile_url": "https://github.com/alice",
+                "credential_data": "should-never-appear",
+            }
+        ],
+    }
+
+    import httpx as _httpx
+
+    def fake_post(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(200, json=fake_response, request=_httpx.Request("POST", url))
+
+    monkeypatch.setattr(_httpx.Client, "post", fake_post)
+
+    events = intelbase_email_lookup({"email": "user@example.com"})
+    # Walk every payload value -- no credential string anywhere.
+    import json as _json
+
+    serialized = _json.dumps(events)
+    assert "hunter2" not in serialized
+    assert "deadbeef" not in serialized
+    assert "should-never-appear" not in serialized
+    # Positive shape: the breach + account were still surfaced.
+    types = [e["event_type"] for e in events]
+    assert "breach-hit" in types
+    assert "person-match" in types
 
 
 def test_true_people_synthetic_emits_person_match() -> None:
