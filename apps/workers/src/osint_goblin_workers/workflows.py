@@ -287,6 +287,45 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
         ],
     ),
+    "w11.em": Workflow(
+        id="w11.em",
+        name="Email Deep (free-stack)",
+        description=(
+            "Margaret's free-stack replacement for IntelBase: MX -> HIBP "
+            "-> Gravatar (owner-attested) -> GitHub commits (behavioral) "
+            "-> Hudson Rock (infostealer logs). All free, no paid keys."
+        ),
+        steps=[
+            WorkflowStep(
+                "email_mx_validate",
+                {"email": "{email}"},
+                required_seed_keys=("email",),
+            ),
+            WorkflowStep(
+                "hibp_breach_check",
+                {"email": "{email}"},
+                required_seed_keys=("email",),
+            ),
+            WorkflowStep(
+                "gravatar_profile_lookup",
+                {"email": "{email}"},
+                required_seed_keys=("email",),
+                description="Owner-attested verified_accounts",
+            ),
+            WorkflowStep(
+                "github_commit_email_search",
+                {"email": "{email}"},
+                required_seed_keys=("email",),
+                description="Behavioral identity via public commits",
+            ),
+            WorkflowStep(
+                "hudson_rock_email_check",
+                {"email": "{email}"},
+                required_seed_keys=("email",),
+                description="Infostealer log lookup (30M+ machines)",
+            ),
+        ],
+    ),
     "w10.ip": Workflow(
         id="w10.ip",
         name="IP Vetting",

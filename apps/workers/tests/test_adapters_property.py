@@ -22,6 +22,7 @@ from osint_goblin_workers.adapters_property import (
     _github_commit_email_synthetic,
     _gravatar_synthetic,
     _hibp_synthetic,
+    _hudson_rock_synthetic,
     _inside_airbnb_synthetic,
     _intelbase_synthetic,
     _nominatim_synthetic,
@@ -30,6 +31,7 @@ from osint_goblin_workers.adapters_property import (
     email_mx_validate,
     github_commit_email_search,
     gravatar_profile_lookup,
+    hudson_rock_email_check,
     inside_airbnb_listings,
     intelbase_email_lookup,
     nominatim_geocode,
@@ -49,6 +51,7 @@ from osint_goblin_workers.adapters_property import (
         "intelbase_email_lookup",
         "gravatar_profile_lookup",
         "github_commit_email_search",
+        "hudson_rock_email_check",
         "inside_airbnb_listings",
         "true_people_search",
         "tineye_image",
@@ -367,6 +370,138 @@ def test_github_commit_uses_pat_when_env_set(
     headers_lower = {k.lower(): v for k, v in captured["headers"].items()}
     assert "authorization" in headers_lower
     assert "ghp_synthetic" in headers_lower["authorization"]
+
+
+def test_hudson_rock_synthetic_emits_breach_hit_and_summary() -> None:
+    """Synthetic Hudson Rock: one breach-hit per stealer + summary."""
+    events = _hudson_rock_synthetic({"email": "u@example.com"})
+    types = [e["event_type"] for e in events]
+    assert "breach-hit" in types
+    assert types[-1] == "tool-run-result"
+    for e in events:
+        assert e["payload"].get("source") == "hudson_rock"
+
+
+def test_hudson_rock_missing_email_returns_error() -> None:
+    events = hudson_rock_email_check({})
+    assert events[0]["event_type"] == "tool-run-error"
+
+
+def test_hudson_rock_emits_breach_hit_per_stealer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each entry in stealers[] becomes a breach-hit event with infostealer
+    metadata (machine name, OS, malware path, date). Top-level totals go
+    in the summary."""
+    fake_response = {
+        "message": "Email is associated with infected computers.",
+        "total_corporate_services": 50,
+        "total_user_services": 1200,
+        "stealers": [
+            {
+                "total_corporate_services": 30,
+                "total_user_services": 700,
+                "date_compromised": "2024-06-01T00:00:00.000Z",
+                "computer_name": "DESKTOP-X (alice)",
+                "operating_system": "Windows 11",
+                "malware_path": "C:\\Users\\alice\\AppData\\...\\stealer.exe",
+                "antiviruses": ["Windows Defender"],
+                "ip": "1.2.**.*",
+                "top_passwords": ["A*******1", "B*******2"],
+                "top_logins": ["a***@example.com", "b***@example.com"],
+            },
+            {
+                "total_corporate_services": 20,
+                "total_user_services": 500,
+                "date_compromised": "2024-08-15T00:00:00.000Z",
+                "computer_name": "LAPTOP-Y (bob)",
+                "operating_system": "Windows 10",
+                "malware_path": "Not Found",
+                "antiviruses": [],
+                "ip": "Not Found",
+                "top_passwords": [],
+                "top_logins": [],
+            },
+        ],
+    }
+
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(200, json=fake_response, request=_httpx.Request("GET", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    events = hudson_rock_email_check({"email": "u@example.com"})
+    breach_hits = [e for e in events if e["event_type"] == "breach-hit"]
+    assert len(breach_hits) == 2
+    # Compromise metadata preserved.
+    computers = {bh["payload"]["computer_name"] for bh in breach_hits}
+    assert "DESKTOP-X (alice)" in computers
+    assert "LAPTOP-Y (bob)" in computers
+    # Summary carries top-level totals.
+    summary = events[-1]["payload"]
+    assert summary["stealer_count"] == 2
+    assert summary["total_corporate_services"] == 50
+    assert summary["total_user_services"] == 1200
+
+
+def test_hudson_rock_strips_credential_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Belt-and-suspenders over Hudson Rock's own partial redaction:
+    even if they ever start returning full top_passwords / top_logins,
+    our `_redact_credentials` recursion must strip them. Same contract
+    as the IntelBase adapter."""
+    fake_response = {
+        "stealers": [
+            {
+                "computer_name": "DESKTOP-X",
+                "top_passwords": ["PLAIN_PASSWORD_LEAKED"],
+                "top_logins": ["user@example.com"],
+                "password_hash": "deadbeef",
+                "credential_data": "should-never-appear",
+            }
+        ],
+    }
+
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(200, json=fake_response, request=_httpx.Request("GET", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    events = hudson_rock_email_check({"email": "u@example.com"})
+    import json as _json
+
+    serialized = _json.dumps(events)
+    assert "PLAIN_PASSWORD_LEAKED" not in serialized
+    assert "deadbeef" not in serialized
+    assert "should-never-appear" not in serialized
+    # The non-credential metadata still surfaced.
+    breach_hits = [e for e in events if e["event_type"] == "breach-hit"]
+    assert len(breach_hits) == 1
+    assert breach_hits[0]["payload"]["computer_name"] == "DESKTOP-X"
+
+
+def test_hudson_rock_empty_stealers_returns_summary_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No infostealer matches != error. Useful negative signal:
+    'this email does not appear in any known stealer dump'."""
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(
+            200,
+            json={"stealers": [], "total_corporate_services": 0, "total_user_services": 0},
+            request=_httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    events = hudson_rock_email_check({"email": "u@example.com"})
+    assert all(e["event_type"] != "breach-hit" for e in events)
+    assert events[-1]["event_type"] == "tool-run-result"
+    assert events[-1]["payload"]["stealer_count"] == 0
 
 
 def test_intelbase_redacts_credential_fields(

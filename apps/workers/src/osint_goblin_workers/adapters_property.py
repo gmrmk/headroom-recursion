@@ -758,6 +758,177 @@ def _github_commit_email_synthetic(payload: dict[str, Any]) -> list[dict[str, An
 
 
 # ---------------------------------------------------------------------------
+# 3a-iii. Hudson Rock Cavalier -- free infostealer-log surface
+#
+# Ship #3 of the free-stack replacement for IntelBase (Margaret's parse,
+# 2026-05-11). This is the direct functional swap for IntelBase's marquee
+# "real-time infostealer log intelligence" feature. Hudson Rock's free
+# Cavalier API indexes ~30M+ infected machines and accepts unauthenticated
+# email lookups. They already partially redact passwords / logins in the
+# free tier response (e.g. "K**********3"), but we layer
+# `_redact_credentials` over the response as belt-and-suspenders -- if
+# they ever change policy, we don't propagate plaintext credentials into
+# our event stream. Same contract as the IntelBase adapter.
+#
+# Endpoint: GET https://cavalier.hudsonrock.com/api/json/v2/osint-tools/
+#                  search-by-email?email=<email>
+# Auth:     none, no signup, no key.
+#
+# Response (verified live, 2026-05-11):
+#   {message, stealers[{computer_name, operating_system, malware_path,
+#                       antiviruses[], ip, date_compromised,
+#                       total_corporate_services, total_user_services,
+#                       top_passwords[redacted], top_logins[redacted]}],
+#    total_corporate_services, total_user_services}
+# ---------------------------------------------------------------------------
+
+
+_HUDSON_ROCK_URL = "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email"
+
+
+def hudson_rock_email_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Hudson Rock Cavalier free infostealer-log lookup. Emits one
+    `breach-hit` per stealer entry + a summary tool-run-result with
+    top-level totals.
+
+    Payload:
+      {"email": "user@example.com"}
+    """
+    email = payload.get("email", "")
+    if not isinstance(email, str) or "@" not in email:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing or malformed 'email'"},
+            }
+        ]
+
+    headers: dict[str, str] = {"Accept": "application/json", "User-Agent": _USER_AGENT}
+
+    try:
+        with httpx.Client(timeout=15.0, headers=headers, follow_redirects=False) as c:
+            r = c.get(_HUDSON_ROCK_URL, params={"email": email})
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"hudson_rock {type(exc).__name__}: {exc}",
+                    "email": email,
+                },
+            }
+        ]
+
+    if r.status_code != 200:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"hudson_rock HTTP {r.status_code}",
+                    "email": email,
+                },
+            }
+        ]
+
+    try:
+        data = r.json()
+    except ValueError:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "hudson_rock non-JSON response", "email": email},
+            }
+        ]
+    if not isinstance(data, dict):
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "hudson_rock unexpected response shape", "email": email},
+            }
+        ]
+
+    # Belt-and-suspenders: redact credential-shaped fields recursively
+    # before any data is referenced for emit. Hudson Rock's free tier
+    # already does partial redaction (K**********3), but we don't trust
+    # that to persist.
+    safe = _redact_credentials(data)
+    stealers = safe.get("stealers") or []
+    if not isinstance(stealers, list):
+        stealers = []
+
+    events: list[dict[str, Any]] = []
+    # Cap at 25 stealer entries -- matches the IntelBase noise budget.
+    for s in stealers[:25]:
+        if not isinstance(s, dict):
+            continue
+        events.append(
+            {
+                "event_type": "breach-hit",
+                "payload": {
+                    "source": "hudson_rock",
+                    "email": email,
+                    "computer_name": s.get("computer_name", ""),
+                    "operating_system": s.get("operating_system", ""),
+                    "malware_path": s.get("malware_path", ""),
+                    "antiviruses": s.get("antiviruses", []),
+                    "ip": s.get("ip", ""),
+                    "date_compromised": s.get("date_compromised", ""),
+                    "total_corporate_services": s.get("total_corporate_services", 0),
+                    "total_user_services": s.get("total_user_services", 0),
+                },
+            }
+        )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "hudson_rock",
+                "email": email,
+                "stealer_count": len(events),
+                "total_corporate_services": safe.get("total_corporate_services", 0),
+                "total_user_services": safe.get("total_user_services", 0),
+            },
+        }
+    )
+    return events
+
+
+def _hudson_rock_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Synthetic Hudson Rock: one stealer + summary."""
+    email = payload.get("email") or "user@example.com"
+    return [
+        {
+            "event_type": "breach-hit",
+            "payload": {
+                "source": "hudson_rock",
+                "email": email,
+                "computer_name": "DESKTOP-SYN (synthetic)",
+                "operating_system": "Windows 11 (synthetic)",
+                "malware_path": "Not Found",
+                "antiviruses": ["Windows Defender"],
+                "ip": "1.2.**.*",
+                "date_compromised": "2024-06-01T00:00:00.000Z",
+                "total_corporate_services": 12,
+                "total_user_services": 240,
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "hudson_rock",
+                "email": email,
+                "stealer_count": 1,
+                "total_corporate_services": 12,
+                "total_user_services": 240,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 3a. IntelBase email lookup -- POST https://api.intelbase.is/lookup/email
 #
 # IntelBase aggregates 40B+ breach records + real-time infostealer log
@@ -2419,6 +2590,19 @@ _REGISTRY.register(
         "GitHub /search/commits?q=author-email:<email>. Behavioral identity "
         "confirm: emits person-match per unique repo. Free anonymous "
         "(10/min); OSINT_GITHUB_PAT unlocks 30/min."
+    ),
+)
+
+_REGISTRY.register(
+    "hudson_rock_email_check",
+    hudson_rock_email_check,
+    synthetic_mode=_hudson_rock_synthetic,
+    in_process=True,
+    description=(
+        "Hudson Rock Cavalier free infostealer-log lookup. Indexes 30M+ "
+        "infected machines; emits breach-hit per stealer entry. "
+        "Credential fields stripped (belt-and-suspenders over their own "
+        "partial redaction). No auth required."
     ),
 )
 
