@@ -739,10 +739,32 @@ else:
         ),
     )
 
-_REGISTRY.register(
-    "tineye_image",
-    _tineye_live_stub,
-    synthetic_mode=_tineye_synthetic,
-    in_process=True,
-    description="TinEye reverse image -- live needs API key (Sprint 3+). Synthetic available.",
-)
+# TinEye reverse-image search: same pattern as TruePeopleSearch.
+# Empirical venv ships Scrapling; the wrapper does URL-based search
+# against tineye.com/search (no image upload needed for property-vetting).
+_TINEYE_WRAPPER = _REPO_ROOT_PROP / "adapters" / "tineye" / "wrapper.py"
+if _TINEYE_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
+    _REGISTRY.register(
+        "tineye_image",
+        make_subprocess_adapter(
+            _TINEYE_WRAPPER,
+            timeout_s=60.0,
+            python_executable=str(_EMPIRICAL_PY),
+        ),
+        synthetic_mode=make_subprocess_adapter(
+            _TINEYE_WRAPPER,
+            timeout_s=30.0,
+            python_executable=str(_EMPIRICAL_PY),
+            extra_env={"OSINT_ADAPTER_MODE": "synthetic"},
+        ),
+        in_process=False,
+        description="TinEye reverse image search via Scrapling subprocess (Sprint 3 live mode).",
+    )
+else:
+    _REGISTRY.register(
+        "tineye_image",
+        _tineye_live_stub,
+        synthetic_mode=_tineye_synthetic,
+        in_process=True,
+        description=("TinEye -- empirical venv or wrapper missing; in-process stub only."),
+    )
