@@ -18,3 +18,8 @@ test:
 
 agpl-lint:
     uv run python tools/ci/agpl_import_lint.py
+
+# Priya R-10 phase6: four-service health probe; target <10s wall, all green
+# means the M0 dev stack is up. Detail per service printed when red.
+smoke:
+    uv run python tools/dev/smoke.py

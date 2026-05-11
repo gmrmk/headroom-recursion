@@ -1,0 +1,138 @@
+{
+  // OSINT GOBLIN -- per-repo VS Code config (Priya phase6 R-10 / P1).
+  //
+  // Why this file exists:
+  //   New contributors open the repo and immediately get:
+  //     - Wrong Python interpreter (system Python, not .venv) -> import errors
+  //       in the editor that don't reproduce on the CLI.
+  //     - Ruff + Biome not auto-applied -> commits fail at the pre-commit ruff
+  //       hook after the editor has already "saved" the file.
+  //     - VS Code indexing .venv/, node_modules/, .next/, .dev-logs/ which
+  //       drowns Cmd-P file search and burns CPU on Win11.
+  //   This file pins the right answers so the onboarding-to-first-PR loop
+  //   doesn't lose 30+ minutes to environment drift (Priya P1).
+
+  // ---------------------------------------------------------------------------
+  // Python
+  // ---------------------------------------------------------------------------
+  // Pin to the repo's .venv. ${workspaceFolder} resolves at editor load,
+  // POSIX or Win11. The .exe suffix is harmless on POSIX (VS Code strips it).
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["packages", "apps", "tests"],
+
+  // Pylance type-check mode. "strict" is the Sora ADR-0006 stance for the
+  // packages/ layer; we accept the editor noise to surface type holes early.
+  "python.analysis.typeCheckingMode": "strict",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.indexing": true,
+
+  // Ruff as the canonical Python formatter + linter (matches pre-commit).
+  // organizeImports.ruff handles isort-equivalent on save so we never commit
+  // an unsorted import block that the pre-commit ruff hook would reject.
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // TypeScript / Next.js (apps/web)
+  // ---------------------------------------------------------------------------
+  "typescript.tsdk": "apps/web/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "javascript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+
+  // Biome handles TS/JSX/JSON formatting + lint (matches what apps/web ships).
+  "[typescript]":      { "editor.defaultFormatter": "biomejs.biome", "editor.formatOnSave": true },
+  "[typescriptreact]": { "editor.defaultFormatter": "biomejs.biome", "editor.formatOnSave": true },
+  "[javascript]":      { "editor.defaultFormatter": "biomejs.biome", "editor.formatOnSave": true },
+  "[javascriptreact]": { "editor.defaultFormatter": "biomejs.biome", "editor.formatOnSave": true },
+  "[json]":            { "editor.defaultFormatter": "biomejs.biome", "editor.formatOnSave": true },
+  "[jsonc]":           { "editor.defaultFormatter": "biomejs.biome", "editor.formatOnSave": true },
+
+  // ---------------------------------------------------------------------------
+  // PowerShell
+  // ---------------------------------------------------------------------------
+  // .ps1 files are ASCII-only by repo policy (Priya WI-0125b; pre-commit hook
+  // catches violations). Set ASCII encoding so VS Code doesn't silently insert
+  // a UTF-8 BOM that PSReadLine reads as cp1252 noise.
+  "[powershell]": {
+    "files.encoding": "windows1252",
+    "editor.formatOnSave": false
+  },
+
+  // ---------------------------------------------------------------------------
+  // Editor
+  // ---------------------------------------------------------------------------
+  "editor.rulers": [100],
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.renderWhitespace": "boundary",
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+
+  // ---------------------------------------------------------------------------
+  // Workspace hygiene -- keep Cmd-P + Search responsive on Win11.
+  // ---------------------------------------------------------------------------
+  "files.exclude": {
+    "**/.venv": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/.mypy_cache": true,
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/.turbo": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.dev-logs": false,
+    "**/data/minio-fs": true,
+    "**/data/*.db": true,
+    "**/data/*.db-journal": true,
+    "**/data/*.db-wal": true,
+    "**/data/*.db-shm": true
+  },
+  "search.exclude": {
+    "**/.venv": true,
+    "**/__pycache__": true,
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/.turbo": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/data/minio-fs": true,
+    "**/pnpm-lock.yaml": true,
+    "**/uv.lock": true
+  },
+  "files.watcherExclude": {
+    "**/.venv/**": true,
+    "**/__pycache__/**": true,
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/.turbo/**": true,
+    "**/.dev-logs/**": true,
+    "**/data/minio-fs/**": true
+  },
+
+  // ---------------------------------------------------------------------------
+  // Terminal -- match the start-dev.ps1 expectations.
+  // ---------------------------------------------------------------------------
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "terminal.integrated.env.windows": {
+    "PYTHONUTF8": "1",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  }
+}

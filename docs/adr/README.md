@@ -23,13 +23,13 @@ This directory is the chronological record of every load-bearing decision in OSI
 | 0015 | [Real-name-leak full Sheet + 35% dim + action freeze](0015-real-name-leak-sheet-dim-freeze.md) | accepted | 2026-05-10 |
 | 0016 | [followthemoney `properties_ext` JSONB escape hatch + upstream-promotion path](0016-followthemoney-properties-ext-escape-hatch.md) | accepted | 2026-05-10 |
 | 0017 | [cmd-K command palette specification](0017-cmd-k-palette-spec.md) | accepted | 2026-05-10 |
+| 0018 | [Defer the `osint_goblin_evidence_pipeline` split until measurement-gated](0018-evidence-pipeline-split-deferral.md) | accepted | 2026-05-11 |
 | 0022 | [Adopt import-linter for DAG enforcement alongside home-grown module_dag_lint](0022-import-linter-dag-enforcement.md) | proposed | 2026-05-11 |
 
-**Reserved (not yet authored)** — placeholders for the four Sora-proposed ADRs in phase6 (numbers reserved to keep authorship order coherent with the research dispatch):
+**Reserved (not yet authored)** — placeholders for the remaining Sora-proposed ADRs in phase6 (numbers reserved to keep authorship order coherent with the research dispatch):
 
 | # | Title | Status | Reserved |
 |---|---|---|---|
-| 0018 | L3 evidence_pipeline split (evidence_writer vs workflow_coordinator) | reserved — measurement-gated per R-11 | 2026-05-11 |
 | 0019 | Per-adapter venv isolation (AGPL + conflict-prone) | reserved — P2 under pivot per R-4/Sora | 2026-05-11 |
 | 0020 | Three-class actor split (fast / slow / streaming) | reserved — P0 distribution-independent | 2026-05-11 |
 | 0021 | Versioned adapter-event schema (adapter_events.schema.json v1) | reserved — P0 Sprint 2 per Sora pivot | 2026-05-11 |

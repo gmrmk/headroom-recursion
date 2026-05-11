@@ -68,23 +68,230 @@ param(
 
     # m1 only -- passed through to docker compose --profile
     [ValidateSet('age','memgraph')]
-    [string]$GraphTier = 'age'
+    [string]$GraphTier = 'age',
+
+    # -Diagnose runs every prereq check non-fatally, prints a what/why/fix
+    # table covering ALL failures (not just the first), then exits 0/9.
+    # Spawns no services. Priya phase6 R-10 / P1 -- the "doctor" command.
+    [switch]$Diagnose
 )
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
 
-$VenvDir   = Join-Path $RepoRoot ".venv"
-$WebDir    = Join-Path $RepoRoot "apps/web"
-$ApiPort   = 8000
-$WebPort   = 3000
-$RedisPort = 6379
+$VenvDir    = Join-Path $RepoRoot ".venv"
+$VenvPython = Join-Path $VenvDir "Scripts/python.exe"
+$WebDir     = Join-Path $RepoRoot "apps/web"
+$ApiPort    = 8000
+$WebPort    = 3000
+$RedisPort  = 6379
 
 function Write-Step($msg)  { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)    { Write-Host "    OK  $msg" -ForegroundColor Green }
 function Write-Warn2($msg) { Write-Host "    WARN $msg" -ForegroundColor Yellow }
 function Write-Err($msg)   { Write-Host "    ERR  $msg" -ForegroundColor Red }
+
+# -----------------------------------------------------------------------------
+# Diagnose accumulator (Priya R-10 phase6).
+#
+# Three-line "what / why / fix" tables are the doctrine: a contributor whose
+# stack failed to come up should see one screen of actionable text, not a
+# 200-line PowerShell stack trace. Each finding goes into $script:DiagFindings
+# and is printed at the end so we surface ALL problems on one pass, not just
+# the first.
+# -----------------------------------------------------------------------------
+$script:DiagFindings = New-Object System.Collections.ArrayList
+
+function Add-DiagFinding {
+    param(
+        [Parameter(Mandatory)][ValidateSet('PASS','FAIL','WARN')][string]$Status,
+        [Parameter(Mandatory)][string]$What,
+        [string]$Why = '',
+        [string]$Fix = ''
+    )
+    [void]$script:DiagFindings.Add([pscustomobject]@{
+        Status = $Status
+        What   = $What
+        Why    = $Why
+        Fix    = $Fix
+    })
+}
+
+function Write-Diagnose {
+    # 3-line what / why / fix block. Used standalone (outside -Diagnose) when
+    # a hard failure happens and we want the operator to see remediation
+    # without grepping the script. Also used at the end of -Diagnose to render
+    # the accumulated table.
+    param(
+        [Parameter(Mandatory)][string]$What,
+        [Parameter(Mandatory)][string]$Why,
+        [Parameter(Mandatory)][string]$Fix
+    )
+    Write-Host ""
+    Write-Host "  WHAT: $What" -ForegroundColor Red
+    Write-Host "  WHY : $Why"  -ForegroundColor Yellow
+    Write-Host "  FIX : $Fix"  -ForegroundColor Cyan
+    Write-Host ""
+}
+
+function Invoke-Diagnose {
+    # Run every prereq check non-fatally, collect findings, print one table,
+    # exit 0 if all PASS/WARN or 9 if any FAIL. Never spawns a service.
+    Write-Step "Diagnose mode -- running all prereq checks (no services will spawn)"
+
+    # 1. Python
+    $python = Resolve-Tool "python"
+    if (-not $python) {
+        Add-DiagFinding -Status FAIL -What "Python on PATH" `
+            -Why "python.exe not resolvable via Get-Command" `
+            -Fix "Install Python 3.13 from python.org and tick 'Add to PATH'"
+    } else {
+        $pyVersion = & $python --version 2>&1
+        if ($pyVersion -notmatch "3\.1[3-9]") {
+            Add-DiagFinding -Status WARN -What "Python version" `
+                -Why "$pyVersion detected, project targets 3.13+" `
+                -Fix "Install 3.13: winget install Python.Python.3.13"
+        } else {
+            Add-DiagFinding -Status PASS -What "Python $pyVersion"
+        }
+    }
+
+    # 2. Node
+    $node = Resolve-Tool "node"
+    if (-not $node) {
+        Add-DiagFinding -Status FAIL -What "Node on PATH" `
+            -Why "node not resolvable via Get-Command" `
+            -Fix "Install Node 20+: winget install OpenJS.NodeJS.LTS"
+    } else {
+        $nodeVersion = & $node --version
+        if ($nodeVersion -notmatch "v(2[0-9]|[3-9][0-9])\.") {
+            Add-DiagFinding -Status WARN -What "Node version" `
+                -Why "$nodeVersion is below 20.x, Next.js 15 expects 20+" `
+                -Fix "Upgrade: winget upgrade OpenJS.NodeJS.LTS"
+        } else {
+            Add-DiagFinding -Status PASS -What "Node $nodeVersion"
+        }
+    }
+
+    # 3. pnpm
+    $pnpm = Resolve-Tool "pnpm"
+    if (-not $pnpm) {
+        Add-DiagFinding -Status WARN -What "pnpm on PATH" `
+            -Why "pnpm not resolvable, will be auto-provisioned by corepack on next non-diagnose run" `
+            -Fix "Or provision now: corepack enable; corepack prepare pnpm@latest --activate"
+    } else {
+        Add-DiagFinding -Status PASS -What "pnpm $(& $pnpm --version)"
+    }
+
+    # 4. uv (optional but strongly preferred)
+    $uv = Resolve-Tool "uv"
+    if (-not $uv) {
+        Add-DiagFinding -Status WARN -What "uv on PATH" `
+            -Why "uv not found; falls back to pip (10x slower sync)" `
+            -Fix "pipx install uv  (or: winget install astral-sh.uv)"
+    } else {
+        Add-DiagFinding -Status PASS -What "uv $(& $uv --version 2>$null)"
+    }
+
+    # 5. venv
+    if (-not (Test-Path $VenvPython)) {
+        Add-DiagFinding -Status FAIL -What ".venv Python interpreter" `
+            -Why "$VenvPython does not exist" `
+            -Fix "Run: ./scripts/start-dev.ps1 -Init  (creates venv on first run)"
+    } else {
+        Add-DiagFinding -Status PASS -What ".venv at $VenvDir"
+    }
+
+    # 6. Redis / Memurai port
+    if (Test-Port $RedisPort) {
+        Add-DiagFinding -Status PASS -What "Redis-protocol service on :$RedisPort"
+    } else {
+        $memurai = Resolve-Tool "memurai"
+        $svc = Get-Service -Name 'Memurai*' -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($svc) {
+            Add-DiagFinding -Status WARN -What "Memurai service installed but not running" `
+                -Why "Service state: $($svc.Status)" `
+                -Fix "Start-Service $($svc.Name)  (or: ./scripts/start-dev.ps1 will start it)"
+        } elseif ($memurai) {
+            Add-DiagFinding -Status WARN -What "memurai.exe present but no service" `
+                -Why "Memurai binary on PATH but no Windows service registered" `
+                -Fix "Reinstall as service: winget install Memurai.MemuraiDeveloper"
+        } else {
+            Add-DiagFinding -Status FAIL -What "Redis-protocol service" `
+                -Why "No service on :$RedisPort and no Memurai installed" `
+                -Fix "winget install Memurai.MemuraiDeveloper  (or run WSL2 redis-server)"
+        }
+    }
+
+    # 7. Mode-specific (m1 only): Docker
+    if ($Mode -eq 'm1') {
+        try {
+            & docker info 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Add-DiagFinding -Status PASS -What "Docker Desktop reachable (m1 mode)"
+            } else {
+                Add-DiagFinding -Status FAIL -What "Docker Desktop (m1 mode)" `
+                    -Why "docker info exited $LASTEXITCODE" `
+                    -Fix "Start Docker Desktop, or fall back to -Mode m0"
+            }
+        } catch {
+            Add-DiagFinding -Status FAIL -What "Docker Desktop (m1 mode)" `
+                -Why "docker command not on PATH" `
+                -Fix "Install Docker Desktop, or fall back to -Mode m0"
+        }
+    }
+
+    # 8. Port collisions for the services we'd spawn
+    if (Test-Port $ApiPort) {
+        Add-DiagFinding -Status WARN -What "API port :$ApiPort already bound" `
+            -Why "Something is already listening (possibly a prior run)" `
+            -Fix "Get-NetTCPConnection -LocalPort $ApiPort | Select-Object OwningProcess | Stop-Process -Force"
+    } else {
+        Add-DiagFinding -Status PASS -What "API port :$ApiPort free"
+    }
+    if (Test-Port $WebPort) {
+        Add-DiagFinding -Status WARN -What "Web port :$WebPort already bound" `
+            -Why "Something is already listening (possibly a prior run)" `
+            -Fix "Get-NetTCPConnection -LocalPort $WebPort | Select-Object OwningProcess | Stop-Process -Force"
+    } else {
+        Add-DiagFinding -Status PASS -What "Web port :$WebPort free"
+    }
+
+    # 9. Repo anchors
+    $anchors = @('.git','pyproject.toml','justfile','.editorconfig') |
+        Where-Object { Test-Path (Join-Path $RepoRoot $_) }
+    if ($anchors.Count -eq 0) {
+        Add-DiagFinding -Status FAIL -What "Repo root anchor" `
+            -Why "None of .git / pyproject.toml / justfile / .editorconfig at $RepoRoot" `
+            -Fix "cd into the cloned osint-goblin repo before running"
+    } else {
+        Add-DiagFinding -Status PASS -What "Repo anchors: $($anchors -join ', ')"
+    }
+
+    # ---- Render table ----
+    Write-Host ""
+    Write-Host "  Diagnose report (osint-goblin dev stack)" -ForegroundColor Cyan
+    Write-Host "  $('-' * 60)"
+    foreach ($f in $script:DiagFindings) {
+        $color = switch ($f.Status) {
+            'PASS' { 'Green' }
+            'WARN' { 'Yellow' }
+            'FAIL' { 'Red' }
+        }
+        Write-Host ("  [{0,-4}] {1}" -f $f.Status, $f.What) -ForegroundColor $color
+        if ($f.Why) { Write-Host ("         why: {0}" -f $f.Why) -ForegroundColor DarkGray }
+        if ($f.Fix) { Write-Host ("         fix: {0}" -f $f.Fix) -ForegroundColor DarkCyan }
+    }
+    $fails = @($script:DiagFindings | Where-Object { $_.Status -eq 'FAIL' }).Count
+    $warns = @($script:DiagFindings | Where-Object { $_.Status -eq 'WARN' }).Count
+    $passes = @($script:DiagFindings | Where-Object { $_.Status -eq 'PASS' }).Count
+    Write-Host ""
+    Write-Host "  Summary: $passes PASS, $warns WARN, $fails FAIL" -ForegroundColor Cyan
+    Write-Host ""
+    if ($fails -gt 0) { exit 9 }
+    exit 0
+}
 
 function Test-Port($port) {
     # Returns $true if something is already listening on $port on localhost.
@@ -188,6 +395,11 @@ def heartbeat() -> str:
     Write-Ok "Init complete"
 }
 
+# -Diagnose runs ALL prereq checks non-fatally and exits. No services spawn.
+# Must precede Init -- the operator may run -Diagnose specifically because
+# the repo state is unhealthy and Init would itself crash.
+if ($Diagnose) { Invoke-Diagnose }
+
 if ($Init) { Invoke-Init }
 
 # ----------------------------------------------------------------------------
@@ -233,9 +445,8 @@ if (-not $SkipPrereqs) {
 
 # ----------------------------------------------------------------------------
 # 2 & 3. Python venv + dep sync
+# ($VenvPython is defined at the top of the script so -Diagnose can use it.)
 # ----------------------------------------------------------------------------
-$VenvPython = Join-Path $VenvDir "Scripts/python.exe"
-
 if (-not (Test-Path $VenvPython)) {
     Write-Step "Creating venv at $VenvDir"
     $python = Resolve-Tool "python"
