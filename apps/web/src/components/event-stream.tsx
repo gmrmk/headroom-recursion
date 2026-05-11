@@ -309,11 +309,14 @@ const ROW_STYLE: React.CSSProperties = {
 };
 
 function EventRow({ event }: { event: InvestigationEvent }) {
-  // Mei-Lan-frontend accept (2026-05-11 wave-3): if the event carries a
-  // local flipped_path, render a clickable file:// link next to the
-  // payload summary. M0 surface only; M1 will swap for an inline
-  // thumbnail when the data/ static-serve path lands + Camille signs
-  // off on path-traversal containment.
+  // Mei-Lan M1 (2026-05-11): when the event carries `flipped_rel` (forward-
+  // slash, rel-to-data), render an inline <img> via /files/{flipped_rel}.
+  // The API surface (apps/api/.../files.py) has Camille's path-traversal
+  // containment: allowlisted subdirs, .. rejection, resolve-and-contain.
+  // Fallback to the older file:// link if only `flipped_path` is present
+  // (older synthetic events).
+  const flippedRel =
+    typeof event.payload?.flipped_rel === "string" ? event.payload.flipped_rel : "";
   const flippedPath =
     typeof event.payload?.flipped_path === "string" ? event.payload.flipped_path : "";
   return (
@@ -326,7 +329,28 @@ function EventRow({ event }: { event: InvestigationEvent }) {
         {Object.keys(event.payload).length > 0 ? (
           <span style={{ color: "#737373" }}>{summarizePayload(event.payload)}</span>
         ) : null}
-        {flippedPath ? (
+        {flippedRel ? (
+          <a
+            href={`/api/files/${flippedRel}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "inline-block", marginTop: 4 }}
+          >
+            <img
+              src={`/api/files/${flippedRel}`}
+              alt="flipped variant"
+              loading="lazy"
+              style={{
+                maxHeight: 96,
+                maxWidth: 160,
+                border: "1px solid #2a2a2a",
+                borderRadius: 4,
+                background: "#1a1a1a",
+                display: "block",
+              }}
+            />
+          </a>
+        ) : flippedPath ? (
           <a
             href={`file:///${flippedPath.replace(/\\/g, "/")}`}
             target="_blank"

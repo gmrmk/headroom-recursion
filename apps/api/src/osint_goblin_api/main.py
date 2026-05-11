@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from osint_goblin_schemas.agpl_runtime_check import assert_no_agpl_loaded
 
+from .files import router as files_router
 from .routes import router
 
 # R-8 phase6: third layer of AGPL containment defense-in-depth (after the AST
@@ -24,3 +25,4 @@ app = FastAPI(
 )
 
 app.include_router(router)
+app.include_router(files_router)

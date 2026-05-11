@@ -297,6 +297,10 @@ def image_flip_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
         h = hashlib.sha256(image_url.encode()).hexdigest()[:16]
         out_path = out_dir / f"{h}.jpg"
         out_path.write_bytes(flipped_bytes)
+        # Mei-Lan M1: emit a forward-slash rel-to-data path alongside the
+        # absolute one. The API's /files/{rel_path} surface (Camille accept)
+        # serves it inline so EventRow can render <img src="/files/...">.
+        flipped_rel = f"flipped/{h}.jpg"
         return [
             {
                 "event_type": "image-match",
@@ -304,6 +308,7 @@ def image_flip_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     "source": "flip",
                     "image_url": image_url,
                     "flipped_path": str(out_path),
+                    "flipped_rel": flipped_rel,
                     "size_bytes": len(flipped_bytes),
                     "content_type": ctype,
                     "note": "feed flipped_path back into tineye_image or yandex_image_reverse",
@@ -311,7 +316,11 @@ def image_flip_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
             },
             {
                 "event_type": "tool-run-result",
-                "payload": {"image_url": image_url, "flipped_path": str(out_path)},
+                "payload": {
+                    "image_url": image_url,
+                    "flipped_path": str(out_path),
+                    "flipped_rel": flipped_rel,
+                },
             },
         ]
     # base64 default
@@ -348,6 +357,7 @@ def _image_flip_check_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]
                 "source": "flip",
                 "image_url": url,
                 "flipped_path": "data/flipped/abc123.jpg",
+                "flipped_rel": "flipped/abc123.jpg",
                 "size_bytes": 102400,
                 "content_type": "image/jpeg",
                 "synthetic": True,
