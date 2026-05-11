@@ -1,0 +1,43 @@
+[project]
+name = "osint-goblin"
+version = "2026.05.0"
+description = "OSINT Goblin — FOSS-first OSINT investigation dashboard (workspace root)."
+requires-python = ">=3.11,<3.14"
+license = { text = "Apache-2.0" }  # ADR-0009-tbd / MANUFACTURING-PLAN §2.2
+
+[tool.uv.workspace]
+members = [
+  "packages/osint_goblin_schemas",
+  "packages/osint_goblin_forensics",
+  "packages/osint_goblin_db",
+  "packages/osint_goblin_ftm",
+  "packages/osint_goblin_opsec",
+  "packages/osint_goblin_fetcher",
+  "packages/osint_goblin_adapters",
+  "packages/osint_goblin_attestation",
+  "packages/osint_goblin_evidence_pipeline",
+  "apps/api",
+  "apps/workers",
+]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.7",
+  "mypy>=1.13,<2",       # mypy 2.0 dropped some strict-mode behaviors; revisit Sprint 7+
+  "pytest>=8,<10",       # pin band; pytest 9 fine, pytest 10+ revisit
+  "pytest-asyncio>=0.24",
+  "pre-commit>=3.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", "adapters"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF", "SIM"]
+
+[tool.mypy]
+strict = true
+warn_unused_ignores = true
+warn_return_any = true

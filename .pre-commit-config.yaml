@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: agpl-import-lint
+        name: AGPL import lint
+        entry: python tools/ci/agpl_import_lint.py
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: module-dag-lint
+        name: Module DAG lint
+        entry: python tools/ci/module_dag_lint.py
+        language: system
+        pass_filenames: false
+        types: [python]

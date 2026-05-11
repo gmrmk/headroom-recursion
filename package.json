@@ -1,0 +1,15 @@
+{
+  "name": "osint-goblin",
+  "version": "2026.05.0",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm --filter @osint-goblin/web dev",
+    "build": "pnpm --filter @osint-goblin/web build",
+    "lint": "biome check .",
+    "gen:api": "openapi-typescript http://localhost:8000/openapi.json -o apps/web/src/types/api.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4"
+  }
+}

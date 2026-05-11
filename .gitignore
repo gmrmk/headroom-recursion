@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+# Node
+node_modules/
+.next/
+.turbo/
+# Build artifacts
+dist/
+build/
+*.egg
+# IDE
+.vscode/*.local
+.idea/
+# OS
+.DS_Store
+Thumbs.db
+# Lockfiles tracked, env not
+.env
+.env.local
+# uv/pnpm reproducible state IS tracked
+!uv.lock
+!pnpm-lock.yaml

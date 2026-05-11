@@ -1,0 +1,10 @@
+[project]
+name = "osint-goblin-adapter-ghunt"
+version = "2026.05.0"
+description = "GHunt subprocess wrapper (AGPL-3.0 vendored). NOT a workspace member."
+requires-python = ">=3.11"
+dependencies = []  # would normally include ghunt; left empty for scaffold spike
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

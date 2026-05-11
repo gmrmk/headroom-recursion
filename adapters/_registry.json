@@ -1,0 +1,6 @@
+{
+  "ghunt": {
+    "licence_class": "agpl-3.0",
+    "wrapper": "adapters/ghunt/wrapper.py"
+  }
+}
