@@ -48,6 +48,18 @@ const ADAPTERS: ReadonlyArray<{
     examplePayload: '{\n  "name": "Alice Smith",\n  "city": "Springfield",\n  "state": "IL"\n}',
   },
   {
+    id: "linkedin_profile",
+    label: "LinkedIn — public profile",
+    hint: "Public-view fetch (no login). Needs profile URL.",
+    examplePayload: '{\n  "profile_url": "https://www.linkedin.com/in/alice-smith"\n}',
+  },
+  {
+    id: "rocketreach_search",
+    label: "RocketReach — name search",
+    hint: "Free-tier name search (no email/phone). Scrapling subprocess.",
+    examplePayload: '{\n  "name": "Alice Smith",\n  "company": "Acme Corp"\n}',
+  },
+  {
     id: "tineye_image",
     label: "TinEye — reverse image",
     hint: "URL-based reverse-image search via Scrapling.",

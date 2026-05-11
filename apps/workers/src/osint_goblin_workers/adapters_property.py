@@ -739,6 +739,47 @@ else:
         ),
     )
 
+# LinkedIn public-profile fetch: same Scrapling subprocess pattern.
+# Public-view only; no login, no account-lock risk. Profile URL required.
+_LINKEDIN_WRAPPER = _REPO_ROOT_PROP / "adapters" / "linkedin" / "wrapper.py"
+if _LINKEDIN_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
+    _REGISTRY.register(
+        "linkedin_profile",
+        make_subprocess_adapter(
+            _LINKEDIN_WRAPPER,
+            timeout_s=60.0,
+            python_executable=str(_EMPIRICAL_PY),
+        ),
+        synthetic_mode=make_subprocess_adapter(
+            _LINKEDIN_WRAPPER,
+            timeout_s=30.0,
+            python_executable=str(_EMPIRICAL_PY),
+            extra_env={"OSINT_ADAPTER_MODE": "synthetic"},
+        ),
+        in_process=False,
+        description="LinkedIn public-profile fetch via Scrapling (no login).",
+    )
+
+# RocketReach name search: free-tier public results only (no API key).
+_ROCKETREACH_WRAPPER = _REPO_ROOT_PROP / "adapters" / "rocketreach" / "wrapper.py"
+if _ROCKETREACH_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
+    _REGISTRY.register(
+        "rocketreach_search",
+        make_subprocess_adapter(
+            _ROCKETREACH_WRAPPER,
+            timeout_s=60.0,
+            python_executable=str(_EMPIRICAL_PY),
+        ),
+        synthetic_mode=make_subprocess_adapter(
+            _ROCKETREACH_WRAPPER,
+            timeout_s=30.0,
+            python_executable=str(_EMPIRICAL_PY),
+            extra_env={"OSINT_ADAPTER_MODE": "synthetic"},
+        ),
+        in_process=False,
+        description="RocketReach name search via Scrapling (free-tier surface only).",
+    )
+
 # TinEye reverse-image search: same pattern as TruePeopleSearch.
 # Empirical venv ships Scrapling; the wrapper does URL-based search
 # against tineye.com/search (no image upload needed for property-vetting).
