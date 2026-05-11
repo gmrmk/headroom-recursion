@@ -131,6 +131,45 @@ _REGISTRY.register(
 )
 
 
+# R-6 (Sprint 2 Day 11-12): worker_stress emits N synthetic events from the
+# WORKER process so the soak test exercises the actual Redis pub/sub bridge
+# (not the in-process m0_gate_stress path which only proves SSE works
+# within one process). Default N=32 mirrors m0_gate_stress so the assertion
+# floors are the same.
+_CYCLE_EVENT_TYPES = (
+    "capture-started",
+    "warc-written",
+    "ed25519-signed",
+    "rfc3161-stamped",
+    "minio-stored",
+    "ftm-entity-created",
+    "wayback-queued",
+    "tool-run-result",
+)
+
+
+def _worker_stress(payload: dict) -> list[dict]:
+    """Emit N events synchronously. The worker actor publishes each to
+    Redis pub/sub. N is `count` in the payload, default 32."""
+    count = int(payload.get("count", 32))
+    return [
+        {
+            "event_type": _CYCLE_EVENT_TYPES[i % len(_CYCLE_EVENT_TYPES)],
+            "payload": {"i": i, "synthetic": True, "source": "worker_stress"},
+        }
+        for i in range(count)
+    ]
+
+
+_REGISTRY.register(
+    "worker_stress",
+    _worker_stress,
+    synthetic_mode=_worker_stress,  # pure in-process generator; live == synthetic
+    in_process=True,
+    description="R-6 soak/bridge test adapter. Emits N synthetic events from the worker process.",
+)
+
+
 # Day 9 (WI-0205): Maigret -- first real subprocess-isolated AGPL adapter.
 # Path is resolved relative to the repo root at import time.
 _REPO_ROOT = Path(__file__).resolve().parents[4]

@@ -8,6 +8,7 @@ dependencies = [
   "osint-goblin-forensics",
   "fastapi>=0.115",
   "pydantic>=2.9",
+  "redis>=5",  # R-6: worker -> API SSE bridge subscriber
   "sse-starlette>=2.1",
   "uvicorn[standard]>=0.32",
 ]

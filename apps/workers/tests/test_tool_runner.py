@@ -26,17 +26,41 @@ def test_unknown_adapter_raises() -> None:
         tool_runner.fn(payload)
 
 
-def test_known_adapter_called(capsys: pytest.CaptureFixture[str]) -> None:
-    payload = {
-        "investigation_id": str(uuid.uuid4()),
-        "run_id": str(uuid.uuid4()),
-        "adapter_id": "echo",
-        "adapter_payload": {"handle": "alice"},
-    }
-    tool_runner.fn(payload)
-    captured = capsys.readouterr()
-    assert "echo" in captured.out
-    assert "alice" in captured.out
+def test_known_adapter_called(monkeypatch: pytest.MonkeyPatch) -> None:
+    """tool_runner dispatches to the named adapter and publishes each event
+    via the worker -> API Redis pub/sub bridge (R-6 Sprint 2 Day 11-12).
+    We mock the publisher so this stays a unit test (no Redis needed)."""
+    published: list[tuple[str, dict]] = []
+
+    def fake_publish(inv_id: str, event: dict) -> int:
+        published.append((inv_id, event))
+        return 1  # subscriber count
+
+    # The package __init__ binds the Actor on `osint_goblin_workers.tool_runner`
+    # attribute name (shadowing the submodule reference for `import as` syntax),
+    # so grab the actual submodule via sys.modules.
+    import sys
+
+    tr_mod = sys.modules["osint_goblin_workers.tool_runner"]
+    monkeypatch.setattr(tr_mod, "publish_event", fake_publish)
+
+    inv = str(uuid.uuid4())
+    run = str(uuid.uuid4())
+    tool_runner.fn(
+        {
+            "investigation_id": inv,
+            "run_id": run,
+            "adapter_id": "echo",
+            "adapter_payload": {"handle": "alice"},
+        }
+    )
+    assert len(published) == 1
+    pub_inv, pub_event = published[0]
+    assert pub_inv == inv
+    assert pub_event["event_type"] == "tool-run-result"
+    assert pub_event["payload"] == {"handle": "alice"}
+    assert pub_event["investigation_id"] == inv
+    assert pub_event["run_id"] == run
 
 
 def test_invalid_payload_rejected_by_pydantic() -> None:

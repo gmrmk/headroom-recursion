@@ -15,6 +15,7 @@ import dramatiq
 from pydantic import BaseModel, ConfigDict, Field
 
 from .adapters import get_registry
+from .publisher import publish_event
 
 
 class ToolRunPayload(BaseModel):
@@ -51,13 +52,18 @@ def tool_runner(req: dict) -> None:
     entry = get_registry().get(payload.adapter_id)
     if entry is None:
         raise ValueError(f"unknown adapter: {payload.adapter_id!r}")
-    # In Day 9+ this dispatches through the evidence pipeline. For now,
-    # call the adapter directly; the events it returns go to a structured
-    # log (a real result emitter is WI-0203 follow-up).
+    # Call the adapter; events it returns flow to the API via Redis pub/sub
+    # (R-6 Sprint 2 Day 11-12). Each event's `investigation_id` field is
+    # mandatory; we stamp it from the actor payload so adapters do not
+    # need to know the surrounding context.
     events = entry.callable(payload.adapter_payload)
-    # The full pipeline (Merkle append, Ed25519 sign, RFC3161 stamp, MinIO,
-    # FtM, SSE notify, Wayback) lands in WI-0202 + WI-0203 integration.
-    # Day 8 ships the dispatch shape; the chain emission is Day 9 + 10.
     for ev in events:
-        # Print for log-driven observability until SSE wire-back lands.
-        print(f"[tool_runner] adapter={payload.adapter_id!r} event={ev!r}")
+        # Stamp investigation_id + run_id; sequence + ts are stamped by the
+        # API on bridge-receive so per-investigation monotonicity is owned
+        # by exactly one process.
+        ev = {
+            **ev,
+            "investigation_id": payload.investigation_id,
+            "run_id": payload.run_id,
+        }
+        publish_event(payload.investigation_id, ev)

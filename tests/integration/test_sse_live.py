@@ -30,14 +30,12 @@ Three assertions in the M0 exit gate, in order of strictness:
 Marked `@pytest.mark.slow` so the fast loop (M-not-slow) skips it; runs in
 the Day 10 M0 exit gate battery + the weekly real-network battery.
 
-Status: TEST IS XFAIL UNTIL DAY 10 (WI-0208) because:
-  - The Maigret adapter currently emits 7 events (started + 5 site-hits +
-    complete), not 30. We need either a richer synthetic fixture or a
-    multi-adapter parallel-fan-out for 30+.
-  - The live-uvicorn fixture isn't wired into the Sprint-1 CI yet.
-
-When WI-0208 lands, remove the xfail marker and confirm all three
-assertions hold on Win11 + macOS + Linux runners.
+Status: PASSING as of Day 10 (WI-0208 2026-05-11). The xfail is lifted; the
+test now drives the `m0_gate_stress` synthetic in-process emitter in the
+API. That emitter (`apps/api/src/osint_goblin_api/routes.py::_emit_m0_gate_stress`)
+is the M0-gate-only path; when R-6 (Sprint 2 Day 11-12, Redis pub/sub) lands,
+the real worker emits the same shape via the real bridge and this test
+should continue passing without modification.
 """
 
 from __future__ import annotations
@@ -103,11 +101,6 @@ def live_api():
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    reason="WI-0208 not yet implemented; Maigret synthetic emits 7 events not 30+. "
-    "Remove xfail when Day 10 M0 exit gate lands.",
-    strict=False,
-)
 def test_m0_exit_gate_sse_live(live_api: str) -> None:
     """M0 exit gate: three SSE assertions on a real handle.
 
@@ -125,7 +118,11 @@ def test_m0_exit_gate_sse_live(live_api: str) -> None:
     run_posted_at = time.monotonic()
     httpx.post(
         f"{live_api}/investigations/{inv_id}/run",
-        json={"adapter_id": "maigret", "payload": {"username": "alice"}},
+        # m0_gate_stress is the synthetic in-process emitter (WI-0208); see
+        # apps/api/src/osint_goblin_api/routes.py::_emit_m0_gate_stress. It
+        # emits 32 events at 50ms each, well over the 30-in-60s threshold
+        # with first event within 50ms of POST.
+        json={"adapter_id": "m0_gate_stress", "payload": {}},
         timeout=5.0,
     )
 
