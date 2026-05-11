@@ -12,6 +12,7 @@ export type AdapterGroup =
   | "email"
   | "phone"
   | "domain"
+  | "ip"
   | "person"
   | "social"
   | "image"
@@ -31,6 +32,7 @@ export const GROUP_LABELS: Record<AdapterGroup, string> = {
   email: "Email",
   phone: "Phone",
   domain: "Domain / subdomain",
+  ip: "IP address",
   person: "Person — name-based",
   social: "Social handle",
   image: "Image",
@@ -43,6 +45,7 @@ export const GROUP_ORDER: ReadonlyArray<AdapterGroup> = [
   "email",
   "phone",
   "domain",
+  "ip",
   "person",
   "social",
   "image",
@@ -71,6 +74,13 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     label: "W3 — Phone Pivot",
     hint: "Format + carrier + timezone + Google-SERP mention scan.",
     examplePayload: '{\n  "phone": "+1 217 555 0123",\n  "region": "US"\n}',
+    group: "workflow",
+  },
+  {
+    id: "w10.ip",
+    label: "W10 — IP Vetting (closes 6-primitive)",
+    hint: "Geolocation + reverse DNS + ASN + AbuseIPDB reputation.",
+    examplePayload: '{\n  "ip": "8.8.8.8"\n}',
     group: "workflow",
   },
   {
@@ -198,6 +208,35 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     hint: "Heavy passive enum. Requires amass on PATH.",
     examplePayload: '{\n  "domain": "example.com",\n  "timeout_s": 120\n}',
     group: "domain",
+  },
+  // IP
+  {
+    id: "ip_geolocation",
+    label: "IP — geolocation (ip-api.com)",
+    hint: "Country + region + city + ISP. Free, 45/min.",
+    examplePayload: '{\n  "ip": "8.8.8.8"\n}',
+    group: "ip",
+  },
+  {
+    id: "ip_reverse_dns",
+    label: "IP — reverse DNS (PTR)",
+    hint: "Stdlib socket lookup. No external dep.",
+    examplePayload: '{\n  "ip": "8.8.8.8"\n}',
+    group: "ip",
+  },
+  {
+    id: "ip_asn_lookup",
+    label: "IP — ASN (Team Cymru WHOIS)",
+    hint: "AS number + AS name + BGP prefix + registry. Free TCP WHOIS.",
+    examplePayload: '{\n  "ip": "8.8.8.8"\n}',
+    group: "ip",
+  },
+  {
+    id: "ip_reputation",
+    label: "IP — AbuseIPDB reputation",
+    hint: "Abuse score + reports. Needs OSINT_ABUSEIPDB_KEY env.",
+    examplePayload: '{\n  "ip": "1.2.3.4"\n}',
+    group: "ip",
   },
   // Email
   {

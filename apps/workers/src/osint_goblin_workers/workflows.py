@@ -278,6 +278,35 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
         ],
     ),
+    "w10.ip": Workflow(
+        id="w10.ip",
+        name="IP Vetting",
+        description=(
+            "Geolocation + reverse DNS + ASN + reputation " "(closes 6-primitive triangulation)."
+        ),
+        steps=[
+            WorkflowStep(
+                "ip_geolocation",
+                {"ip": "{ip}"},
+                required_seed_keys=("ip",),
+            ),
+            WorkflowStep(
+                "ip_reverse_dns",
+                {"ip": "{ip}"},
+                required_seed_keys=("ip",),
+            ),
+            WorkflowStep(
+                "ip_asn_lookup",
+                {"ip": "{ip}"},
+                required_seed_keys=("ip",),
+            ),
+            WorkflowStep(
+                "ip_reputation",
+                {"ip": "{ip}"},
+                required_seed_keys=("ip",),
+            ),
+        ],
+    ),
     "w9.pv": Workflow(
         id="w9.pv",
         name="Property Vetting",

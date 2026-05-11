@@ -6,6 +6,7 @@
 from . import (
     adapters_domain,  # noqa: F401
     adapters_image,  # noqa: F401
+    adapters_ip,  # noqa: F401
     adapters_phone,  # noqa: F401
     adapters_property,  # noqa: F401
 )

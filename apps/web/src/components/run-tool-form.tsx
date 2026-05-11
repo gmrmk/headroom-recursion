@@ -34,6 +34,7 @@ export function RunToolForm({ investigationId }: RunToolFormProps) {
       email: [],
       phone: [],
       domain: [],
+      ip: [],
       person: [],
       social: [],
       image: [],
