@@ -8,7 +8,10 @@ not new actors.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
+
+from .subprocess_adapter import make_subprocess_adapter
 
 
 class AdapterCallable(Protocol):
@@ -73,11 +76,23 @@ def get_registry() -> AdapterRegistry:
     return _REGISTRY
 
 
-# Day 8: register a single 'echo' adapter for smoke testing. Maigret + the
-# other 11 M1 adapters land Day 9+ (WI-0205).
+# Day 8: 'echo' smoke adapter for in-process contract.
 def _echo(payload: dict) -> list[dict]:
     """Trivial adapter: echoes the payload back as a single event."""
     return [{"event_type": "tool-run-result", "payload": payload}]
 
 
 _REGISTRY.register("echo", _echo, in_process=True, description="Day-8 smoke adapter.")
+
+
+# Day 9 (WI-0205): Maigret — first real subprocess-isolated AGPL adapter.
+# Path is resolved relative to the repo root at import time.
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_MAIGRET_WRAPPER = _REPO_ROOT / "adapters" / "maigret" / "wrapper.py"
+if _MAIGRET_WRAPPER.is_file():
+    _REGISTRY.register(
+        "maigret",
+        make_subprocess_adapter(_MAIGRET_WRAPPER, timeout_s=180.0),
+        in_process=False,
+        description="Maigret username-on-N-sites probe (AGPL-3.0 subprocess-isolated).",
+    )

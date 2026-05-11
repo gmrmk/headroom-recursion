@@ -2,5 +2,11 @@
   "ghunt": {
     "licence_class": "agpl-3.0",
     "wrapper": "adapters/ghunt/wrapper.py"
+  },
+  "maigret": {
+    "licence_class": "agpl-3.0",
+    "wrapper": "adapters/maigret/wrapper.py",
+    "synthetic_mode": true,
+    "comment": "Falls back to synthetic event stream if maigret pkg not installed; real install gated on Camille's AGPL containment sign-off."
   }
 }
