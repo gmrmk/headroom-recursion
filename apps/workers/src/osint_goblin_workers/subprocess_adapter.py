@@ -119,13 +119,24 @@ def make_subprocess_adapter(
     wrapper_path: Path | str,
     *,
     timeout_s: float = 120.0,
+    extra_env: dict[str, str] | None = None,
 ):
     """Factory: return a callable conforming to AdapterCallable that dispatches
     to the wrapper at `wrapper_path`. The callable closes over the path so
-    registry entries don't have to carry it."""
+    registry entries don't have to carry it.
+
+    `extra_env` is forwarded to invoke_wrapper -- useful for synthetic-mode
+    factories that need to pass `OSINT_ADAPTER_MODE=synthetic` (Yuki P1 phase6).
+    """
     resolved_wrapper = Path(wrapper_path)
+    resolved_env = dict(extra_env) if extra_env else None
 
     def _adapter(payload: dict) -> list[dict]:
-        return invoke_wrapper(resolved_wrapper, payload, timeout_s=timeout_s)
+        return invoke_wrapper(
+            resolved_wrapper,
+            payload,
+            timeout_s=timeout_s,
+            extra_env=resolved_env,
+        )
 
     return _adapter

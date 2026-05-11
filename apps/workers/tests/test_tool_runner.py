@@ -51,7 +51,13 @@ def test_adapter_registry_register_unregister() -> None:
     def _adapter(p: dict) -> list[dict]:
         return [{"k": "v"}]
 
-    entry = reg.register("test-adapter", _adapter, in_process=True, description="test")
+    entry = reg.register(
+        "test-adapter",
+        _adapter,
+        synthetic_mode=_adapter,
+        in_process=True,
+        description="test",
+    )
     assert entry.id == "test-adapter"
     assert reg.get("test-adapter") is entry
     assert "test-adapter" in reg.names()
@@ -65,17 +71,75 @@ def test_adapter_registry_duplicate_register_rejected() -> None:
     def _adapter(p: dict) -> list[dict]:
         return []
 
-    reg.register("dup", _adapter)
+    reg.register("dup", _adapter, synthetic_mode=_adapter)
     with pytest.raises(ValueError, match="already registered"):
-        reg.register("dup", _adapter)
+        reg.register("dup", _adapter, synthetic_mode=_adapter)
 
 
 def test_default_echo_adapter_in_global_registry() -> None:
     entry = get_registry().get("echo")
     assert entry is not None
     assert entry.in_process is True
+    assert entry.synthetic_mode is not None
     result = entry.callable({"x": 1})
     assert result == [{"event_type": "tool-run-result", "payload": {"x": 1}}]
+    # Pure in-process: live == synthetic (echo doesn't touch the network)
+    assert entry.synthetic_mode is entry.callable
+
+
+# ----------------------------------------------------------------------------
+# Yuki P1 (phase6 2026-05-11): synthetic_mode mandate
+# ----------------------------------------------------------------------------
+
+
+def test_synthetic_mode_is_required_at_register_time() -> None:
+    """Adapters without synthetic_mode must fail registration, not at M0 gate."""
+    reg = AdapterRegistry()
+
+    def _adapter(p: dict) -> list[dict]:
+        return []
+
+    with pytest.raises(ValueError, match="synthetic_mode is mandatory"):
+        reg.register("missing-synthetic", _adapter, synthetic_mode=None)
+
+
+def test_synthetic_mode_field_exposed_on_entry() -> None:
+    """AdapterEntry has a `synthetic_mode` attribute; not None for any
+    registered adapter."""
+    reg = AdapterRegistry()
+
+    def _live(p: dict) -> list[dict]:
+        return [{"event_type": "live"}]
+
+    def _syn(p: dict) -> list[dict]:
+        return [{"event_type": "synthetic"}]
+
+    entry = reg.register("split", _live, synthetic_mode=_syn)
+    assert entry.callable is _live
+    assert entry.synthetic_mode is _syn
+    # The two paths are independent
+    assert entry.callable({})[0]["event_type"] == "live"
+    assert entry.synthetic_mode({})[0]["event_type"] == "synthetic"
+
+
+def test_registry_assert_all_have_synthetic_mode_passes_for_clean_registry() -> None:
+    """Registry-level lint: callable from CI to fail the build if any adapter
+    is missing synthetic_mode."""
+    reg = AdapterRegistry()
+
+    def _a(p: dict) -> list[dict]:
+        return []
+
+    reg.register("a1", _a, synthetic_mode=_a)
+    reg.register("a2", _a, synthetic_mode=_a)
+    # Does not raise
+    reg.assert_all_have_synthetic_mode()
+
+
+def test_global_registry_passes_synthetic_mode_lint() -> None:
+    """The actual production registry must pass the lint -- every adapter
+    registered at import time has a synthetic_mode."""
+    get_registry().assert_all_have_synthetic_mode()
 
 
 def test_tool_runner_bound_to_a_broker() -> None:

@@ -97,6 +97,15 @@ def main() -> int:
         sys.stderr.write(f"error: invalid JSON payload: {exc}\n")
         return 2
 
+    # Yuki P1 (phase6): explicit synthetic-mode env-var lets the M0 exit gate
+    # exercise the wire contract without ever attempting to import maigret.
+    # Honors `OSINT_ADAPTER_MODE=synthetic` (the registry uses this for the
+    # synthetic_mode entry-point per adapters.py).
+    import os
+    if os.environ.get("OSINT_ADAPTER_MODE") == "synthetic":
+        sys.stderr.write("OSINT_ADAPTER_MODE=synthetic; bypassing import attempt\n")
+        return _run_maigret_synthetic(payload)
+
     try:
         # The only AGPL import in the entire codebase (path-exempt).
         import maigret  # noqa: F401  -- real path; falls through to synthetic if missing
