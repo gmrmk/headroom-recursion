@@ -308,17 +308,39 @@ const ROW_STYLE: React.CSSProperties = {
   fontFamily: "ui-monospace, SFMono-Regular, monospace",
 };
 
+// Mei-Lan M1 (2026-05-11): payload keys ending in `_rel` carry a forward-
+// slash, rel-to-data path that the API's /files/{rel} surface serves
+// inline (Camille's allowlist + containment, see apps/api/.../files.py).
+// Any image adapter that writes an artifact under data/<allowed-subdir>/
+// opts into inline rendering by emitting a *_rel field -- no frontend
+// change needed per new adapter, as long as the subdir is on the
+// allowlist.
+const PREVIEW_LABELS: Record<string, string> = {
+  flipped_rel: "flipped variant",
+  ela_rel: "ELA glow-map",
+};
+
+function collectPreviews(
+  payload: Record<string, unknown>,
+): ReadonlyArray<{ rel: string; label: string }> {
+  const out: Array<{ rel: string; label: string }> = [];
+  for (const [k, v] of Object.entries(payload)) {
+    if (!k.endsWith("_rel") || typeof v !== "string" || !v) {
+      continue;
+    }
+    out.push({ rel: v, label: PREVIEW_LABELS[k] ?? k.replace(/_rel$/, "") });
+  }
+  return out;
+}
+
 function EventRow({ event }: { event: InvestigationEvent }) {
-  // Mei-Lan M1 (2026-05-11): when the event carries `flipped_rel` (forward-
-  // slash, rel-to-data), render an inline <img> via /files/{flipped_rel}.
-  // The API surface (apps/api/.../files.py) has Camille's path-traversal
-  // containment: allowlisted subdirs, .. rejection, resolve-and-contain.
-  // Fallback to the older file:// link if only `flipped_path` is present
-  // (older synthetic events).
-  const flippedRel =
-    typeof event.payload?.flipped_rel === "string" ? event.payload.flipped_rel : "";
+  const previews = collectPreviews(event.payload);
+  // Fallback for older synthetic events that emit only flipped_path (no
+  // _rel sibling). Drop when the synthetic-only path is retired.
   const flippedPath =
-    typeof event.payload?.flipped_path === "string" ? event.payload.flipped_path : "";
+    previews.length === 0 && typeof event.payload?.flipped_path === "string"
+      ? event.payload.flipped_path
+      : "";
   return (
     <li style={ROW_STYLE}>
       <span style={{ color: "#525252" }}>#{event.sequence}</span>
@@ -329,27 +351,33 @@ function EventRow({ event }: { event: InvestigationEvent }) {
         {Object.keys(event.payload).length > 0 ? (
           <span style={{ color: "#737373" }}>{summarizePayload(event.payload)}</span>
         ) : null}
-        {flippedRel ? (
-          <a
-            href={`/api/files/${flippedRel}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ display: "inline-block", marginTop: 4 }}
-          >
-            <img
-              src={`/api/files/${flippedRel}`}
-              alt="flipped variant"
-              loading="lazy"
-              style={{
-                maxHeight: 96,
-                maxWidth: 160,
-                border: "1px solid #2a2a2a",
-                borderRadius: 4,
-                background: "#1a1a1a",
-                display: "block",
-              }}
-            />
-          </a>
+        {previews.length > 0 ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+            {previews.map((p) => (
+              <a
+                key={p.rel}
+                href={`/api/files/${p.rel}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={p.label}
+                style={{ display: "inline-block" }}
+              >
+                <img
+                  src={`/api/files/${p.rel}`}
+                  alt={p.label}
+                  loading="lazy"
+                  style={{
+                    maxHeight: 96,
+                    maxWidth: 160,
+                    border: "1px solid #2a2a2a",
+                    borderRadius: 4,
+                    background: "#1a1a1a",
+                    display: "block",
+                  }}
+                />
+              </a>
+            ))}
+          </div>
         ) : flippedPath ? (
           <a
             href={`file:///${flippedPath.replace(/\\/g, "/")}`}

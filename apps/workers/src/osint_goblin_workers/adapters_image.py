@@ -418,6 +418,10 @@ def image_ela_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
             }
         ]
     try:
+        import hashlib
+
+        from PIL import ImageEnhance
+
         img = Image.open(io.BytesIO(data)).convert("RGB")
         # Re-save at known quality
         buf = io.BytesIO()
@@ -430,6 +434,20 @@ def image_ela_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
         mean_diff = float(arr.mean())
         max_diff = int(arr.max())
         std_diff = float(arr.std())
+        # Auto-contrast the diff so manipulated regions glow brightly --
+        # raw ELA diffs are nearly black to the eye. Scale so max_diff
+        # becomes ~255. This is the canonical ELA visualization.
+        if max_diff > 0:
+            scale = 255.0 / max_diff
+            visualization = ImageEnhance.Brightness(diff).enhance(scale)
+        else:
+            visualization = diff
+        out_dir = _REPO_ROOT / "data" / "ela"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        h = hashlib.sha256(f"{image_url}|q={quality}".encode()).hexdigest()[:16]
+        ela_path = out_dir / f"{h}.jpg"
+        visualization.save(ela_path, format="JPEG", quality=92)
+        ela_rel = f"ela/{h}.jpg"
     except Exception as exc:
         return [
             {
@@ -458,12 +476,19 @@ def image_ela_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "max_diff": max_diff,
                 "std_diff": round(std_diff, 2),
                 "verdict": verdict,
+                "ela_path": str(ela_path),
+                "ela_rel": ela_rel,
                 "note": "ELA is heuristic; visual inspection of high-diff regions confirms",
             },
         },
         {
             "event_type": "tool-run-result",
-            "payload": {"image_url": image_url, "verdict": verdict},
+            "payload": {
+                "image_url": image_url,
+                "verdict": verdict,
+                "ela_path": str(ela_path),
+                "ela_rel": ela_rel,
+            },
         },
     ]
 
@@ -481,6 +506,8 @@ def _image_ela_check_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "max_diff": 42,
                 "std_diff": 6.8,
                 "verdict": "clean",
+                "ela_path": "data/ela/abc123.jpg",
+                "ela_rel": "ela/abc123.jpg",
                 "synthetic": True,
             },
         },

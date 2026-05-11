@@ -33,8 +33,10 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 # Subdirs of data/ that are safe to expose by URL.
-# flipped/ = mirror-flipped variants for image-OSINT, M1's target surface.
-_ALLOWED_SUBDIRS: frozenset[str] = frozenset({"flipped"})
+#   flipped/ = mirror-flipped variants (image_flip_check)
+#   ela/     = Error-Level-Analysis glow-maps (image_ela_check) -- the
+#              daily-driver "is this listing photo doctored?" tell
+_ALLOWED_SUBDIRS: frozenset[str] = frozenset({"flipped", "ela"})
 
 # Repo root: apps/api/src/osint_goblin_api/files.py -> ../../../../
 _DEFAULT_DATA_ROOT = Path(__file__).resolve().parents[4] / "data"

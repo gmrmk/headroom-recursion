@@ -26,6 +26,7 @@ def data_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     request time (not import time) so a per-test override works."""
     root = tmp_path / "data"
     (root / "flipped").mkdir(parents=True)
+    (root / "ela").mkdir(parents=True)
     monkeypatch.setenv("OSINT_DATA_ROOT", str(root))
     return root
 
@@ -84,3 +85,13 @@ def test_unknown_extension_falls_back_to_octet_stream(client: TestClient, data_r
     assert resp.status_code == 200
     # Never text/html (that's the XSS pivot) -- octet-stream is safe.
     assert resp.headers["content-type"] == "application/octet-stream"
+
+
+def test_serves_ela_subdir(client: TestClient, data_root: Path) -> None:
+    # ELA visualizations land under data/ela/ via image_ela_check. The
+    # allowlist must include ela/ so EventRow can render them inline.
+    target = data_root / "ela" / "x.jpg"
+    target.write_bytes(b"\xff\xd8\xff\xe0ela-glow-map")
+    resp = client.get("/files/ela/x.jpg")
+    assert resp.status_code == 200
+    assert resp.content == b"\xff\xd8\xff\xe0ela-glow-map"
