@@ -210,6 +210,20 @@ const ADAPTERS: ReadonlyArray<{
     examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
   },
   {
+    id: "phash_dedupe",
+    label: "pHash dedupe — multi-listing photo theft",
+    hint: "Catches same photo reused across cases. Append-only local DB.",
+    examplePayload:
+      '{\n  "image_url": "https://example.com/photo.jpg",\n  "case_id": "case-2026-05-alice"\n}',
+  },
+  {
+    id: "seasonal_metadata_check",
+    label: "Image seasonal check — EXIF date vs claim",
+    hint: "Catches summer-photo-on-winter-listing fraud. Solar angle bonus.",
+    examplePayload:
+      '{\n  "image_url": "https://example.com/photo.jpg",\n  "claimed_season": "winter"\n}',
+  },
+  {
     id: "ai_image_detection",
     label: "AI image detection (Sightengine)",
     hint: "GenAI-fabricated photo detector. Needs OSINT_SIGHTENGINE_* keys.",

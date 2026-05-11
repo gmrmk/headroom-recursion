@@ -15,6 +15,7 @@ dependencies = [
   "pillow>=11.0",                 # image flip + ELA + EXIF parsing baseline
   "numpy>=2.0",                   # ELA pixel-difference math
   "exifread>=3.0",                # deeper EXIF than Pillow alone (still in-process)
+  "imagehash>=4.3",               # pHash dedupe across an investigation (Tomas gap)
 ]
 
 [build-system]

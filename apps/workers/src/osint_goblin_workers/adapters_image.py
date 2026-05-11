@@ -51,6 +51,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -955,6 +956,433 @@ def _kartaview_nearby_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]
 
 
 # ---------------------------------------------------------------------------
+# 7b. phash_dedupe -- catch multi-listing photo theft across an investigation
+# ---------------------------------------------------------------------------
+# Tomas gap (2026-05-11 pre-commit review): "property fraudsters reuse 4-6
+# stolen photos across multiple fake listings. pHash on every fetched image,
+# stored against the case, surfaces 'this photo also appeared in case-id-X
+# last week.' Higher signal-per-minute than a fourth reverse engine."
+#
+# Store: jsonl at data/phash-db.jsonl. Each line: {phash, case_id, image_url,
+# saved_at}. Append-only; no delete (audit trail). Hamming-distance match
+# with a configurable threshold (default 8 = "visually identical-ish").
+
+_PHASH_DB_PATH = _REPO_ROOT / "data" / "phash-db.jsonl"
+
+
+def _hamming(a: str, b: str) -> int:
+    """Hamming distance between two equal-length hex pHash strings.
+
+    imagehash returns hex strings; convert to int and XOR + popcount."""
+    try:
+        return bin(int(a, 16) ^ int(b, 16)).count("1")
+    except ValueError:
+        return 99  # treat unparseable as "very far"
+
+
+def phash_dedupe(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Compute pHash of an image, find prior matches in the local DB.
+
+    Payload:
+      {"image_url": "https://example.com/photo.jpg",
+       "case_id": "case-2026-05-alice",      # optional but recommended
+       "threshold": 8,                        # Hamming distance, default 8
+       "skip_store": false}                   # don't append to DB if true
+
+    Hamming-distance thresholds (Bowman & Williams 2013 perceptual-hash
+    paper, plus empirical practice):
+      <= 4   -- effectively identical (re-saved/recompressed)
+      5-8   -- visually identical (cropped, resized, color-shifted)
+      9-12  -- visually similar (significant edits)
+      >12  -- different scene
+    """
+    image_url = (payload.get("image_url") or "").strip()
+    if not image_url:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'image_url'"},
+            }
+        ]
+    case_id = (payload.get("case_id") or "unscoped").strip()
+    threshold = int(payload.get("threshold", 8))
+    skip_store = bool(payload.get("skip_store", False))
+
+    try:
+        import imagehash
+        from PIL import Image
+    except ImportError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": f"imagehash/PIL not installed: {exc}"},
+            }
+        ]
+
+    try:
+        data, _ctype = _fetch_image_bytes(image_url, timeout_s=20.0)
+    except Exception as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"fetch failed: {type(exc).__name__}: {exc}",
+                    "image_url": image_url,
+                },
+            }
+        ]
+    try:
+        img = Image.open(io.BytesIO(data))
+        # Default 64-bit pHash via DCT-based perceptual hashing.
+        phash = str(imagehash.phash(img))
+    except Exception as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"phash failed: {type(exc).__name__}: {exc}",
+                    "image_url": image_url,
+                },
+            }
+        ]
+
+    # Search prior DB for matches within threshold.
+    matches: list[dict[str, Any]] = []
+    if _PHASH_DB_PATH.is_file():
+        try:
+            with _PHASH_DB_PATH.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        row = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    prior_phash = row.get("phash", "")
+                    if not prior_phash:
+                        continue
+                    dist = _hamming(phash, prior_phash)
+                    if dist <= threshold:
+                        matches.append(
+                            {
+                                "prior_image_url": row.get("image_url", ""),
+                                "prior_case_id": row.get("case_id", ""),
+                                "prior_saved_at": row.get("saved_at", ""),
+                                "hamming_distance": dist,
+                                "verdict": (
+                                    "identical"
+                                    if dist <= 4
+                                    else "visually-identical"
+                                    if dist <= 8
+                                    else "visually-similar"
+                                ),
+                            }
+                        )
+        except OSError as exc:
+            sys.stderr.write(f"phash-db read soft-fail: {exc}\n")
+
+    # Append to DB (append-only audit trail; no overwrite).
+    if not skip_store:
+        try:
+            from datetime import UTC
+            from datetime import datetime as _dt
+
+            _PHASH_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+            row = {
+                "phash": phash,
+                "case_id": case_id,
+                "image_url": image_url,
+                "saved_at": _dt.now(UTC).isoformat(),
+            }
+            with _PHASH_DB_PATH.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(row, separators=(",", ":")) + "\n")
+        except OSError as exc:
+            sys.stderr.write(f"phash-db write soft-fail: {exc}\n")
+
+    events: list[dict[str, Any]] = []
+    for m in matches[:20]:  # cap dossier noise
+        events.append(
+            {
+                "event_type": "image-match",
+                "payload": {
+                    "source": "phash-dedupe",
+                    "image_url": image_url,
+                    "phash": phash,
+                    **m,
+                },
+            }
+        )
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "image_url": image_url,
+                "phash": phash,
+                "case_id": case_id,
+                "matches": len(matches),
+                "threshold": threshold,
+                "stored": not skip_store,
+            },
+        }
+    )
+    return events
+
+
+def _phash_dedupe_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    url = payload.get("image_url") or "https://example.com/synthetic.jpg"
+    return [
+        {
+            "event_type": "image-match",
+            "payload": {
+                "source": "phash-dedupe",
+                "image_url": url,
+                "phash": "ffeeddccbbaa9988",
+                "prior_image_url": "https://airbnb.com/rooms/12345/photos/main.jpg",
+                "prior_case_id": "case-2026-04-prior",
+                "prior_saved_at": "2026-04-22T15:00:00+00:00",
+                "hamming_distance": 2,
+                "verdict": "identical",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {"image_url": url, "matches": 1, "synthetic": True},
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
+# 7c. seasonal_metadata_check -- EXIF date + sun-angle vs listing-claim season
+# ---------------------------------------------------------------------------
+# Tomas gap: "Investigator runs searches like 'this photo was taken outside
+# in fall but the listing claims winter'. Should there be a
+# seasonal_metadata_check?" Yes. Pull EXIF DateTimeOriginal, optionally GPS,
+# compute solar elevation/azimuth at that lat/lon/time, surface
+# date+season+sun-angle so the investigator compares to the listing claim.
+
+
+def _solar_position(
+    lat: float, lon: float, year: int, month: int, day: int, hour: float
+) -> tuple[float, float]:
+    """Compute solar elevation + azimuth in degrees at a lat/lon/UTC-time.
+
+    Standard NOAA Solar Position Algorithm (simplified). Returns
+    (elevation_deg, azimuth_deg). Inputs are decimal-degree lat/lon,
+    civil date, and decimal hour UTC.
+
+    Source: NOAA solar-position formulas, Cornwall et al. Accurate to
+    +/- 0.5 degrees for the purpose of "is the sun high or low" which
+    is what the property-vetting use case needs.
+    """
+    import math
+    from datetime import datetime as _dt
+
+    # Day-of-year + fractional time
+    doy = (_dt(year, month, day) - _dt(year, 1, 1)).days + 1
+    frac_year = (2 * math.pi / 365) * (doy - 1 + (hour - 12) / 24)
+
+    # Equation of time (in minutes)
+    eqtime = 229.18 * (
+        0.000075
+        + 0.001868 * math.cos(frac_year)
+        - 0.032077 * math.sin(frac_year)
+        - 0.014615 * math.cos(2 * frac_year)
+        - 0.040849 * math.sin(2 * frac_year)
+    )
+
+    # Solar declination (radians)
+    decl = (
+        0.006918
+        - 0.399912 * math.cos(frac_year)
+        + 0.070257 * math.sin(frac_year)
+        - 0.006758 * math.cos(2 * frac_year)
+        + 0.000907 * math.sin(2 * frac_year)
+        - 0.002697 * math.cos(3 * frac_year)
+        + 0.00148 * math.sin(3 * frac_year)
+    )
+
+    # Time offset in minutes (lon in degrees east)
+    time_offset = eqtime + 4 * lon  # lon in degrees east of GMT
+    tst = (hour * 60) + time_offset  # true solar time in minutes
+    ha = math.radians((tst / 4) - 180)  # hour angle in radians
+    lat_r = math.radians(lat)
+
+    # Solar zenith
+    cos_z = math.sin(lat_r) * math.sin(decl) + math.cos(lat_r) * math.cos(decl) * math.cos(ha)
+    cos_z = max(-1.0, min(1.0, cos_z))
+    zenith = math.degrees(math.acos(cos_z))
+    elevation = 90.0 - zenith
+
+    # Azimuth (measured clockwise from north)
+    cos_az = (math.sin(lat_r) * cos_z - math.sin(decl)) / (
+        math.cos(lat_r) * math.sin(math.radians(zenith)) or 1e-9
+    )
+    cos_az = max(-1.0, min(1.0, cos_az))
+    azimuth = math.degrees(math.acos(cos_az))
+    if ha > 0:
+        azimuth = 360 - azimuth
+
+    return elevation, azimuth
+
+
+def _season_for_month(month: int, lat: float) -> str:
+    """Meteorological season heuristic. Hemispheres flipped for southern."""
+    northern = lat >= 0
+    if month in (12, 1, 2):
+        return "winter" if northern else "summer"
+    if month in (3, 4, 5):
+        return "spring" if northern else "autumn"
+    if month in (6, 7, 8):
+        return "summer" if northern else "winter"
+    return "autumn" if northern else "spring"
+
+
+def seasonal_metadata_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Pull EXIF DateTimeOriginal + GPS; report season + solar position.
+
+    Payload:
+      {"image_url": "https://example.com/photo.jpg",
+       "claimed_season": "winter"}            # optional; if set, emits
+                                              # a match/mismatch flag
+
+    Use cases:
+      - Listing claims "cozy winter cabin"; EXIF says June -> mismatch flag.
+      - Listing claims "sunlit afternoon" -> compare claimed time-of-day
+        against sun elevation derived from EXIF date + GPS.
+      - Shadow direction in photo can be cross-checked with the computed
+        azimuth (manual investigator step, but surfaced for that workflow).
+    """
+    image_url = (payload.get("image_url") or "").strip()
+    if not image_url:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'image_url'"},
+            }
+        ]
+    claimed_season = (payload.get("claimed_season") or "").strip().lower()
+
+    # Lean on image_exif rather than re-fetching the image.
+    exif_events = image_exif({"image_url": image_url})
+    base = exif_events[0]
+    if base.get("event_type") != "image-match":
+        return exif_events
+
+    p = base["payload"]
+    datetime_str = p.get("datetime_original", "") or ""
+    lat = p.get("gps_lat")
+    lon = p.get("gps_lon")
+
+    # Parse EXIF datetime: "YYYY:MM:DD HH:MM:SS"
+    import re as _re
+
+    m = _re.match(r"(\d{4})[:\-/](\d{1,2})[:\-/](\d{1,2})\s+(\d{1,2}):(\d{1,2})", datetime_str)
+    photo_year = photo_month = photo_day = 0
+    photo_hour = 12.0
+    if m:
+        photo_year, photo_month, photo_day = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        photo_hour = int(m.group(4)) + int(m.group(5)) / 60.0
+
+    flags: dict[str, Any] = {}
+    if photo_month:
+        photo_season = _season_for_month(photo_month, lat if isinstance(lat, int | float) else 0.0)
+        flags["photo_season"] = photo_season
+        flags["photo_month"] = photo_month
+        flags["photo_year"] = photo_year
+        if claimed_season and photo_season != claimed_season:
+            flags["season_mismatch"] = True
+            flags["mismatch_note"] = (
+                f"listing claims '{claimed_season}' but photo EXIF dates to "
+                f"{photo_year}-{photo_month:02d}-{photo_day:02d} ({photo_season})"
+            )
+        elif claimed_season:
+            flags["season_mismatch"] = False
+    else:
+        flags["photo_season"] = ""
+        flags["mismatch_note"] = "EXIF DateTimeOriginal absent or unparseable"
+
+    # Solar position (only if GPS + datetime both present)
+    if isinstance(lat, int | float) and isinstance(lon, int | float) and photo_year:
+        elev, az = _solar_position(
+            float(lat), float(lon), photo_year, photo_month, photo_day, photo_hour
+        )
+        flags["solar_elevation_deg"] = round(elev, 1)
+        flags["solar_azimuth_deg"] = round(az, 1)
+        flags["solar_time_descriptor"] = (
+            "below-horizon (night)"
+            if elev < 0
+            else "low (golden hour)"
+            if elev < 15
+            else "high (midday)"
+            if elev > 50
+            else "mid"
+        )
+
+    return [
+        {
+            "event_type": "image-match",
+            "payload": {
+                "source": "seasonal-metadata",
+                "image_url": image_url,
+                "datetime_original": datetime_str,
+                "gps_lat": lat,
+                "gps_lon": lon,
+                **flags,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "image_url": image_url,
+                "season_mismatch": flags.get("season_mismatch"),
+                "photo_season": flags.get("photo_season", ""),
+            },
+        },
+    ]
+
+
+def _seasonal_metadata_check_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    url = payload.get("image_url") or "https://example.com/synthetic.jpg"
+    claimed = payload.get("claimed_season") or "winter"
+    return [
+        {
+            "event_type": "image-match",
+            "payload": {
+                "source": "seasonal-metadata",
+                "image_url": url,
+                "datetime_original": "2025:06:15 14:23:10",
+                "gps_lat": 39.78,
+                "gps_lon": -89.65,
+                "photo_season": "summer",
+                "photo_month": 6,
+                "photo_year": 2025,
+                "season_mismatch": claimed != "summer",
+                "mismatch_note": (
+                    f"listing claims '{claimed}' but photo EXIF dates to " f"2025-06-15 (summer)"
+                    if claimed != "summer"
+                    else ""
+                ),
+                "solar_elevation_deg": 71.2,
+                "solar_azimuth_deg": 195.0,
+                "solar_time_descriptor": "high (midday)",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "image_url": url,
+                "season_mismatch": claimed != "summer",
+                "photo_season": "summer",
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 8. image_provenance_check -- composite: exiftool + ELA + c2pa
 # ---------------------------------------------------------------------------
 
@@ -1281,6 +1709,20 @@ _REGISTRY.register(
     synthetic_mode=_image_provenance_check_synthetic,
     in_process=True,
     description="Composite: ExifTool + ELA + C2PA -> aggregate verdict.",
+)
+_REGISTRY.register(
+    "phash_dedupe",
+    phash_dedupe,
+    synthetic_mode=_phash_dedupe_synthetic,
+    in_process=True,
+    description="pHash dedupe across investigation; catches multi-listing photo theft.",
+)
+_REGISTRY.register(
+    "seasonal_metadata_check",
+    seasonal_metadata_check,
+    synthetic_mode=_seasonal_metadata_check_synthetic,
+    in_process=True,
+    description="EXIF date + sun-angle vs listing-claim season (Tomas gap).",
 )
 _REGISTRY.register(
     "reverse_image_aggregator",
