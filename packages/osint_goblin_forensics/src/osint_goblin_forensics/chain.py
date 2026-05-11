@@ -1,4 +1,13 @@
-"""Merkle hash-chain primitive.
+"""Hash-chain primitive.
+
+This is a linear hash chain: `this = H(prev_hash || payload)`. NOT a Merkle
+tree (a Merkle tree is a binary tree of hashes giving O(log n) membership
+proofs; we walk linearly, O(n), which is fine for chain-of-custody where
+the audit reads the whole chain anyway). Renamed from `MerkleChain` per
+Camille P1 phase6 2026-05-11: the prior name was a misnomer that would not
+survive expert-witness scrutiny in a court evidence context. A back-compat
+alias remains in `__init__.py` for verify.py shipped in pre-rename evidence
+zips.
 
 Formula (Yuki phase4/03-qa.md sec.6 I2):
 
@@ -6,8 +15,8 @@ Formula (Yuki phase4/03-qa.md sec.6 I2):
     genesis: seq=0, prev_hash=b"\x00" * 32, payload=b""
 
 Single-writer-queue is the architectural fix for concurrent writes (Diego
-ADR-0006). This module is INTENTIONALLY not thread-safe -- the caller serializes
-appends. Property-based tests in test_chain.py cover I1-I7.
+ADR-0006). This module is INTENTIONALLY not thread-safe -- the caller
+serializes appends. Property-based tests in test_chain.py cover I1-I7.
 """
 
 from __future__ import annotations
@@ -20,7 +29,7 @@ GENESIS_PREV_HASH: bytes = b"\x00" * 32
 
 @dataclass(frozen=True, slots=True)
 class ChainRow:
-    """One row in the Merkle chain. Immutable."""
+    """One row in the hash chain. Immutable."""
 
     seq: int
     prev_hash: bytes  # 32 bytes; row[0].prev_hash == GENESIS_PREV_HASH
@@ -36,8 +45,8 @@ def chain_hash(prev_hash: bytes, payload: bytes) -> bytes:
     return hashlib.sha256(prev_hash + payload).digest()
 
 
-class MerkleChain:
-    """In-memory Merkle chain. Single-writer; serialize externally.
+class HashChain:
+    """In-memory hash chain. Single-writer; serialize externally.
 
     The chain starts with a genesis row at seq=0 with empty payload, then
     each `append(p)` adds a row whose prev_hash equals the previous row's

@@ -1,7 +1,7 @@
 [project]
 name = "osint-goblin-forensics"
 version = "2026.05.0"
-description = "OSINT Goblin -- Merkle chain + Ed25519 + RFC3161 evidence forensics (L0: stdlib + cryptography only). Hosts standalone verify.py for evidence-package zips."
+description = "OSINT Goblin -- hash chain + Ed25519 + RFC3161 evidence forensics (L0: stdlib + cryptography only). Hosts standalone verify.py for evidence-package zips."
 requires-python = ">=3.11,<3.14"
 dependencies = [
   "cryptography>=43",

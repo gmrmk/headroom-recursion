@@ -12,7 +12,7 @@ The original Phase 2 architect roadmap scheduled the full evidence-package zip �
 The security persona (`phase3/05-security-compliance.md` §5, INV-S3) escalated: all four load-bearing components are buildable in two sprints because their primitives are independent and each sub-team verdict locked them:
 
 - **Ed25519** signing — `cryptography` 48.0.0, sub-millisecond per signature, primitive selection locked in `phase3/subagent-security-ed25519.md`.
-- **Merkle chain** — Postgres advisory-lock per `case_id`, empirically 186K rows/sec across 8 threads (`phase3/subagent-security-merkle.md`), tamper detection at row N+1.
+- **hash chain** — Postgres advisory-lock per `case_id`, empirically 186K rows/sec across 8 threads (`phase3/subagent-security-merkle.md`), tamper detection at row N+1.
 - **RFC 3161** — three-TSA fan-out (FreeTSA primary, DFN + Apple fallback), verification semantics + FRE 901(b)(9) admissibility argument in `phase3/subagent-security-rfc3161.md`.
 - **WARC layout** — Webrecorder / `warcio`, layout specified in `phase3/05-security-compliance.md` §5.
 

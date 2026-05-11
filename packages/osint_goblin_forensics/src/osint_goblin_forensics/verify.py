@@ -36,7 +36,7 @@ def _load_chain(chain_path: Path) -> list[dict[str, Any]]:
 
 
 def _verify_chain(rows: list[dict[str, Any]]) -> tuple[bool, int | None, str]:
-    """Walk the chain. Same semantics as MerkleChain.verify_chain but on
+    """Walk the chain. Same semantics as HashChain.verify_chain but on
     JSON dicts (since we can't import the package -- this is the offline tool)."""
     if not rows:
         return False, None, "empty chain"
@@ -110,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--skip-signatures",
         action="store_true",
-        help="verify only the Merkle chain (faster; skips Ed25519 signature checks)",
+        help="verify only the hash chain (faster; skips Ed25519 signature checks)",
     )
     args = parser.parse_args(argv)
 

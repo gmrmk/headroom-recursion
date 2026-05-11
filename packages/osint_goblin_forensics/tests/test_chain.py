@@ -9,14 +9,14 @@ from hypothesis import strategies as st
 from osint_goblin_forensics.chain import (
     GENESIS_PREV_HASH,
     ChainRow,
-    MerkleChain,
+    HashChain,
     chain_hash,
     verify_chain,
 )
 
 
 def test_I1_genesis_seq_zero_prev_hash_zero():
-    c = MerkleChain()
+    c = HashChain()
     g = c.rows()[0]
     assert g.seq == 0
     assert g.prev_hash == GENESIS_PREV_HASH
@@ -25,7 +25,7 @@ def test_I1_genesis_seq_zero_prev_hash_zero():
 
 @given(payloads=st.lists(st.binary(max_size=4096), max_size=64))
 def test_I2_hash_formula(payloads):
-    c = MerkleChain()
+    c = HashChain()
     for p in payloads:
         c.append(p)
     for r in c.rows():
@@ -34,7 +34,7 @@ def test_I2_hash_formula(payloads):
 
 @given(payloads=st.lists(st.binary(max_size=512), min_size=1, max_size=32))
 def test_I3_prev_linkage(payloads):
-    c = MerkleChain()
+    c = HashChain()
     for p in payloads:
         c.append(p)
     rows = c.rows()
@@ -44,7 +44,7 @@ def test_I3_prev_linkage(payloads):
 
 @given(payloads=st.lists(st.binary(max_size=256), min_size=0, max_size=64))
 def test_I4_seq_monotone(payloads):
-    c = MerkleChain()
+    c = HashChain()
     for p in payloads:
         c.append(p)
     rows = c.rows()
@@ -55,7 +55,7 @@ def test_I4_seq_monotone(payloads):
 @given(payloads=st.lists(st.binary(min_size=1, max_size=128), min_size=3, max_size=20))
 def test_I5_tamper_detected(payloads):
     """Mutate any byte in any row's payload and re-verify -- chain must reject."""
-    c = MerkleChain()
+    c = HashChain()
     for p in payloads:
         c.append(p)
     rows = c.rows()
@@ -77,7 +77,7 @@ def test_I5_tamper_detected(payloads):
 
 
 def test_I6_genesis_cannot_be_silently_replaced():
-    c = MerkleChain()
+    c = HashChain()
     c.append(b"a")
     rows = c.rows()
     fake_genesis = ChainRow(
@@ -91,11 +91,11 @@ def test_I6_genesis_cannot_be_silently_replaced():
 
 def test_I7_order_sensitive():
     """Same payloads in different order -> different head hash."""
-    c1 = MerkleChain()
+    c1 = HashChain()
     c1.append(b"a")
     c1.append(b"b")
 
-    c2 = MerkleChain()
+    c2 = HashChain()
     c2.append(b"b")
     c2.append(b"a")
 
@@ -112,3 +112,18 @@ def test_empty_chain_rejected_by_verify():
     ok, _, reason = verify_chain([])
     assert not ok
     assert "empty" in reason
+
+
+def test_merkle_chain_backcompat_alias():
+    """Camille P1 phase6: MerkleChain stays importable as a back-compat alias
+    so verify.py shipped in pre-rename evidence zips doesn't break. The alias
+    is identical-by-identity to HashChain (not a subclass / not a wrapper)."""
+    from osint_goblin_forensics import HashChain as _Hash
+    from osint_goblin_forensics import MerkleChain as _Merkle
+
+    assert _Merkle is _Hash, "MerkleChain must be the exact same class as HashChain"
+    # Behavioral check: a chain constructed via the alias is indistinguishable.
+    c = _Merkle()
+    row = c.append(b"evidence")
+    assert isinstance(c, _Hash)
+    assert row.seq == 1

@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from osint_goblin_forensics.chain import MerkleChain
+from osint_goblin_forensics.chain import HashChain
 from osint_goblin_forensics.signing import (
     generate_keypair,
     serialize_public_key,
@@ -25,7 +25,7 @@ def _build_evidence_dir(tmp_path: Path) -> Path:
     (ev / "artifacts").mkdir()
     (ev / "signatures").mkdir()
 
-    chain = MerkleChain()
+    chain = HashChain()
     payloads = [b"artifact-1 bytes", b"artifact-2 bytes", b"artifact-3 bytes"]
     chain_rows: list[dict[str, object]] = []
     for r in chain.rows():
