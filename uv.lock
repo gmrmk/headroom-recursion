@@ -732,6 +732,7 @@ name = "osint-goblin-api"
 version = "2026.5.0"
 source = { editable = "apps/api" }
 dependencies = [
+    { name = "dramatiq", extra = ["redis"] },
     { name = "fastapi" },
     { name = "osint-goblin-forensics" },
     { name = "osint-goblin-schemas" },
@@ -749,6 +750,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dramatiq", extras = ["redis"], specifier = ">=1.17" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27" },
     { name = "osint-goblin-forensics", editable = "packages/osint_goblin_forensics" },

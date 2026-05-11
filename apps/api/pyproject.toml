@@ -6,6 +6,7 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
   "osint-goblin-schemas",
   "osint-goblin-forensics",
+  "dramatiq[redis]>=1.17",  # API -> worker enqueue path (Sprint 3 wire)
   "fastapi>=0.115",
   "pydantic>=2.9",
   "redis>=5",  # R-6: worker -> API SSE bridge subscriber

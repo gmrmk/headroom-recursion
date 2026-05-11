@@ -18,6 +18,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
+from .broker import enqueue_tool_run
 from .models import (
     CreateInvestigation,
     Investigation,
@@ -153,6 +154,36 @@ async def run_tool(inv_id: UUID, body: ToolRunRequest) -> ToolRunResponse:
         task = asyncio.create_task(_emit_m0_gate_stress(store, inv_id, resp.run_id))
         _BACKGROUND_TASKS.add(task)
         task.add_done_callback(_BACKGROUND_TASKS.discard)
+    else:
+        # Sprint 3 wire: enqueue the real tool_runner job on the Redis broker.
+        # The worker subprocess picks it up, dispatches to the adapter, and
+        # publishes events back via Redis pub/sub (R-6 bridge). The API does
+        # not block on adapter completion; the SSE stream is the read-back
+        # surface.
+        try:
+            enqueue_tool_run(
+                investigation_id=str(inv_id),
+                run_id=str(resp.run_id),
+                adapter_id=body.adapter_id,
+                adapter_payload=body.payload,
+            )
+        except Exception as exc:
+            # If the broker is unreachable (dev env without Memurai), surface
+            # the error to the dossier so the investigator knows the run
+            # didn't actually dispatch. We do NOT 500 -- the run-accepted
+            # event already fired and the SSE stream is the correct surface.
+            await store.publish_event(
+                InvestigationEvent(
+                    event_type="tool-run-error",
+                    investigation_id=inv_id,
+                    run_id=resp.run_id,
+                    sequence=store.next_seq(inv_id),
+                    payload={
+                        "adapter_id": body.adapter_id,
+                        "reason": f"broker enqueue failed: {type(exc).__name__}: {exc}",
+                    },
+                )
+            )
     return resp
 
 
