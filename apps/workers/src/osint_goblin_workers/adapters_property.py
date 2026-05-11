@@ -556,6 +556,208 @@ def _gravatar_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# 3a-ii. GitHub commit-email search -- behavioral identity confirm
+#
+# Ship #2 of the free-stack replacement for IntelBase (Margaret's parse,
+# 2026-05-11). Where Gravatar gives owner-attested identity, GitHub gives
+# behavioral identity: did this email actually author code in public
+# repos? If yes, the email -> login -> repo graph is a strong "real
+# long-lived developer" signal -- exactly what property-vetting needs to
+# distinguish a churn account from a real person.
+#
+# Endpoint: GET https://api.github.com/search/commits?q=author-email:<email>
+# Auth:     anonymous works at 10/min; OSINT_GITHUB_PAT raises to 30/min.
+# ---------------------------------------------------------------------------
+
+
+_GITHUB_COMMITS_URL = "https://api.github.com/search/commits"
+
+
+def github_commit_email_search(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """GitHub commit search by author-email. Emits one `person-match` per
+    unique repo (collapsing N commits to same repo into one event) plus a
+    summary tool-run-result with commit + repo counts.
+
+    Payload:
+      {"email": "user@example.com",
+       "per_page": 30}              # optional, default 30, GitHub max 100
+
+    Env (optional):
+      OSINT_GITHUB_PAT  -- raises rate limit 10/min -> 30/min for search
+    """
+    email = payload.get("email", "")
+    if not isinstance(email, str) or "@" not in email:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing or malformed 'email'"},
+            }
+        ]
+
+    per_page = int(payload.get("per_page", 30))
+    if per_page < 1 or per_page > 100:
+        per_page = 30
+
+    headers: dict[str, str] = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": _USER_AGENT,
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    pat = os.environ.get("OSINT_GITHUB_PAT", "").strip()
+    if pat:
+        headers["Authorization"] = f"Bearer {pat}"
+
+    params: dict[str, Any] = {
+        "q": f"author-email:{email}",
+        "per_page": per_page,
+        "sort": "author-date",
+        "order": "desc",
+    }
+
+    try:
+        with httpx.Client(timeout=15.0, headers=headers, follow_redirects=False) as c:
+            r = c.get(_GITHUB_COMMITS_URL, params=params)
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"github {type(exc).__name__}: {exc}",
+                    "email": email,
+                },
+            }
+        ]
+
+    if r.status_code in (403, 429):
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"github HTTP {r.status_code} (rate-limited)",
+                    "email": email,
+                },
+            }
+        ]
+    if r.status_code != 200:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"github HTTP {r.status_code}",
+                    "email": email,
+                },
+            }
+        ]
+
+    try:
+        data = r.json()
+    except ValueError:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "github non-JSON response", "email": email},
+            }
+        ]
+    if not isinstance(data, dict):
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "github unexpected response shape", "email": email},
+            }
+        ]
+
+    items = data.get("items") or []
+    # Roll up by repo: many commits to the same repo collapse to one
+    # person-match event with commit_count. Keeps the stream scannable.
+    by_repo: dict[str, dict[str, Any]] = {}
+    if isinstance(items, list):
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            repo = (it.get("repository") or {}).get("full_name", "")
+            if not repo:
+                continue
+            author = it.get("author") or {}
+            commit = (it.get("commit") or {}).get("author") or {}
+            entry = by_repo.setdefault(
+                repo,
+                {
+                    "repo": repo,
+                    "login": author.get("login", ""),
+                    "profile_url": author.get("html_url", ""),
+                    "author_name": commit.get("name", ""),
+                    "commit_count": 0,
+                    "first_seen": commit.get("date", ""),
+                    "last_seen": commit.get("date", ""),
+                    "sample_commit": it.get("html_url", ""),
+                },
+            )
+            entry["commit_count"] += 1
+            d = commit.get("date", "")
+            if d and (entry["first_seen"] == "" or d < entry["first_seen"]):
+                entry["first_seen"] = d
+            if d and d > entry["last_seen"]:
+                entry["last_seen"] = d
+
+    events: list[dict[str, Any]] = []
+    for entry in by_repo.values():
+        events.append(
+            {
+                "event_type": "person-match",
+                "payload": {"source": "github_commits", "email": email, **entry},
+            }
+        )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "github_commits",
+                "email": email,
+                "total_commits": data.get("total_count", 0),
+                "unique_repos": len(by_repo),
+                "rate_limited": False,
+            },
+        }
+    )
+    return events
+
+
+def _github_commit_email_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Synthetic GitHub commit search: one repo person-match + summary."""
+    email = payload.get("email") or "user@example.com"
+    return [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "github_commits",
+                "email": email,
+                "repo": "synthetic-user/synthetic-repo",
+                "login": "synthetic-user",
+                "profile_url": "https://github.com/synthetic-user",
+                "author_name": "Synthetic User",
+                "commit_count": 7,
+                "first_seen": "2023-01-01T00:00:00Z",
+                "last_seen": "2024-12-01T00:00:00Z",
+                "sample_commit": "https://github.com/synthetic-user/synthetic-repo/commit/abc",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "github_commits",
+                "email": email,
+                "total_commits": 7,
+                "unique_repos": 1,
+                "rate_limited": False,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 3a. IntelBase email lookup -- POST https://api.intelbase.is/lookup/email
 #
 # IntelBase aggregates 40B+ breach records + real-time infostealer log
@@ -2205,6 +2407,18 @@ _REGISTRY.register(
         "Gravatar v3 profile lookup. Owner-attested identity pivot: emits "
         "person-match per verified_accounts entry. Free anonymous (100/hr); "
         "OSINT_GRAVATAR_TOKEN unlocks 1000/hr."
+    ),
+)
+
+_REGISTRY.register(
+    "github_commit_email_search",
+    github_commit_email_search,
+    synthetic_mode=_github_commit_email_synthetic,
+    in_process=True,
+    description=(
+        "GitHub /search/commits?q=author-email:<email>. Behavioral identity "
+        "confirm: emits person-match per unique repo. Free anonymous "
+        "(10/min); OSINT_GITHUB_PAT unlocks 30/min."
     ),
 )
 

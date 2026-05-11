@@ -19,6 +19,7 @@ import pytest
 from osint_goblin_workers.adapters import get_registry
 from osint_goblin_workers.adapters_property import (
     _email_mx_synthetic,
+    _github_commit_email_synthetic,
     _gravatar_synthetic,
     _hibp_synthetic,
     _inside_airbnb_synthetic,
@@ -27,6 +28,7 @@ from osint_goblin_workers.adapters_property import (
     _tineye_synthetic,
     _true_people_synthetic,
     email_mx_validate,
+    github_commit_email_search,
     gravatar_profile_lookup,
     inside_airbnb_listings,
     intelbase_email_lookup,
@@ -46,6 +48,7 @@ from osint_goblin_workers.adapters_property import (
         "hibp_breach_check",
         "intelbase_email_lookup",
         "gravatar_profile_lookup",
+        "github_commit_email_search",
         "inside_airbnb_listings",
         "true_people_search",
         "tineye_image",
@@ -225,6 +228,145 @@ def test_gravatar_emits_person_match_per_verified_account(
     assert summary["profile_found"] is True
     assert summary["display_name"] == "Alex Morgan"
     assert summary["verified_count"] == 2
+
+
+def test_github_commit_synthetic_emits_person_match() -> None:
+    """Synthetic GitHub commit search: one person-match per repo + summary."""
+    events = _github_commit_email_synthetic({"email": "u@example.com"})
+    types = [e["event_type"] for e in events]
+    assert "person-match" in types
+    assert types[-1] == "tool-run-result"
+    for e in events:
+        assert e["payload"].get("source") == "github_commits"
+
+
+def test_github_commit_missing_email_returns_error() -> None:
+    events = github_commit_email_search({})
+    assert events[0]["event_type"] == "tool-run-error"
+
+
+def test_github_commit_emits_person_match_per_unique_repo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each unique repo touched by the email becomes one person-match.
+    Same email committing to the same repo 50x = one event, not 50."""
+    fake_response = {
+        "total_count": 3,
+        "items": [
+            {
+                "sha": "abc1",
+                "html_url": "https://github.com/octo/repo1/commit/abc1",
+                "commit": {
+                    "author": {
+                        "name": "Octo Cat",
+                        "email": "u@example.com",
+                        "date": "2024-03-01T12:00:00Z",
+                    },
+                    "message": "Fix",
+                },
+                "author": {
+                    "login": "octocat",
+                    "html_url": "https://github.com/octocat",
+                },
+                "repository": {"full_name": "octo/repo1", "private": False},
+            },
+            {
+                "sha": "abc2",
+                "html_url": "https://github.com/octo/repo1/commit/abc2",
+                "commit": {
+                    "author": {
+                        "name": "Octo Cat",
+                        "email": "u@example.com",
+                        "date": "2024-03-02T12:00:00Z",
+                    },
+                    "message": "Fix more",
+                },
+                "author": {
+                    "login": "octocat",
+                    "html_url": "https://github.com/octocat",
+                },
+                "repository": {"full_name": "octo/repo1", "private": False},
+            },
+            {
+                "sha": "def1",
+                "html_url": "https://github.com/octo/repo2/commit/def1",
+                "commit": {
+                    "author": {
+                        "name": "Octo Cat",
+                        "email": "u@example.com",
+                        "date": "2024-03-03T12:00:00Z",
+                    },
+                    "message": "Another repo",
+                },
+                "author": {
+                    "login": "octocat",
+                    "html_url": "https://github.com/octocat",
+                },
+                "repository": {"full_name": "octo/repo2", "private": False},
+            },
+        ],
+    }
+
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(200, json=fake_response, request=_httpx.Request("GET", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    events = github_commit_email_search({"email": "u@example.com"})
+    person_matches = [e for e in events if e["event_type"] == "person-match"]
+    # 3 commits across 2 repos -> 2 person-matches.
+    assert len(person_matches) == 2
+    repos = {pm["payload"]["repo"] for pm in person_matches}
+    assert repos == {"octo/repo1", "octo/repo2"}
+    # Each should carry login + name + commit count for that repo.
+    by_repo = {pm["payload"]["repo"]: pm["payload"] for pm in person_matches}
+    assert by_repo["octo/repo1"]["commit_count"] == 2
+    assert by_repo["octo/repo1"]["login"] == "octocat"
+    assert by_repo["octo/repo1"]["author_name"] == "Octo Cat"
+
+
+def test_github_commit_403_rate_limit_returns_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """403 / 429 are rate-limit signals from GitHub. Surface as tool-run-
+    error so the investigator sees it (not as silent empty result)."""
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(403, request=_httpx.Request("GET", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    events = github_commit_email_search({"email": "u@example.com"})
+    assert events[0]["event_type"] == "tool-run-error"
+    assert "403" in events[0]["payload"]["reason"]
+
+
+def test_github_commit_uses_pat_when_env_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """OSINT_GITHUB_PAT raises 10/min unauthed -> 30/min authed.
+    When set, the Authorization header must be on the request."""
+    monkeypatch.setenv("OSINT_GITHUB_PAT", "ghp_synthetic")
+
+    captured: dict[str, Any] = {}
+
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        captured["headers"] = dict(self.headers)
+        return _httpx.Response(
+            200,
+            json={"total_count": 0, "items": []},
+            request=_httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    github_commit_email_search({"email": "u@example.com"})
+    # Header key is lowercased by httpx; check case-insensitively.
+    headers_lower = {k.lower(): v for k, v in captured["headers"].items()}
+    assert "authorization" in headers_lower
+    assert "ghp_synthetic" in headers_lower["authorization"]
 
 
 def test_intelbase_redacts_credential_fields(

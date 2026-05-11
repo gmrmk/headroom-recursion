@@ -267,6 +267,13 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     examplePayload: '{\n  "email": "user@example.com"\n}',
     group: "email",
   },
+  {
+    id: "github_commit_email_search",
+    label: "GitHub commits — behavioral identity",
+    hint: "Free. Search public commits by author-email. Rolls up by repo. OSINT_GITHUB_PAT raises 10/min → 30/min.",
+    examplePayload: '{\n  "email": "user@example.com"\n}',
+    group: "email",
+  },
   // Person — name-based
   {
     id: "true_people_search",
