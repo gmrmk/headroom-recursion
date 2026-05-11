@@ -77,6 +77,12 @@ export function useInvestigationStream(invId: string | undefined): {
       "tool-run-accepted",
       "tool-run-result",
       "tool-run-error",
+      // R-5 property-vetting event types.
+      "geocode-match",
+      "listing-match",
+      "person-match",
+      "breach-hit",
+      "image-match",
     ];
     for (const t of eventTypes) {
       source.addEventListener(t, (e) => handle((e as MessageEvent).data));

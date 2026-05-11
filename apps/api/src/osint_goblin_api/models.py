@@ -83,6 +83,14 @@ class InvestigationEvent(BaseModel):
         "tool-run-accepted",
         "tool-run-result",
         "tool-run-error",
+        # R-5 phase6 property-vetting adapters (Sprint 2 / 2026-05-11):
+        # domain-meaningful event types for the six-primitive triangulation.
+        # See apps/workers/src/osint_goblin_workers/adapters_property.py.
+        "geocode-match",  # Nominatim address -> lat/lon
+        "listing-match",  # Inside Airbnb / lodging platform hit
+        "person-match",  # TruePeopleSearch / PII lookup hit
+        "breach-hit",  # HIBP / credential breach finding
+        "image-match",  # TinEye / reverse-image hit
     ]
     investigation_id: UUID
     run_id: UUID | None = None

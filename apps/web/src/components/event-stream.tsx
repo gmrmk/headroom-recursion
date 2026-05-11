@@ -21,6 +21,12 @@ const EVENT_COLORS: Record<InvestigationEventType, string> = {
   "tool-run-accepted": "#60a5fa",
   "tool-run-result": "#34d399",
   "tool-run-error": "#f87171",
+  // R-5 property-vetting event colors
+  "geocode-match": "#fbbf24",
+  "listing-match": "#fbbf24",
+  "person-match": "#fbbf24",
+  "breach-hit": "#f87171",
+  "image-match": "#fbbf24",
 };
 
 const STATUS_LABEL: Record<StreamStatus, string> = {
@@ -53,6 +59,19 @@ const TRIAGE_EVENT_TYPES: ReadonlySet<InvestigationEventType> = new Set([
   "wayback-queued",
   "tool-run-accepted",
   "tool-run-result",
+  // R-5 property-vetting Triage: evidence-of-presence events.
+  "geocode-match",
+  "listing-match",
+  "person-match",
+  "image-match",
+]);
+
+const DISPROVE_EVENT_TYPES: ReadonlySet<InvestigationEventType> = new Set([
+  // R-5 property-vetting Disprove: evidence-against-claims events. The
+  // breach-hit is the canonical "this subject is not who they claim"
+  // signal in the property-vetting workflow.
+  "breach-hit",
+  "tool-run-error",
 ]);
 
 function matchesFacet(event: InvestigationEvent, facet: Facet): boolean {
@@ -62,16 +81,13 @@ function matchesFacet(event: InvestigationEvent, facet: Facet): boolean {
   if (facet === "triage") {
     return TRIAGE_EVENT_TYPES.has(event.event_type);
   }
-  // Disprove: events flagged as contradicting the subject. Until the
-  // contradiction-detection adapter lands (Sprint 3+), the heuristic is
-  // any event whose payload has a `contradicts` or `mismatch` key. The
-  // chip surface exists today; the semantics deepen as adapters wire it.
+  // Disprove: typed event types AND legacy payload-flag heuristic (until
+  // every adapter migrates to typed disprove events).
+  if (DISPROVE_EVENT_TYPES.has(event.event_type)) {
+    return true;
+  }
   const p = event.payload;
-  return (
-    typeof p === "object" &&
-    p !== null &&
-    ("contradicts" in p || "mismatch" in p || event.event_type === "tool-run-error")
-  );
+  return typeof p === "object" && p !== null && ("contradicts" in p || "mismatch" in p);
 }
 
 export function EventStream({ investigationId }: EventStreamProps) {

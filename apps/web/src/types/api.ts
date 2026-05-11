@@ -40,7 +40,13 @@ export type InvestigationEventType =
   | "wayback-queued"
   | "tool-run-accepted"
   | "tool-run-result"
-  | "tool-run-error";
+  | "tool-run-error"
+  // R-5 phase6 property-vetting event types (Sprint 2).
+  | "geocode-match"
+  | "listing-match"
+  | "person-match"
+  | "breach-hit"
+  | "image-match";
 
 export interface InvestigationEvent {
   event_type: InvestigationEventType;
