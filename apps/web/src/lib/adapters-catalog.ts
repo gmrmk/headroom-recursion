@@ -319,6 +319,90 @@ export const ADAPTER_BY_ID: Record<string, AdapterMeta> = Object.fromEntries(
   ADAPTERS.map((a) => [a.id, a]),
 );
 
+// W1-W8 workflows per ADR-0017 §3. Rendered as the cmd-K palette's
+// empty-state grid (cold start). Each workflow has a 2-letter prefix
+// the §4 ranker uses + a brief "what it does" summary.
+//
+// Property-vetting note: the original W1-W8 were general-OSINT workflows
+// from before the property-vetting pivot. The pivot adds property_vetting
+// as an extra (W9) so the dossier surface includes the case the user
+// actually runs every day.
+
+export interface WorkflowMeta {
+  readonly prefix: string;
+  readonly name: string;
+  readonly summary: string;
+  readonly subject: string;
+  readonly id: string; // for rank candidate parity
+}
+
+export const WORKFLOWS: ReadonlyArray<WorkflowMeta> = [
+  {
+    id: "w1.un",
+    prefix: "un",
+    name: "Username Dossier",
+    summary: "Maigret + Sherlock + social fan-out across N platforms.",
+    subject: "username",
+  },
+  {
+    id: "w2.em",
+    prefix: "em",
+    name: "Email Lookup",
+    summary: "MX validate → HIBP breaches → email-to-account pivot.",
+    subject: "email",
+  },
+  {
+    id: "w3.ph",
+    prefix: "ph",
+    name: "Phone Pivot",
+    summary: "Carrier lookup → SMS-account pivot → social handle scan.",
+    subject: "phone",
+  },
+  {
+    id: "w4.im",
+    prefix: "im",
+    name: "Image OSINT",
+    summary: "Reverse-image aggregator + EXIF + provenance + geo.",
+    subject: "image",
+  },
+  {
+    id: "w5.do",
+    prefix: "do",
+    name: "Domain + CT Timeline",
+    summary: "Subfinder + Amass + CT log + Wayback CDX timeline.",
+    subject: "domain",
+  },
+  {
+    id: "w6.pe",
+    prefix: "pe",
+    name: "Person Background",
+    summary: "TruePeopleSearch + LinkedIn + GitHub + breach surface.",
+    subject: "person",
+  },
+  {
+    id: "w7.fa",
+    prefix: "fa",
+    name: "Face Match",
+    summary: "Reverse image + biometric gate. OPSEC red by default.",
+    subject: "face",
+  },
+  {
+    id: "w8.ge",
+    prefix: "ge",
+    name: "Event Geolocation",
+    summary: "Image geo + KartaView + sun-angle. Time-pinned.",
+    subject: "event",
+  },
+  {
+    id: "w9.pv",
+    prefix: "pv",
+    name: "Property Vetting (pivot)",
+    summary:
+      "Nominatim → Inside Airbnb → reverse-image + EXIF on listing photos → host name cross-check.",
+    subject: "property",
+  },
+];
+
 /** Event name dispatched on `window` when the palette selects an adapter.
  *  RunToolForm listens for this and updates its own adapter selection. */
 export const ADAPTER_SELECT_EVENT = "osint:adapter-select";

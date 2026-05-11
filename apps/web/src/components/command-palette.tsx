@@ -7,9 +7,11 @@ import {
   ADAPTER_SELECT_EVENT,
   GROUP_LABELS,
   GROUP_ORDER,
+  WORKFLOWS,
   type AdapterGroup,
   type AdapterMeta,
   type AdapterSelectDetail,
+  type WorkflowMeta,
 } from "../lib/adapters-catalog";
 import { KEY_BINDINGS, matchesBinding } from "../lib/keyboard";
 
@@ -243,11 +245,23 @@ export function CommandPalette({ forceOpen = false }: CommandPaletteProps) {
             padding: "4px 0",
           }}
         >
-          {filtered.length === 0 ? (
+          {query.trim() === "" ? (
+            // ADR-0017 §3 empty-state: render the W1-W9 workflow grid.
+            // Click/Enter on a workflow fills the search with its prefix
+            // so the filtered list below shows related adapters.
+            <WorkflowGrid
+              workflows={WORKFLOWS}
+              onPick={(w) => {
+                setQuery(w.prefix);
+                setActiveIdx(0);
+                inputRef.current?.focus();
+              }}
+            />
+          ) : filtered.length === 0 ? (
             <p style={{ color: "#525252", fontSize: 12, padding: "12px 14px" }}>
-              No adapters match "{query}". ADR-0017's W1-W8 workflow-grid
-              empty state is WI-0606; for now, try a substring of the
-              adapter id (e.g. "yandex", "exif", "follower").
+              No adapters match "{query}". Try a substring of the adapter
+              id (e.g. "yandex", "exif", "follower"), or a workflow prefix
+              from the W1-W9 grid (un, em, ph, im, do, pe, fa, ge, pv).
             </p>
           ) : (
             GROUP_ORDER.map((g) => {
@@ -309,6 +323,79 @@ export function CommandPalette({ forceOpen = false }: CommandPaletteProps) {
             })
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface WorkflowGridProps {
+  workflows: ReadonlyArray<WorkflowMeta>;
+  onPick: (w: WorkflowMeta) => void;
+}
+
+function WorkflowGrid({ workflows, onPick }: WorkflowGridProps) {
+  return (
+    <div style={{ padding: "12px 14px" }}>
+      <div
+        style={{
+          color: "#525252",
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+          marginBottom: 8,
+        }}
+      >
+        Workflows (ADR-0017 §3) — click to filter
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 8,
+        }}
+      >
+        {workflows.map((w) => (
+          <button
+            type="button"
+            key={w.id}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onPick(w);
+            }}
+            aria-label={`Workflow ${w.name}`}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              padding: "10px 12px",
+              background: "#0a0a0a",
+              border: "1px solid #1f1f1f",
+              borderRadius: 4,
+              color: "#e5e5e5",
+              fontSize: 12,
+              fontFamily: "inherit",
+              textAlign: "left",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span
+                style={{
+                  color: "#fbbf24",
+                  fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                  fontWeight: 700,
+                }}
+              >
+                {w.prefix}
+              </span>
+              <span style={{ fontWeight: 600 }}>{w.name}</span>
+            </div>
+            <span style={{ color: "#737373", fontSize: 11 }}>{w.summary}</span>
+          </button>
+        ))}
+      </div>
+      <div style={{ color: "#525252", fontSize: 11, marginTop: 10 }}>
+        Or type to search {ADAPTERS.length} adapters by id, label, or hint.
       </div>
     </div>
   );
