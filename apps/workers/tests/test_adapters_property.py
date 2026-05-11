@@ -19,6 +19,7 @@ import pytest
 from osint_goblin_workers.adapters import get_registry
 from osint_goblin_workers.adapters_property import (
     _email_mx_synthetic,
+    _gravatar_synthetic,
     _hibp_synthetic,
     _inside_airbnb_synthetic,
     _intelbase_synthetic,
@@ -26,6 +27,7 @@ from osint_goblin_workers.adapters_property import (
     _tineye_synthetic,
     _true_people_synthetic,
     email_mx_validate,
+    gravatar_profile_lookup,
     inside_airbnb_listings,
     intelbase_email_lookup,
     nominatim_geocode,
@@ -43,6 +45,7 @@ from osint_goblin_workers.adapters_property import (
         "email_mx_validate",
         "hibp_breach_check",
         "intelbase_email_lookup",
+        "gravatar_profile_lookup",
         "inside_airbnb_listings",
         "true_people_search",
         "tineye_image",
@@ -122,6 +125,106 @@ def test_intelbase_without_api_key_falls_back_to_synthetic(
     # Synthetic must NOT make a network call; presence of the synthetic
     # marker is the contract.
     assert any(e["payload"].get("synthetic") is True for e in events)
+
+
+def test_gravatar_synthetic_emits_verified_account_matches() -> None:
+    """Synthetic Gravatar: profile + N verified_accounts -> person-match
+    per account + summary. Locks the wire shape."""
+    events = _gravatar_synthetic({"email": "user@example.com"})
+    types = [e["event_type"] for e in events]
+    assert types.count("person-match") >= 1
+    assert types[-1] == "tool-run-result"
+    # Source field is set so the dossier can distinguish gravatar hits.
+    for e in events:
+        assert e["payload"].get("source") == "gravatar"
+
+
+def test_gravatar_missing_email_returns_error() -> None:
+    events = gravatar_profile_lookup({})
+    assert events[0]["event_type"] == "tool-run-error"
+    assert "email" in events[0]["payload"]["reason"].lower()
+
+
+def test_gravatar_hashes_email_sha256(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Gravatar v3 requires sha256(lower(trim(email))) in the URL.
+    A wrong hash = wrong lookup. Pin the canonicalization."""
+    import hashlib
+
+    captured: dict[str, str] = {}
+
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        captured["url"] = url
+        return _httpx.Response(404, request=_httpx.Request("GET", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    gravatar_profile_lookup({"email": "  USER@Example.COM  "})
+
+    expected = hashlib.sha256(b"user@example.com").hexdigest()
+    assert (
+        expected in captured["url"]
+    ), f"expected sha256 of normalized email in URL; got {captured['url']}"
+
+
+def test_gravatar_404_returns_no_profile_summary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No Gravatar profile != error. It's a useful negative signal:
+    'this email is not linked to a public claimed identity'. Emit a
+    summary, no error."""
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(404, request=_httpx.Request("GET", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    events = gravatar_profile_lookup({"email": "user@example.com"})
+    assert events[-1]["event_type"] == "tool-run-result"
+    # No person-match emitted on 404 -- summary only.
+    assert all(e["event_type"] != "tool-run-error" for e in events)
+    assert events[-1]["payload"].get("profile_found") is False
+
+
+def test_gravatar_emits_person_match_per_verified_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each entry in verified_accounts[] becomes one person-match event
+    (owner-attested platform linkage -- the highest-signal free pivot)."""
+    fake_response = {
+        "hash": "abc",
+        "display_name": "Alex Morgan",
+        "profile_url": "https://gravatar.com/alex",
+        "verified_accounts": [
+            {
+                "service_type": "github",
+                "service_label": "GitHub",
+                "url": "https://github.com/alex",
+                "is_hidden": False,
+            },
+            {
+                "service_type": "linkedin",
+                "service_label": "LinkedIn",
+                "url": "https://linkedin.com/in/alex",
+                "is_hidden": False,
+            },
+        ],
+    }
+
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(200, json=fake_response, request=_httpx.Request("GET", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    events = gravatar_profile_lookup({"email": "user@example.com"})
+    person_matches = [e for e in events if e["event_type"] == "person-match"]
+    assert len(person_matches) == 2
+    platforms = {pm["payload"]["platform"] for pm in person_matches}
+    assert platforms == {"github", "linkedin"}
+    # Profile metadata surfaces in the summary.
+    summary = events[-1]["payload"]
+    assert summary["profile_found"] is True
+    assert summary["display_name"] == "Alex Morgan"
+    assert summary["verified_count"] == 2
 
 
 def test_intelbase_redacts_credential_fields(

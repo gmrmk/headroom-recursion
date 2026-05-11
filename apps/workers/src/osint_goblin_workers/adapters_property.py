@@ -368,6 +368,194 @@ def hibp_breach_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# 3a-i. Gravatar v3 profile lookup -- owner-attested identity pivot
+#
+# Single highest-signal free email pivot per Margaret's deliberation
+# (2026-05-11 evening). `verified_accounts[]` is the property owner
+# *explicitly* tying their email to listed platforms (LinkedIn, GitHub,
+# etc.) -- if a fraudulent listing's owner email comes back with a real
+# Gravatar profile and 3 verified platforms, that's strong "real person"
+# signal; if it comes back 404, that's a useful negative signal too.
+#
+# Endpoint: GET https://api.gravatar.com/v3/profiles/{sha256_hex}
+# Auth:     anonymous works (100/hr); Bearer token in OSINT_GRAVATAR_TOKEN
+#           unlocks 1000/hr.
+# Hash:     sha256(lower(strip(email))). Per docs.gravatar.com/rest/hash/.
+# ---------------------------------------------------------------------------
+
+
+_GRAVATAR_URL = "https://api.gravatar.com/v3/profiles/{hash}"
+
+
+def gravatar_profile_lookup(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Gravatar v3 profile lookup. Emits one `person-match` per
+    `verified_accounts[]` entry + a summary tool-run-result.
+
+    Payload:
+      {"email": "user@example.com"}
+
+    Env (optional):
+      OSINT_GRAVATAR_TOKEN  -- bearer token raises 100/hr -> 1000/hr
+    """
+    import hashlib
+
+    email = payload.get("email", "")
+    if not isinstance(email, str) or "@" not in email:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing or malformed 'email'"},
+            }
+        ]
+
+    normalized = email.strip().lower()
+    sha256 = hashlib.sha256(normalized.encode()).hexdigest()
+    url = _GRAVATAR_URL.format(hash=sha256)
+
+    headers: dict[str, str] = {"Accept": "application/json", "User-Agent": _USER_AGENT}
+    token = os.environ.get("OSINT_GRAVATAR_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    try:
+        with httpx.Client(timeout=10.0, headers=headers, follow_redirects=False) as c:
+            r = c.get(url)
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"gravatar {type(exc).__name__}: {exc}",
+                    "email": email,
+                },
+            }
+        ]
+
+    if r.status_code == 404:
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "source": "gravatar",
+                    "email": email,
+                    "profile_found": False,
+                    "verified_count": 0,
+                },
+            }
+        ]
+    if r.status_code != 200:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"gravatar HTTP {r.status_code}",
+                    "email": email,
+                },
+            }
+        ]
+
+    try:
+        data = r.json()
+    except ValueError:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "gravatar non-JSON response", "email": email},
+            }
+        ]
+    if not isinstance(data, dict):
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "gravatar unexpected response shape", "email": email},
+            }
+        ]
+
+    verified = data.get("verified_accounts") or []
+    events: list[dict[str, Any]] = []
+    if isinstance(verified, list):
+        for v in verified:
+            if not isinstance(v, dict):
+                continue
+            if v.get("is_hidden") is True:
+                continue
+            events.append(
+                {
+                    "event_type": "person-match",
+                    "payload": {
+                        "source": "gravatar",
+                        "email": email,
+                        "platform": v.get("service_type", "") or v.get("service_label", ""),
+                        "platform_label": v.get("service_label", ""),
+                        "profile_url": v.get("url", ""),
+                        "owner_attested": True,
+                    },
+                }
+            )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "gravatar",
+                "email": email,
+                "profile_found": True,
+                "display_name": data.get("display_name", ""),
+                "profile_url": data.get("profile_url", ""),
+                "location": data.get("location", ""),
+                "job_title": data.get("job_title", ""),
+                "company": data.get("company", ""),
+                "verified_count": sum(1 for e in events if e["event_type"] == "person-match"),
+            },
+        }
+    )
+    return events
+
+
+def _gravatar_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Synthetic Gravatar: a profile with two verified accounts. Locks
+    the wire shape (person-match per verified account + summary)."""
+    email = payload.get("email") or "user@example.com"
+    return [
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "gravatar",
+                "email": email,
+                "platform": "github",
+                "platform_label": "GitHub",
+                "profile_url": "https://github.com/synthetic-user",
+                "owner_attested": True,
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "person-match",
+            "payload": {
+                "source": "gravatar",
+                "email": email,
+                "platform": "linkedin",
+                "platform_label": "LinkedIn",
+                "profile_url": "https://linkedin.com/in/synthetic-user",
+                "owner_attested": True,
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "gravatar",
+                "email": email,
+                "profile_found": True,
+                "display_name": "Synthetic User",
+                "verified_count": 2,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 3a. IntelBase email lookup -- POST https://api.intelbase.is/lookup/email
 #
 # IntelBase aggregates 40B+ breach records + real-time infostealer log
@@ -2005,6 +2193,18 @@ _REGISTRY.register(
         "IntelBase /lookup/email: breach + account fanout from a single email "
         "(40B+ breach records, infostealer logs). Env-gated on "
         "OSINT_INTELBASE_API_KEY."
+    ),
+)
+
+_REGISTRY.register(
+    "gravatar_profile_lookup",
+    gravatar_profile_lookup,
+    synthetic_mode=_gravatar_synthetic,
+    in_process=True,
+    description=(
+        "Gravatar v3 profile lookup. Owner-attested identity pivot: emits "
+        "person-match per verified_accounts entry. Free anonymous (100/hr); "
+        "OSINT_GRAVATAR_TOKEN unlocks 1000/hr."
     ),
 )
 

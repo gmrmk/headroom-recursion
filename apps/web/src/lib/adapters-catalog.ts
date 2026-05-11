@@ -260,6 +260,13 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     examplePayload: '{\n  "email": "user@example.com",\n  "include_data_breaches": true\n}',
     group: "email",
   },
+  {
+    id: "gravatar_profile_lookup",
+    label: "Gravatar — owner-attested identity",
+    hint: "Free. Hash(email) → owner's claimed identity + verified_accounts (LinkedIn, GitHub, etc.). Single highest-signal free pivot.",
+    examplePayload: '{\n  "email": "user@example.com"\n}',
+    group: "email",
+  },
   // Person — name-based
   {
     id: "true_people_search",
