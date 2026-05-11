@@ -120,6 +120,7 @@ def make_subprocess_adapter(
     *,
     timeout_s: float = 120.0,
     extra_env: dict[str, str] | None = None,
+    python_executable: str | None = None,
 ):
     """Factory: return a callable conforming to AdapterCallable that dispatches
     to the wrapper at `wrapper_path`. The callable closes over the path so
@@ -127,9 +128,16 @@ def make_subprocess_adapter(
 
     `extra_env` is forwarded to invoke_wrapper -- useful for synthetic-mode
     factories that need to pass `OSINT_ADAPTER_MODE=synthetic` (Yuki P1 phase6).
+
+    `python_executable` lets the adapter pin a specific interpreter when the
+    wrapper depends on packages outside the worker's own venv (e.g. Scrapling
+    + Patchright living in the empirical venv at
+    `osint-dashboard-research/empirical/.venv`). Defaults to `sys.executable`
+    (the worker's interpreter) when None.
     """
     resolved_wrapper = Path(wrapper_path)
     resolved_env = dict(extra_env) if extra_env else None
+    resolved_python = python_executable
 
     def _adapter(payload: dict) -> list[dict]:
         return invoke_wrapper(
@@ -137,6 +145,7 @@ def make_subprocess_adapter(
             payload,
             timeout_s=timeout_s,
             extra_env=resolved_env,
+            python_executable=resolved_python,
         )
 
     return _adapter

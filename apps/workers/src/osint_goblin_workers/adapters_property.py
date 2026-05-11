@@ -45,6 +45,17 @@ from typing import Any
 import httpx
 
 from .adapters import get_registry
+from .subprocess_adapter import make_subprocess_adapter
+
+# Pinned: the empirical venv ships Scrapling + Patchright + Playwright.
+# The worker's own .venv intentionally does NOT ship these (heavy + only
+# needed by anti-scraping wrappers); the wrappers run via this interpreter.
+_EMPIRICAL_PY = (
+    Path(r"C:\Users\strid\osint-dashboard-research\empirical\.venv\Scripts\python.exe")
+    if os.name == "nt"
+    else Path("/c/Users/strid/osint-dashboard-research/empirical/.venv/bin/python")
+)
+_REPO_ROOT_PROP = Path(__file__).resolve().parents[4]
 
 # Stable identifier surfaced to upstream services. Email is OPSEC-leaky
 # if used directly; the env var lets the deploy override with a real
@@ -695,13 +706,38 @@ _REGISTRY.register(
     description="Inside Airbnb city-CSV search (Sprint 3). Commercial-operator fingerprint.",
 )
 
-_REGISTRY.register(
-    "true_people_search",
-    _true_people_live_stub,
-    synthetic_mode=_true_people_synthetic,
-    in_process=True,
-    description="TruePeopleSearch -- live needs Scrapling (Sprint 3+). Synthetic available.",
-)
+# TruePeopleSearch: live mode upgraded from stub to subprocess wrapper
+# pinned to the empirical venv (Scrapling + Patchright). The in-process
+# synthetic + stub paths are retained as fallbacks via the subprocess
+# wrapper's OSINT_ADAPTER_MODE env-var contract.
+_TRUE_PEOPLE_WRAPPER = _REPO_ROOT_PROP / "adapters" / "true_people_search" / "wrapper.py"
+if _TRUE_PEOPLE_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
+    _REGISTRY.register(
+        "true_people_search",
+        make_subprocess_adapter(
+            _TRUE_PEOPLE_WRAPPER,
+            timeout_s=60.0,
+            python_executable=str(_EMPIRICAL_PY),
+        ),
+        synthetic_mode=make_subprocess_adapter(
+            _TRUE_PEOPLE_WRAPPER,
+            timeout_s=30.0,
+            python_executable=str(_EMPIRICAL_PY),
+            extra_env={"OSINT_ADAPTER_MODE": "synthetic"},
+        ),
+        in_process=False,
+        description="TruePeopleSearch via Scrapling subprocess (Sprint 3 live mode).",
+    )
+else:
+    _REGISTRY.register(
+        "true_people_search",
+        _true_people_live_stub,
+        synthetic_mode=_true_people_synthetic,
+        in_process=True,
+        description=(
+            "TruePeopleSearch -- empirical venv or wrapper missing; " "in-process stub only."
+        ),
+    )
 
 _REGISTRY.register(
     "tineye_image",
