@@ -6,7 +6,14 @@
 // anchor maps adapter id -> group. Re-open trigger: total >50 OR any
 // one primitive >12.
 
-export type AdapterGroup = "addrgeo" | "email" | "person" | "social" | "image" | "smoke";
+export type AdapterGroup =
+  | "workflow"
+  | "addrgeo"
+  | "email"
+  | "person"
+  | "social"
+  | "image"
+  | "smoke";
 
 export interface AdapterMeta {
   readonly id: string;
@@ -17,14 +24,17 @@ export interface AdapterMeta {
 }
 
 export const GROUP_LABELS: Record<AdapterGroup, string> = {
+  workflow: "Workflows (ADR-0017 §3)",
   addrgeo: "Address / Geo",
   email: "Email",
   person: "Person — name-based",
   social: "Social handle",
   image: "Image",
-  smoke: "Smoke / test",};
+  smoke: "Smoke / test",
+};
 
 export const GROUP_ORDER: ReadonlyArray<AdapterGroup> = [
+  "workflow",
   "addrgeo",
   "email",
   "person",
@@ -34,6 +44,61 @@ export const GROUP_ORDER: ReadonlyArray<AdapterGroup> = [
 ];
 
 export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
+  // Workflows -- run via workflow_runner instead of tool_runner; the API
+  // routes w*.* ids automatically (is_workflow_id in broker.py).
+  {
+    id: "w1.un",
+    label: "W1 — Username Dossier",
+    hint: "Maigret + Sherlock + social fan-out across N platforms.",
+    examplePayload: '{\n  "username": "alice"\n}',
+    group: "workflow",
+  },
+  {
+    id: "w2.em",
+    label: "W2 — Email Lookup",
+    hint: "MX validate → HIBP breaches → email-to-account pivot.",
+    examplePayload: '{\n  "email": "alice@example.com"\n}',
+    group: "workflow",
+  },
+  {
+    id: "w4.im",
+    label: "W4 — Image OSINT",
+    hint: "Reverse-image aggregator + EXIF + provenance + geo.",
+    examplePayload:
+      '{\n  "image_url": "https://example.com/photo.jpg",\n  "case_id": "case-2026-05-alice"\n}',
+    group: "workflow",
+  },
+  {
+    id: "w6.pe",
+    label: "W6 — Person Background",
+    hint: "TruePeopleSearch + LinkedIn + GitHub + breach surface.",
+    examplePayload:
+      '{\n  "name": "Alice Smith",\n  "city": "Springfield",\n  "state": "IL",\n  "company": "Acme Corp",\n  "email": "alice@example.com"\n}',
+    group: "workflow",
+  },
+  {
+    id: "w7.fa",
+    label: "W7 — Face Match (OPSEC red)",
+    hint: "Reverse image + biometric gate. Surfaces image-match events.",
+    examplePayload: '{\n  "image_url": "https://example.com/face.jpg"\n}',
+    group: "workflow",
+  },
+  {
+    id: "w8.ge",
+    label: "W8 — Event Geolocation",
+    hint: "Image geo + KartaView + sun-angle. Time-pinned.",
+    examplePayload:
+      '{\n  "image_url": "https://example.com/photo.jpg",\n  "lat": 39.78,\n  "lon": -89.65,\n  "season": "winter"\n}',
+    group: "workflow",
+  },
+  {
+    id: "w9.pv",
+    label: "W9 — Property Vetting (pivot)",
+    hint: "Geocode + Inside Airbnb + reverse-image + EXIF + host name + breach.",
+    examplePayload:
+      '{\n  "address": "123 Main St, Springfield IL",\n  "csv_path": "data/inside-airbnb/springfield-il.csv",\n  "host_name": "Alice Smith",\n  "city": "Springfield",\n  "state": "IL",\n  "email": "alice@example.com",\n  "photo_url": "https://example.com/listing-photo.jpg"\n}',
+    group: "workflow",
+  },
   // Address / Geo
   {
     id: "nominatim_geocode",

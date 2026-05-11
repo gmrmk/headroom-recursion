@@ -10,12 +10,15 @@ from . import (
 from .adapters import AdapterEntry, AdapterRegistry
 from .broker import configure_broker, get_broker
 from .tool_runner import ToolRunPayload, tool_runner
+from .workflow_runner import WorkflowRunPayload, workflow_runner
 
 __all__ = [
     "AdapterEntry",
     "AdapterRegistry",
     "ToolRunPayload",
+    "WorkflowRunPayload",
     "configure_broker",
     "get_broker",
     "tool_runner",
+    "workflow_runner",
 ]

@@ -18,7 +18,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 
-from .broker import enqueue_tool_run
+from .broker import enqueue_tool_run, enqueue_workflow_run, is_workflow_id
 from .models import (
     CreateInvestigation,
     Investigation,
@@ -155,23 +155,25 @@ async def run_tool(inv_id: UUID, body: ToolRunRequest) -> ToolRunResponse:
         _BACKGROUND_TASKS.add(task)
         task.add_done_callback(_BACKGROUND_TASKS.discard)
     else:
-        # Sprint 3 wire: enqueue the real tool_runner job on the Redis broker.
-        # The worker subprocess picks it up, dispatches to the adapter, and
-        # publishes events back via Redis pub/sub (R-6 bridge). The API does
-        # not block on adapter completion; the SSE stream is the read-back
-        # surface.
+        # ADR-0017 §3 workflow id (w*.*) -> route to workflow_runner;
+        # everything else -> tool_runner.
         try:
-            enqueue_tool_run(
-                investigation_id=str(inv_id),
-                run_id=str(resp.run_id),
-                adapter_id=body.adapter_id,
-                adapter_payload=body.payload,
-            )
+            if is_workflow_id(body.adapter_id):
+                enqueue_workflow_run(
+                    investigation_id=str(inv_id),
+                    run_id=str(resp.run_id),
+                    workflow_id=body.adapter_id,
+                    seed=body.payload,
+                )
+            else:
+                enqueue_tool_run(
+                    investigation_id=str(inv_id),
+                    run_id=str(resp.run_id),
+                    adapter_id=body.adapter_id,
+                    adapter_payload=body.payload,
+                )
         except Exception as exc:
-            # If the broker is unreachable (dev env without Memurai), surface
-            # the error to the dossier so the investigator knows the run
-            # didn't actually dispatch. We do NOT 500 -- the run-accepted
-            # event already fired and the SSE stream is the correct surface.
+            # Broker unreachable -- surface in dossier, don't 500.
             await store.publish_event(
                 InvestigationEvent(
                     event_type="tool-run-error",

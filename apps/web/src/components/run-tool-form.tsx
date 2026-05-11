@@ -29,6 +29,7 @@ export function RunToolForm({ investigationId }: RunToolFormProps) {
   const grouped = useMemo(() => {
     type Bucket = Array<(typeof ADAPTERS)[number]>;
     const buckets: Record<AdapterGroup, Bucket> = {
+      workflow: [],
       addrgeo: [],
       email: [],
       person: [],

@@ -252,9 +252,13 @@ export function CommandPalette({ forceOpen = false }: CommandPaletteProps) {
             <WorkflowGrid
               workflows={WORKFLOWS}
               onPick={(w) => {
-                setQuery(w.prefix);
-                setActiveIdx(0);
-                inputRef.current?.focus();
+                // Dispatch the workflow as the form's selected "adapter".
+                // The API routes w*.* ids to workflow_runner (see
+                // apps/api/.../broker.py is_workflow_id). The form will
+                // surface the workflow's example seed payload via the
+                // ADAPTER_SELECT_EVENT contract -- needs a registry entry,
+                // see WORKFLOW_AS_ADAPTER below.
+                dispatchSelect(w.id);
               }}
             />
           ) : filtered.length === 0 ? (

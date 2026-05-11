@@ -70,6 +70,49 @@ def enqueue_tool_run(
     return msg.message_id
 
 
+def enqueue_workflow_run(
+    investigation_id: str,
+    run_id: str,
+    workflow_id: str,
+    seed: dict[str, Any],
+) -> str:
+    """Enqueue a `workflow_runner` message on the broker.
+
+    Same shape as enqueue_tool_run but routes to the workflow_runner
+    actor on the workflow_runner queue. workflow_id is e.g. w1.un /
+    w9.pv; the seed dict carries the workflow's input parameters.
+    """
+    broker = get_broker()
+    msg = Message(
+        queue_name="workflow_runner",
+        actor_name="workflow_runner",
+        args=(
+            {
+                "investigation_id": investigation_id,
+                "run_id": run_id,
+                "workflow_id": workflow_id,
+                "seed": seed,
+            },
+        ),
+        kwargs={},
+        options={},
+        message_id=str(uuid4()),
+        message_timestamp=0,
+    )
+    broker.enqueue(msg)
+    return msg.message_id
+
+
+def is_workflow_id(adapter_id: str) -> bool:
+    """API-side mirror of osint_goblin_workers.workflows.is_workflow_id.
+    Duplicated to keep the L4 sibling boundary (api cannot import
+    workers per the DAG); the contract is the same shape /^w\\d+\\./."""
+    if not adapter_id or "." not in adapter_id:
+        return False
+    head = adapter_id.split(".", 1)[0]
+    return head.startswith("w") and head[1:].isdigit()
+
+
 def reset_broker_for_tests() -> None:
     """Drop the cached broker so tests can swap config."""
     global _broker
