@@ -1,9 +1,19 @@
+"""FastAPI app entrypoint.
+
+Diego sec.B1 + Mei-Lan §7 SSE wiring. The route module is the surface; this
+file is the tiny composition root + middleware.
+"""
+
+from __future__ import annotations
+
 from fastapi import FastAPI
 
+from .routes import router
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="OSINT Goblin API", version="2026.05.0")
-    return app
+app = FastAPI(
+    title="OSINT Goblin API",
+    version="2026.05.0",
+    description="Greenfield FOSS-first OSINT investigation dashboard backend.",
+)
 
-
-app = create_app()
+app.include_router(router)
