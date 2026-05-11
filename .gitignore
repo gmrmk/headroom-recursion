@@ -29,3 +29,8 @@ Thumbs.db
 
 # Runtime artifacts
 .dev-logs/
+
+# Margaret COO PDF mirrors -- canonical artifacts live in
+# ../osint-dashboard-research/phase6/; this directory exists for
+# VSCode internal link convenience and should not be committed.
+docs/margaret/
