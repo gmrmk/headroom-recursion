@@ -1886,6 +1886,7 @@ for _social_id, _social_dir in (
     ("twitter_followers", "twitter_followers"),
     ("instagram_followers", "instagram_followers"),
     ("tiktok_followers", "tiktok_followers"),
+    ("twstalker", "twstalker"),
 ):
     _wrapper_path = _REPO_ROOT_PROP / "adapters" / _social_dir / "wrapper.py"
     if _wrapper_path.is_file() and _EMPIRICAL_PY.is_file():

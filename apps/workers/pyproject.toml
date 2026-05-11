@@ -10,6 +10,11 @@ dependencies = [
   "dramatiq[redis]>=2.1",
   "redis>=5",
   "pydantic>=2.9",
+  "httpx>=0.27",                  # property adapters fetch external services
+  # Image-analysis adapter deps (Sprint 3+):
+  "pillow>=11.0",                 # image flip + ELA + EXIF parsing baseline
+  "numpy>=2.0",                   # ELA pixel-difference math
+  "exifread>=3.0",                # deeper EXIF than Pillow alone (still in-process)
 ]
 
 [build-system]

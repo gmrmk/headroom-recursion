@@ -154,9 +154,84 @@ const ADAPTERS: ReadonlyArray<{
   },
   {
     id: "tineye_image",
-    label: "TinEye — reverse image",
-    hint: "URL-based reverse-image search via Scrapling.",
+    label: "TinEye — reverse image (exact)",
+    hint: "Exact-match reverse image search. Pair with image_flip_check for flipped duplicates.",
     examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
+  },
+  {
+    id: "yandex_image_reverse",
+    label: "Yandex — reverse image (catches flips)",
+    hint: "Neural-feature matcher; best engine for flipped/cropped variants.",
+    examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
+  },
+  // google_lens_reverse intentionally NOT in the dropdown (Tomas review
+  // 2026-05-11): captcha-fragile; kept registered so the aggregator can
+  // fan it out for free, but standalone use is rarely the right call.
+  {
+    id: "bing_visual_reverse",
+    label: "Bing Visual Search — reverse image",
+    hint: "Third triangulation engine; catches what Google misses.",
+    examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
+  },
+  {
+    id: "reverse_image_aggregator",
+    label: "Reverse image — ALL engines (meta)",
+    hint: "Fan-out: TinEye + Yandex + Google Lens + Bing. Single call.",
+    examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
+  },
+  {
+    id: "image_flip_check",
+    label: "Image — generate flipped variant",
+    hint: "Horizontally flip; feed result into exact-match engines.",
+    examplePayload:
+      '{\n  "image_url": "https://example.com/photo.jpg",\n  "output_format": "file"\n}',
+  },
+  // image_exif intentionally NOT in dropdown (Tomas review 2026-05-11):
+  // three EXIF-class tools is one too many. Kept registered as the
+  // fallback inside image_provenance_check when exiftool is not on PATH;
+  // standalone use is dropdown clutter at 30+ adapters.
+  {
+    id: "exiftool_full",
+    label: "ExifTool — full metadata (gold standard)",
+    hint: "~23,000 tags. Requires exiftool on PATH.",
+    examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
+  },
+  {
+    id: "image_ela_check",
+    label: "Image ELA — manipulation detector",
+    hint: "Error Level Analysis. Flags retouched / clone-stamped regions.",
+    examplePayload:
+      '{\n  "image_url": "https://example.com/photo.jpg",\n  "quality": 90\n}',
+  },
+  {
+    id: "image_provenance_check",
+    label: "Image provenance — composite (EXIF + ELA + C2PA)",
+    hint: "One call, aggregated verdict (high-risk / elevated / low).",
+    examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
+  },
+  {
+    id: "ai_image_detection",
+    label: "AI image detection (Sightengine)",
+    hint: "GenAI-fabricated photo detector. Needs OSINT_SIGHTENGINE_* keys.",
+    examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
+  },
+  {
+    id: "c2pa_verify",
+    label: "C2PA — Content Credentials verify",
+    hint: "Cryptographic provenance chain (2024+ Sony/Leica/Nikon).",
+    examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
+  },
+  {
+    id: "kartaview_nearby",
+    label: "KartaView — OSM street-level at lat/lon",
+    hint: "Open street-level imagery. No API key.",
+    examplePayload: '{\n  "lat": 39.78,\n  "lon": -89.65,\n  "radius_m": 200\n}',
+  },
+  {
+    id: "twstalker",
+    label: "TWStalker — Twitter mirror (public-view)",
+    hint: "Third no-login Twitter surface; complements nitter + x.com.",
+    examplePayload: '{\n  "handle": "username"\n}',
   },
   {
     id: "echo",
