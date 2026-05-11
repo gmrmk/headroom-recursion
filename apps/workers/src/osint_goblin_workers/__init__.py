@@ -4,6 +4,7 @@
 # in the global registry. Must run before tool_runner is imported so
 # that dispatches against the new adapter ids resolve.
 from . import (
+    adapters_domain,  # noqa: F401
     adapters_image,  # noqa: F401
     adapters_phone,  # noqa: F401
     adapters_property,  # noqa: F401

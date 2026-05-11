@@ -33,6 +33,7 @@ export function RunToolForm({ investigationId }: RunToolFormProps) {
       addrgeo: [],
       email: [],
       phone: [],
+      domain: [],
       person: [],
       social: [],
       image: [],

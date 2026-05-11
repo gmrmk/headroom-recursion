@@ -11,6 +11,7 @@ export type AdapterGroup =
   | "addrgeo"
   | "email"
   | "phone"
+  | "domain"
   | "person"
   | "social"
   | "image"
@@ -29,6 +30,7 @@ export const GROUP_LABELS: Record<AdapterGroup, string> = {
   addrgeo: "Address / Geo",
   email: "Email",
   phone: "Phone",
+  domain: "Domain / subdomain",
   person: "Person — name-based",
   social: "Social handle",
   image: "Image",
@@ -40,6 +42,7 @@ export const GROUP_ORDER: ReadonlyArray<AdapterGroup> = [
   "addrgeo",
   "email",
   "phone",
+  "domain",
   "person",
   "social",
   "image",
@@ -68,6 +71,13 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     label: "W3 — Phone Pivot",
     hint: "Format + carrier + timezone + Google-SERP mention scan.",
     examplePayload: '{\n  "phone": "+1 217 555 0123",\n  "region": "US"\n}',
+    group: "workflow",
+  },
+  {
+    id: "w5.do",
+    label: "W5 — Domain + CT Timeline",
+    hint: "CT log + Wayback CDX + subfinder + amass subdomain enum.",
+    examplePayload: '{\n  "domain": "example.com"\n}',
     group: "workflow",
   },
   {
@@ -159,6 +169,35 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     hint: "Search Google for public mentions of the number.",
     examplePayload: '{\n  "phone": "+1 217 555 0123"\n}',
     group: "phone",
+  },
+  // Domain
+  {
+    id: "ct_log_lookup",
+    label: "CT logs — crt.sh subdomain enum",
+    hint: "Certificate Transparency log query. Free, no auth.",
+    examplePayload: '{\n  "domain": "example.com",\n  "limit": 100\n}',
+    group: "domain",
+  },
+  {
+    id: "wayback_cdx_subdomains",
+    label: "Wayback CDX — subdomain history",
+    hint: "Historical archived URLs grouped by subdomain.",
+    examplePayload: '{\n  "domain": "example.com",\n  "limit": 100\n}',
+    group: "domain",
+  },
+  {
+    id: "subfinder_subprocess",
+    label: "subfinder — Project Discovery enum",
+    hint: "Passive subdomain enum. Requires subfinder on PATH.",
+    examplePayload: '{\n  "domain": "example.com"\n}',
+    group: "domain",
+  },
+  {
+    id: "amass_subprocess",
+    label: "amass — OWASP enum",
+    hint: "Heavy passive enum. Requires amass on PATH.",
+    examplePayload: '{\n  "domain": "example.com",\n  "timeout_s": 120\n}',
+    group: "domain",
   },
   // Email
   {

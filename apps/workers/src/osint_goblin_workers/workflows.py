@@ -193,9 +193,28 @@ WORKFLOWS: dict[str, Workflow] = {
     "w5.do": Workflow(
         id="w5.do",
         name="Domain + CT Timeline",
-        description="Subfinder + Amass + CT log + Wayback CDX timeline.",
+        description="CT log + Wayback CDX + subfinder + amass subdomain enum.",
         steps=[
-            # Domain adapters land in Sprint-4; placeholder.
+            WorkflowStep(
+                "ct_log_lookup",
+                {"domain": "{domain}", "limit": 200},
+                required_seed_keys=("domain",),
+            ),
+            WorkflowStep(
+                "wayback_cdx_subdomains",
+                {"domain": "{domain}", "limit": 200},
+                required_seed_keys=("domain",),
+            ),
+            WorkflowStep(
+                "subfinder_subprocess",
+                {"domain": "{domain}"},
+                required_seed_keys=("domain",),
+            ),
+            WorkflowStep(
+                "amass_subprocess",
+                {"domain": "{domain}"},
+                required_seed_keys=("domain",),
+            ),
         ],
     ),
     "w6.pe": Workflow(
