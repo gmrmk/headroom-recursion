@@ -1,13 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
+import "./tokens.css";
+
 export const metadata: Metadata = {
   title: "OSINT Goblin",
   description: "FOSS-first OSINT investigation dashboard",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "oklch(15% 0.005 240)",
 };
 
 interface RootLayoutProps {
@@ -16,18 +18,8 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en">
-      <body
-        style={{
-          margin: 0,
-          fontFamily:
-            "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-          background: "#0a0a0a",
-          color: "#e5e5e5",
-        }}
-      >
-        {children}
-      </body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
