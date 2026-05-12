@@ -513,8 +513,9 @@ def test_hudson_rock_empty_stealers_returns_summary_only(
 def test_partial_pivot_synthetic_emits_partial_per_platform() -> None:
     """Each of the four partial-recovery adapters has a synthetic mode
     that emits the wire shape the live path produces: one person-match
-    with `<platform>_partial` source + email_partial + account_exists,
-    and a tool-run-result summary."""
+    with `<platform>_partial` source + redacted partial metadata +
+    account_exists, and a tool-run-result summary. Naomi #3: raw partial
+    values must NOT appear in the default emit shape."""
     from osint_goblin_workers.adapters import get_registry
 
     registry = get_registry()
@@ -527,10 +528,195 @@ def test_partial_pivot_synthetic_emits_partial_per_platform() -> None:
         types = [e["event_type"] for e in events]
         assert "person-match" in types, f"{platform}: missing person-match"
         assert types[-1] == "tool-run-result", f"{platform}: missing summary"
-        # Source field marks platform so dossier can distinguish.
         for e in events:
             if e["event_type"] != "tool-run-accepted":
                 assert e["payload"].get("source") == f"{platform}_partial"
+        # Naomi #3 redaction: the default in-process synthetic carries
+        # metadata, not the raw partial string. The summary records
+        # values_kept=False to mark this.
+        person_match = next(e for e in events if e["event_type"] == "person-match")
+        assert (
+            "email_partial_meta" in person_match["payload"]
+        ), f"{platform}: redacted metadata missing"
+        assert (
+            "email_partial" not in person_match["payload"]
+        ), f"{platform}: raw email_partial leaked in default emit (Naomi #3)"
+        summary = events[-1]["payload"]
+        assert (
+            summary.get("values_kept") is False
+        ), f"{platform}: summary must mark values_kept=False by default"
+        assert summary.get("partials_visible_count") == 1
+
+
+def test_redact_email_partial_keeps_first_length_domain() -> None:
+    """Naomi #3 redaction shape: `j***@gmail.com` -> first/local_length/domain.
+    The raw asterisks-leak gets dropped in favor of structured metadata."""
+    import importlib.util
+    from pathlib import Path
+
+    wrapper_path = (
+        Path(__file__).resolve().parents[3] / "adapters" / "partial_recovery" / "wrapper.py"
+    )
+    spec = importlib.util.spec_from_file_location("partial_wrapper", wrapper_path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    meta = mod._redact_email_partial("j***@gmail.com")
+    assert meta["first"] == "j"
+    assert meta["domain"] == "gmail.com"
+    assert meta["local_length"] == 4
+    assert meta["raw_length"] == len("j***@gmail.com")
+
+
+def test_redact_phone_partial_keeps_last_digits_length() -> None:
+    """Phone partial 'ending in 1234' style -> last_digits + implied length."""
+    import importlib.util
+    from pathlib import Path
+
+    wrapper_path = (
+        Path(__file__).resolve().parents[3] / "adapters" / "partial_recovery" / "wrapper.py"
+    )
+    spec = importlib.util.spec_from_file_location("partial_wrapper", wrapper_path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    meta = mod._redact_phone_partial("+1 *** *** 1234")
+    assert meta["last_digits"] == "1234"
+    assert meta["implied_length"] >= 7  # +1 + 4 digits + asterisks counted
+
+
+def test_eu_guardrail_refuses_without_lawful_basis_flag(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Naomi #5: OSINT_PARTIAL_REGION=EU set without _LAWFUL_BASIS_CONFIRMED
+    must refuse (SystemExit with non-zero code + tool-run-error emit)."""
+    import importlib.util
+    from pathlib import Path
+
+    wrapper_path = (
+        Path(__file__).resolve().parents[3] / "adapters" / "partial_recovery" / "wrapper.py"
+    )
+    spec = importlib.util.spec_from_file_location("partial_wrapper", wrapper_path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    monkeypatch.setenv("OSINT_PARTIAL_REGION", "EU")
+    monkeypatch.delenv("OSINT_PARTIAL_LAWFUL_BASIS_CONFIRMED", raising=False)
+    with pytest.raises(SystemExit) as exc_info:
+        mod._check_region_guardrail()
+    assert exc_info.value.code == 5
+    out = capsys.readouterr().out
+    assert "lawful" in out.lower() or "legitimate" in out.lower()
+
+
+def test_eu_guardrail_passes_with_lawful_basis_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Setting OSINT_PARTIAL_LAWFUL_BASIS_CONFIRMED=1 unblocks the EU path."""
+    import importlib.util
+    from pathlib import Path
+
+    wrapper_path = (
+        Path(__file__).resolve().parents[3] / "adapters" / "partial_recovery" / "wrapper.py"
+    )
+    spec = importlib.util.spec_from_file_location("partial_wrapper", wrapper_path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    monkeypatch.setenv("OSINT_PARTIAL_REGION", "EU")
+    monkeypatch.setenv("OSINT_PARTIAL_LAWFUL_BASIS_CONFIRMED", "1")
+    # No SystemExit raised.
+    mod._check_region_guardrail()
+
+
+def test_eu_guardrail_noop_for_non_eu_region(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Non-EU regions don't require the lawful-basis flag."""
+    import importlib.util
+    from pathlib import Path
+
+    wrapper_path = (
+        Path(__file__).resolve().parents[3] / "adapters" / "partial_recovery" / "wrapper.py"
+    )
+    spec = importlib.util.spec_from_file_location("partial_wrapper", wrapper_path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    monkeypatch.setenv("OSINT_PARTIAL_REGION", "US")
+    monkeypatch.delenv("OSINT_PARTIAL_LAWFUL_BASIS_CONFIRMED", raising=False)
+    mod._check_region_guardrail()  # no raise
+
+
+def test_audit_log_writes_per_query_record(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """Naomi #4: every live query appends a NDJSON record to
+    data/partial-pivots-audit/<date>.jsonl with platform + target +
+    account_signal. Never includes partial values."""
+    import importlib.util
+    from datetime import UTC, datetime
+    from pathlib import Path
+
+    wrapper_path = (
+        Path(__file__).resolve().parents[3] / "adapters" / "partial_recovery" / "wrapper.py"
+    )
+    spec = importlib.util.spec_from_file_location("partial_wrapper", wrapper_path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    data_root = Path(str(tmp_path)) / "data"
+    monkeypatch.setenv("OSINT_DATA_ROOT", str(data_root))
+    monkeypatch.delenv("OSINT_ADAPTER_MODE", raising=False)
+
+    mod._audit_log("instagram", "user@example.com", "exists")
+
+    audit_file = (
+        data_root / "partial-pivots-audit" / f"{datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
+    )
+    assert audit_file.is_file()
+    line = audit_file.read_text(encoding="utf-8").strip()
+    import json as _json
+
+    record = _json.loads(line)
+    assert record["platform"] == "instagram"
+    assert record["target"] == "user@example.com"
+    assert record["account_signal"] == "exists"
+    # Audit must NOT carry partial values.
+    assert "email_partial" not in record
+    assert "phone_partial" not in record
+
+
+def test_audit_log_noop_in_synthetic_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pytest.TempPathFactory,
+) -> None:
+    """Synthetic-mode queries don't audit (no real query happened)."""
+    import importlib.util
+    from pathlib import Path
+
+    wrapper_path = (
+        Path(__file__).resolve().parents[3] / "adapters" / "partial_recovery" / "wrapper.py"
+    )
+    spec = importlib.util.spec_from_file_location("partial_wrapper", wrapper_path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    data_root = Path(str(tmp_path)) / "data"
+    monkeypatch.setenv("OSINT_DATA_ROOT", str(data_root))
+    monkeypatch.setenv("OSINT_ADAPTER_MODE", "synthetic")
+
+    mod._audit_log("instagram", "user@example.com", "exists")
+
+    audit_dir = data_root / "partial-pivots-audit"
+    assert not audit_dir.exists() or not list(audit_dir.iterdir())
 
 
 def test_user_scanner_synthetic_emits_person_match_and_summary() -> None:

@@ -2727,6 +2727,12 @@ def _make_partial_in_process_stub(platform: str) -> Any:
 
 
 def _make_partial_in_process_synthetic(platform: str) -> Any:
+    """In-process synthetic mirrors the redacted wire shape (Naomi #3):
+    `email_partial_meta` carries first-char + length + domain, NOT the
+    raw partial string. The wrapper-side synthetic also redacts by
+    default; opt-in via OSINT_PARTIAL_KEEP_VALUES=1 only on the wrapper
+    path (in-process is intentionally fixture-only)."""
+
     def _synth(payload: dict[str, Any]) -> list[dict[str, Any]]:
         target = (
             payload.get("target")
@@ -2740,8 +2746,13 @@ def _make_partial_in_process_synthetic(platform: str) -> Any:
                 "payload": {
                     "source": f"{platform}_partial",
                     "target": target,
-                    "email_partial": "s***c@e***le.com",
                     "account_exists": True,
+                    "email_partial_meta": {
+                        "raw_length": 16,
+                        "first": "s",
+                        "local_length": 4,
+                        "domain": "e***le.com",
+                    },
                     "synthetic": True,
                 },
             },
@@ -2750,8 +2761,9 @@ def _make_partial_in_process_synthetic(platform: str) -> Any:
                 "payload": {
                     "source": f"{platform}_partial",
                     "target": target,
-                    "partials_found": 1,
+                    "partials_visible_count": 1,
                     "account_signal": "exists",
+                    "values_kept": False,
                     "synthetic": True,
                 },
             },

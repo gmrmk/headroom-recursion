@@ -4,9 +4,7 @@ Castrickclues's marquee technique: submit a target to a platform's
 forgot-password flow and harvest the obfuscated partial email/phone the
 platform displays as the "we'll send a code to ***@gmail.com" hint. The
 partial form alone is signal -- corroborates that the target email/phone
-IS linked to an account on that platform. Multiple partials across
-platforms can sometimes be brute-forced to reconstruct the full string
-(out of scope for this wrapper -- we just emit what's visible).
+IS linked to an account on that platform.
 
 Platforms supported (selected by OSINT_PARTIAL_PLATFORM env var):
   - microsoft  account.live.com password reset       (Ship A; phone -> partial email)
@@ -17,32 +15,61 @@ Platforms supported (selected by OSINT_PARTIAL_PLATFORM env var):
 Contract (Sora ADR-0004 sec.5):
   stdin:   {"target": "..."} on one line, EOF
   env:     OSINT_PARTIAL_PLATFORM=<microsoft|linkedin|instagram|twitter>
-           OSINT_ADAPTER_MODE=synthetic  (optional; skips browser)
+           OSINT_ADAPTER_MODE=synthetic   (optional; skips browser)
+           OSINT_PARTIAL_REGION=EU         (optional; gates on lawful-basis flag)
+           OSINT_PARTIAL_LAWFUL_BASIS_CONFIRMED=1
+             (required if region=EU; investigator's documented Art. 6(1)(f)
+              legitimate-interest basis for processing EU-subject data)
+           OSINT_PARTIAL_KEEP_VALUES=1     (optional; default 0 = redact
+              partial-email/phone strings before emit. Naomi #3)
+           OSINT_DATA_ROOT                (optional; overrides where
+              rate-limit + audit files land; default <repo>/data/)
   stdout:  NDJSON events
   stderr:  log lines
   exit:    0 on clean run; non-zero on adapter failure
 
-Wire shape:
-  - one `person-match` per partial pattern matched in the response page,
-    with source=<platform>_partial, target, and either email_partial or
-    phone_partial set
-  - one `tool-run-result` summary with partials_found, account_signal
+Wire shape (default; OSINT_PARTIAL_KEEP_VALUES unset or 0):
+  - one `person-match` per partial visible, with source=<platform>_partial,
+    target, account_exists boolean, and `email_partial_meta` /
+    `phone_partial_meta` (first char + local-part length + domain),
+    NOT the raw partial string.
+  - one `tool-run-result` summary with partials_visible_count,
+    account_signal, parsed flag.
 
-Discipline: this is account-existence enumeration on consenting target
-emails / phones, used per-target for property-vetting (articulating-link
-investigation). Bulk discovery would be misuse; the worker should rate-
-limit calls (one per 30s) and the live path explicitly suggests doing so.
+With OSINT_PARTIAL_KEEP_VALUES=1 (live investigator review only):
+  - person-match additionally carries `email_partial` / `phone_partial`
+    raw strings as the platform displayed them. Do not persist these
+    into dossier exports; this mode is for in-session review.
+
+Operational hardening (Naomi 2026-05-11):
+  - Per-platform rate-limit at the wrapper layer (30-45s with random
+    jitter). Persists across subprocess invocations via a lockfile.
+  - Per-query audit log written to data/partial-pivots-audit/<date>.jsonl
+    so the investigator can prove single-target investigative use.
+  - EU-target guardrail requires OSINT_PARTIAL_LAWFUL_BASIS_CONFIRMED=1.
+  - Partial *values* redacted by default; only the *fact* of account
+    existence + partial metadata (length + domain) emitted.
+
+Discipline: account-existence enumeration on investigative targets with
+a documented basis, per-target only. Bulk discovery is misuse. Per the
+user's 2026-05-11 scope note: articulating-link investigation, not
+stalkerware.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import sys
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
+
+_RATE_LIMIT_BASE_S = 30.0
+_RATE_LIMIT_JITTER_S = 15.0
 
 
 def _emit(event: dict[str, Any]) -> None:
@@ -52,6 +79,138 @@ def _emit(event: dict[str, Any]) -> None:
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _data_dir() -> Path:
+    """Resolved data root. Tests override via OSINT_DATA_ROOT."""
+    override = os.environ.get("OSINT_DATA_ROOT", "").strip()
+    if override:
+        return Path(override)
+    # adapters/partial_recovery/wrapper.py -> ../../data/
+    return Path(__file__).resolve().parents[2] / "data"
+
+
+def _keep_values() -> bool:
+    """Naomi #3: default to redacting partial values; opt-in keeps them."""
+    return os.environ.get("OSINT_PARTIAL_KEEP_VALUES", "0").strip() == "1"
+
+
+def _enforce_rate_limit(platform: str) -> None:
+    """Naomi #1+#2: per-platform rate-limit at the wrapper layer with
+    random jitter. Persists across subprocess invocations via a lockfile.
+
+    Skipped entirely in synthetic mode (callers control timing in tests).
+    """
+    if os.environ.get("OSINT_ADAPTER_MODE", "").strip().lower() == "synthetic":
+        return
+    if os.environ.get("OSINT_PARTIAL_SKIP_RATE_LIMIT", "").strip() == "1":
+        # Test-only escape hatch. Never set this for live runs.
+        return
+    dir_ = _data_dir() / "partial-pivots-rate-limit"
+    try:
+        dir_.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        sys.stderr.write(f"rate-limit dir create failed (will proceed): {exc}\n")
+        return
+    lock = dir_ / f"{platform}.last"
+    now = time.time()
+    last = 0.0
+    if lock.is_file():
+        try:
+            last = float(lock.read_text().strip())
+        except (ValueError, OSError):
+            last = 0.0
+    elapsed = now - last
+    required = _RATE_LIMIT_BASE_S + random.uniform(0.0, _RATE_LIMIT_JITTER_S)
+    if elapsed < required:
+        delay = required - elapsed
+        sys.stderr.write(
+            f"rate-limit: sleeping {delay:.1f}s before {platform} query "
+            f"(min {_RATE_LIMIT_BASE_S}s + jitter)\n"
+        )
+        time.sleep(delay)
+    try:
+        lock.write_text(str(time.time()))
+    except OSError as exc:
+        sys.stderr.write(f"rate-limit lock write failed (will proceed): {exc}\n")
+
+
+def _check_region_guardrail() -> None:
+    """Naomi #5: refuse EU-target queries without documented lawful basis."""
+    region = os.environ.get("OSINT_PARTIAL_REGION", "").strip().upper()
+    if region != "EU":
+        return
+    if os.environ.get("OSINT_PARTIAL_LAWFUL_BASIS_CONFIRMED", "").strip() == "1":
+        return
+    _emit(
+        {
+            "event_type": "tool-run-error",
+            "payload": {
+                "reason": (
+                    "OSINT_PARTIAL_REGION=EU set without "
+                    "OSINT_PARTIAL_LAWFUL_BASIS_CONFIRMED=1. Document an "
+                    "Art. 6(1)(f) legitimate-interest basis before processing "
+                    "EU-subject data; set the env var to confirm."
+                ),
+            },
+        }
+    )
+    sys.exit(5)
+
+
+def _audit_log(platform: str, target: str, account_signal: str) -> None:
+    """Naomi #4: per-query audit trail (target, platform, signal, ts).
+    NEVER includes partial values -- the audit is about what was queried,
+    not what was harvested. Append-only NDJSON keyed by UTC date."""
+    if os.environ.get("OSINT_ADAPTER_MODE", "").strip().lower() == "synthetic":
+        return
+    dir_ = _data_dir() / "partial-pivots-audit"
+    try:
+        dir_.mkdir(parents=True, exist_ok=True)
+        path = dir_ / f"{datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
+        line = json.dumps(
+            {
+                "ts": _now_iso(),
+                "platform": platform,
+                "target": target,
+                "account_signal": account_signal,
+            },
+            separators=(",", ":"),
+        )
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except OSError as exc:
+        sys.stderr.write(f"audit log write failed (will proceed): {exc}\n")
+
+
+def _redact_email_partial(raw: str) -> dict[str, Any]:
+    """Strip the asterisk-leak in a redacted-email string while keeping
+    the durable signal: first char, local-part length, domain.
+
+    `j***@gmail.com` -> {first: "j", local_length: 4, domain: "gmail.com"}
+    """
+    out: dict[str, Any] = {"raw_length": len(raw)}
+    if "@" not in raw:
+        return out
+    local, _, domain = raw.partition("@")
+    out["domain"] = domain
+    if local:
+        out["first"] = local[0] if local[0] != "*" else ""
+        # Length includes all chars (the platform's asterisks count too);
+        # this is the most we can infer about the real local-part length.
+        out["local_length"] = len(local)
+    return out
+
+
+def _redact_phone_partial(raw: str) -> dict[str, Any]:
+    """Phone partials are usually 'ending in 1234' style. Keep the
+    trailing digits (the most distinctive bit) and the implied length."""
+    digits = re.findall(r"\d", raw)
+    return {
+        "raw_length": len(raw),
+        "last_digits": "".join(digits[-4:]) if digits else "",
+        "implied_length": len(digits) + raw.count("*") + raw.count("•"),
+    }
 
 
 # Per-platform configuration. Selectors are best-effort against the
@@ -126,7 +285,12 @@ def _resolve_platform() -> tuple[str, dict[str, Any]]:
 def _run_synthetic(platform: str, payload: dict[str, Any]) -> int:
     """Synthetic event stream -- no browser, deterministic. Used by the
     in-process synthetic registration and by OSINT_ADAPTER_MODE=synthetic."""
-    target = payload.get("target") or payload.get("email") or payload.get("phone") or "user@example.com"
+    target = (
+        payload.get("target")
+        or payload.get("email")
+        or payload.get("phone")
+        or "user@example.com"
+    )
     _emit(
         {
             "event_type": "tool-run-accepted",
@@ -137,26 +301,26 @@ def _run_synthetic(platform: str, payload: dict[str, Any]) -> int:
             },
         }
     )
-    _emit(
-        {
-            "event_type": "person-match",
-            "payload": {
-                "source": f"{platform}_partial",
-                "target": target,
-                "email_partial": "s***c@e***le.com",
-                "account_exists": True,
-                "synthetic": True,
-            },
-        }
-    )
+    raw_partial = "s***c@e***le.com"
+    person_payload: dict[str, Any] = {
+        "source": f"{platform}_partial",
+        "target": target,
+        "account_exists": True,
+        "email_partial_meta": _redact_email_partial(raw_partial),
+        "synthetic": True,
+    }
+    if _keep_values():
+        person_payload["email_partial"] = raw_partial
+    _emit({"event_type": "person-match", "payload": person_payload})
     _emit(
         {
             "event_type": "tool-run-result",
             "payload": {
                 "source": f"{platform}_partial",
                 "target": target,
-                "partials_found": 1,
+                "partials_visible_count": 1,
                 "account_signal": "exists",
+                "values_kept": _keep_values(),
                 "synthetic": True,
             },
         }
@@ -197,6 +361,11 @@ def _run_live(platform: str, config: dict[str, Any], payload: dict[str, Any]) ->
     """Live mode: drive Patchright (Playwright with stealth patches) through
     the platform's password-recovery flow and harvest any partial-email or
     partial-phone strings from the resulting page text."""
+    # Naomi #5: refuse EU-target queries without documented lawful basis.
+    # Runs BEFORE anything else so a misconfigured env doesn't trigger a
+    # browser launch + a real outbound request.
+    _check_region_guardrail()
+
     target = (
         (payload.get("target") or payload.get("email") or payload.get("phone") or "")
     ).strip()
@@ -222,6 +391,10 @@ def _run_live(platform: str, config: dict[str, Any], payload: dict[str, Any]) ->
             }
         )
         return 3
+
+    # Naomi #1+#2: rate-limit at the wrapper layer with random jitter.
+    # Skipped in synthetic mode (see _enforce_rate_limit).
+    _enforce_rate_limit(platform)
 
     _emit(
         {
@@ -285,20 +458,31 @@ def _run_live(platform: str, config: dict[str, Any], payload: dict[str, Any]) ->
 
     signal = _classify_account_signal(body_text, config)
     partials = _harvest_partials(body_text, config)
+    keep_values = _keep_values()
+    total_visible = 0
 
     for kind, vals in partials.items():
         for v in vals[:5]:  # cap dossier noise per platform per kind
-            _emit(
-                {
-                    "event_type": "person-match",
-                    "payload": {
-                        "source": f"{platform}_partial",
-                        "target": target,
-                        f"{kind}_partial": v,
-                        "account_exists": signal == "exists",
-                    },
-                }
-            )
+            total_visible += 1
+            person_payload: dict[str, Any] = {
+                "source": f"{platform}_partial",
+                "target": target,
+                "account_exists": signal == "exists",
+            }
+            # Naomi #3: emit metadata by default; raw partial only when
+            # OSINT_PARTIAL_KEEP_VALUES=1 (live investigator-review only).
+            if kind == "email":
+                person_payload["email_partial_meta"] = _redact_email_partial(v)
+                if keep_values:
+                    person_payload["email_partial"] = v
+            elif kind == "phone":
+                person_payload["phone_partial_meta"] = _redact_phone_partial(v)
+                if keep_values:
+                    person_payload["phone_partial"] = v
+            _emit({"event_type": "person-match", "payload": person_payload})
+
+    # Naomi #4: per-query audit trail. Never includes partial values.
+    _audit_log(platform, target, signal)
 
     _emit(
         {
@@ -306,9 +490,10 @@ def _run_live(platform: str, config: dict[str, Any], payload: dict[str, Any]) ->
             "payload": {
                 "source": f"{platform}_partial",
                 "target": target,
-                "partials_found": sum(len(v[:5]) for v in partials.values()),
+                "partials_visible_count": total_visible,
                 "account_signal": signal,
                 "parsed": bool(partials) or signal in ("exists", "missing"),
+                "values_kept": keep_values,
                 "finished_at": _now_iso(),
             },
         }
