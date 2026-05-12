@@ -666,13 +666,408 @@ def _exiftool_full_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# 5a. image_ai_local_detect -- LOCAL AI-image heuristic detector
+#
+# 100% local + offline analysis. No third-party upload, no API keys, no
+# LLM. Per docs/security/target-data-handling-policy.md: target data
+# never leaves the local process.
+#
+# Combines six independent heuristics and aggregates to a single
+# `ai_likelihood` verdict (none / low / medium / high). Each signal has
+# its own weight; the per-signal breakdown is emitted so investigators
+# can see exactly *why* an image looks suspect.
+#
+# Heuristics (none individually conclusive, aggregate-only):
+#   1. EXIF Software tag: contains generator name -> near-confirmed
+#   2. PNG tEXt chunk: Stable Diffusion / ComfyUI / A1111 parameters
+#      block embedded -> near-confirmed
+#   3. EXIF camera metadata absent (no make/model/datetime/GPS) -> suggestive
+#      (could also be a stripped-EXIF real photo; combined with other
+#      signals it's stronger)
+#   4. Image dimensions match a known generator default (512^2, 768^2,
+#      1024^2, 1024x1792, 1792x1024, 1024x1536, 1456x816, 1408x2048, ...)
+#   5. Both dimensions are multiples of 64 (most diffusion models
+#      constrain to /64) AND no camera EXIF
+#   6. URL filename contains a generator-name marker (dalle/midjourney/
+#      sd_/stable_diffusion/imagen/flux/firefly)
+#
+# Optional C2PA byte-scan: detects presence of a JUMBF box ("jumb"
+# magic) which means the file carries Content Credentials. Note this is
+# NOT itself an AI indicator -- cameras (Sony/Leica/Nikon 2024+) also
+# write C2PA. We emit the fact but don't score it.
+# ---------------------------------------------------------------------------
+
+
+# Generator-default output dimensions (W, H). When an image matches one
+# of these exactly, that's a strong AI tell.
+_AI_DEFAULT_SIZES: frozenset[tuple[int, int]] = frozenset(
+    {
+        (256, 256),
+        (512, 512),
+        (768, 768),
+        (1024, 1024),
+        (1024, 1792),
+        (1792, 1024),
+        (1024, 768),
+        (768, 1024),
+        (1024, 1536),
+        (1536, 1024),
+        (1456, 816),
+        (816, 1456),
+        (1408, 2048),
+        (2048, 1408),
+        (2048, 2048),
+        (2048, 1152),
+        (1152, 2048),
+    }
+)
+
+# Markers in EXIF Software or PNG tEXt that name a known generator.
+# Lowercased substring match.
+_GENERATOR_MARKERS: tuple[str, ...] = (
+    "stable diffusion",
+    "stablediffusion",
+    "sdxl",
+    "a1111",
+    "automatic1111",
+    "comfyui",
+    "comfy ui",
+    "midjourney",
+    "dall-e",
+    "dalle",
+    "dall e",
+    "imagen",
+    "firefly",
+    "adobe firefly",
+    "flux",
+    "ideogram",
+    "leonardo.ai",
+    "leonardo ai",
+    "playground.ai",
+    "runwayml",
+    "generative ai",
+    "civitai",
+    "novelai",
+    "openai images",
+)
+
+# PNG tEXt chunk keys A1111/ComfyUI write to encode generation parameters.
+_PNG_PARAMETER_KEYS: tuple[str, ...] = (
+    "parameters",
+    "prompt",
+    "negativeprompt",
+    "negative_prompt",
+    "steps",
+    "sampler",
+    "cfg_scale",
+    "comfy_workflow",
+    "comfy_prompt",
+    "workflow",
+    "sd-metadata",
+    "software",
+)
+
+
+def _exif_ai_signals(image_bytes: bytes) -> dict[str, Any]:
+    """Score EXIF-derived AI tells. Returns a dict with sub-scores +
+    raw observations the verdict can cite."""
+    try:
+        import exifread
+    except ImportError:
+        return {"exif_readable": False, "score": 0, "reasons": ["exifread missing"]}
+    tags = exifread.process_file(io.BytesIO(image_bytes), details=False) or {}
+    if not tags:
+        return {
+            "exif_readable": True,
+            "exif_tag_count": 0,
+            "score": 2,
+            "reasons": ["no EXIF metadata (camera real photos almost always carry some)"],
+        }
+    flat = {str(k): str(v) for k, v in tags.items() if not k.startswith("JPEGThumbnail")}
+    software = flat.get("Image Software", "").lower()
+    artist = flat.get("Image Artist", "").lower()
+    copyright_ = flat.get("Image Copyright", "").lower()
+    camera_present = bool(flat.get("Image Make") or flat.get("Image Model"))
+    datetime_present = bool(flat.get("EXIF DateTimeOriginal"))
+    gps_present = bool(flat.get("GPS GPSLatitude"))
+    reasons: list[str] = []
+    score = 0
+    for marker in _GENERATOR_MARKERS:
+        if marker in software:
+            score += 5
+            reasons.append(f"EXIF Software contains generator marker: {marker!r}")
+            break
+        if marker in artist or marker in copyright_:
+            score += 4
+            reasons.append(f"EXIF Artist/Copyright contains generator marker: {marker!r}")
+            break
+    if not camera_present:
+        score += 1
+        reasons.append("no camera make/model in EXIF")
+    if not datetime_present:
+        score += 1
+        reasons.append("no DateTimeOriginal in EXIF")
+    # GPS absent alone is common (many real photos strip it); only count
+    # when combined with the other absences.
+    if not gps_present and not camera_present and not datetime_present:
+        score += 1
+        reasons.append("EXIF has no camera, no datetime, AND no GPS (multiple absences)")
+    return {
+        "exif_readable": True,
+        "exif_tag_count": len(flat),
+        "camera_present": camera_present,
+        "datetime_present": datetime_present,
+        "gps_present": gps_present,
+        "software": software,
+        "score": score,
+        "reasons": reasons,
+    }
+
+
+def _dimension_ai_signals(image_bytes: bytes) -> dict[str, Any]:
+    """Score dimension-based AI tells."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return {"score": 0, "reasons": ["Pillow missing"]}
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        w, h = img.size
+    except Exception as exc:
+        return {"score": 0, "reasons": [f"PIL open failed: {exc}"]}
+    reasons: list[str] = []
+    score = 0
+    if (w, h) in _AI_DEFAULT_SIZES:
+        score += 2
+        reasons.append(f"dimensions {w}x{h} exactly match a known AI generator default")
+    elif w % 64 == 0 and h % 64 == 0 and w >= 256 and h >= 256:
+        score += 1
+        reasons.append(
+            f"dimensions {w}x{h} both multiples of 64 (diffusion-model shape constraint)"
+        )
+    return {"width": w, "height": h, "score": score, "reasons": reasons}
+
+
+def _filename_ai_signals(image_url: str) -> dict[str, Any]:
+    """URL-filename heuristic. Cheap; sometimes the strongest signal
+    (e.g. `dalle3_castle_in_clouds.png`)."""
+    lower = image_url.lower()
+    for marker in _GENERATOR_MARKERS:
+        token = marker.replace(" ", "")
+        if token and token in lower.replace(" ", ""):
+            return {
+                "score": 1,
+                "reasons": [f"URL filename contains generator marker: {marker!r}"],
+            }
+    return {"score": 0, "reasons": []}
+
+
+def _png_chunk_ai_signals(image_bytes: bytes) -> dict[str, Any]:
+    """A1111 / ComfyUI / SD-WebUI write generation parameters into PNG
+    tEXt or iTXt chunks. These are the most reliable single signal --
+    near-confirmation of AI generation when present."""
+    # Quick PNG signature check.
+    if not image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return {"score": 0, "reasons": []}
+    # Walk PNG chunks. Each chunk: [4-byte length][4-byte type][data][CRC].
+    reasons: list[str] = []
+    score = 0
+    pos = 8
+    while pos + 8 <= len(image_bytes):
+        length_bytes = image_bytes[pos : pos + 4]
+        if len(length_bytes) != 4:
+            break
+        length = int.from_bytes(length_bytes, "big")
+        ctype = image_bytes[pos + 4 : pos + 8].decode("ascii", errors="replace")
+        data_start = pos + 8
+        data_end = data_start + length
+        if data_end > len(image_bytes):
+            break
+        if ctype in ("tEXt", "iTXt"):
+            # tEXt = keyword\x00text; iTXt = keyword\x00<lang+translated><text>
+            chunk_data = image_bytes[data_start:data_end]
+            try:
+                if ctype == "tEXt":
+                    key, _, val = chunk_data.partition(b"\x00")
+                else:
+                    # iTXt has more structure; just check the keyword + text bytes
+                    key, _, rest = chunk_data.partition(b"\x00")
+                    val = rest
+                key_lower = key.decode("latin-1", errors="ignore").lower()
+                val_text = val.decode("latin-1", errors="ignore").lower()
+                if key_lower in _PNG_PARAMETER_KEYS:
+                    score += 5
+                    reasons.append(f"PNG {ctype} chunk has generator-parameter key {key_lower!r}")
+                    break
+                for marker in _GENERATOR_MARKERS:
+                    if marker in val_text:
+                        score += 5
+                        reasons.append(
+                            f"PNG {ctype} chunk text contains generator marker: {marker!r}"
+                        )
+                        break
+                if score:
+                    break
+            except Exception:
+                pass
+        pos = data_end + 4  # skip CRC
+        if ctype == "IEND":
+            break
+    return {"score": score, "reasons": reasons}
+
+
+def _c2pa_byte_scan(image_bytes: bytes) -> dict[str, Any]:
+    """Quick presence check for a JUMBF box (C2PA Content Credentials
+    container). Doesn't classify camera-vs-generator -- just notes the
+    file carries Content Credentials. The investigator can run the
+    `c2pa_verify` adapter for cryptographic chain verification."""
+    if b"jumb" in image_bytes[:65536] or b"c2pa" in image_bytes[:65536]:
+        return {
+            "c2pa_present": True,
+            "score": 0,
+            "reasons": ["JUMBF/c2pa box present (Content Credentials -- could be camera OR AI)"],
+        }
+    return {"c2pa_present": False, "score": 0, "reasons": []}
+
+
+def _score_to_likelihood(score: int) -> str:
+    if score >= 5:
+        return "high"
+    if score >= 3:
+        return "medium"
+    if score >= 1:
+        return "low"
+    return "none"
+
+
+def image_ai_local_detect(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Local-only AI-generated-image heuristic detector.
+
+    Payload:
+      {"image_url": "https://example.com/photo.jpg"}
+
+    Emits one `image-match` event with `source: ai_local_detect`,
+    `ai_likelihood: none|low|medium|high`, total score, and per-signal
+    breakdown (exif, dimensions, filename, png_chunks, c2pa).
+
+    Local-only: no third-party upload, no API keys, no LLM. Per
+    docs/security/target-data-handling-policy.md.
+    """
+    image_url = (payload.get("image_url") or "").strip()
+    if not image_url:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'image_url' in payload"},
+            }
+        ]
+    try:
+        data, ctype = _fetch_image_bytes(image_url, timeout_s=20.0)
+    except Exception as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"fetch failed: {type(exc).__name__}: {exc}",
+                    "image_url": image_url,
+                },
+            }
+        ]
+
+    exif = _exif_ai_signals(data)
+    dim = _dimension_ai_signals(data)
+    fname = _filename_ai_signals(image_url)
+    png = _png_chunk_ai_signals(data)
+    c2pa = _c2pa_byte_scan(data)
+
+    total = exif["score"] + dim["score"] + fname["score"] + png["score"] + c2pa["score"]
+    likelihood = _score_to_likelihood(total)
+    all_reasons: list[str] = []
+    for sig in (exif, dim, fname, png, c2pa):
+        all_reasons.extend(sig.get("reasons", []))
+
+    return [
+        {
+            "event_type": "image-match",
+            "payload": {
+                "source": "ai_local_detect",
+                "image_url": image_url,
+                "content_type": ctype,
+                "ai_likelihood": likelihood,
+                "score": total,
+                "reasons": all_reasons,
+                "signals": {
+                    "exif": {k: v for k, v in exif.items() if k != "reasons"},
+                    "dimensions": {k: v for k, v in dim.items() if k != "reasons"},
+                    "filename": {k: v for k, v in fname.items() if k != "reasons"},
+                    "png_chunks": {k: v for k, v in png.items() if k != "reasons"},
+                    "c2pa": {k: v for k, v in c2pa.items() if k != "reasons"},
+                },
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "ai_local_detect",
+                "image_url": image_url,
+                "ai_likelihood": likelihood,
+                "score": total,
+            },
+        },
+    ]
+
+
+def _image_ai_local_detect_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Synthetic: medium-confidence AI tell to exercise the wire shape."""
+    url = payload.get("image_url") or "https://example.com/synthetic.png"
+    return [
+        {
+            "event_type": "image-match",
+            "payload": {
+                "source": "ai_local_detect",
+                "image_url": url,
+                "content_type": "image/png",
+                "ai_likelihood": "medium",
+                "score": 3,
+                "reasons": [
+                    "no EXIF metadata",
+                    "dimensions 1024x1024 exactly match a known AI generator default",
+                ],
+                "signals": {
+                    "exif": {"exif_readable": True, "exif_tag_count": 0, "score": 2},
+                    "dimensions": {"width": 1024, "height": 1024, "score": 2},
+                    "filename": {"score": 0},
+                    "png_chunks": {"score": 0},
+                    "c2pa": {"c2pa_present": False, "score": 0},
+                },
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "ai_local_detect",
+                "image_url": url,
+                "ai_likelihood": "medium",
+                "score": 3,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 5. ai_image_detection -- Sightengine free-tier GenAI detector
 # ---------------------------------------------------------------------------
 
 
 def ai_image_detection(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """⚠ THIRD-PARTY UPLOAD: forwards image_url to sightengine.com (US-hosted
-    SaaS, Sightengine SAS). The URL string is transmitted; Sightengine
+    """⚠ THIRD-PARTY UPLOAD (conflicts with target-data-handling-policy.md):
+    forwards image_url to sightengine.com (US-hosted SaaS, Sightengine SAS).
+    Use `image_ai_local_detect` instead for local-only AI-detection that
+    keeps target data on-machine.
+
+    The URL string is transmitted; Sightengine
     fetches and analyzes the image server-side. Not for private/auth'd
     URLs (presigned S3, Discord CDN, internal corp domains LEAK the
     bucket on transmission).
@@ -1739,8 +2134,22 @@ _REGISTRY.register(
     synthetic_mode=_ai_image_detection_synthetic,
     in_process=True,
     description=(
-        "AI-image detection (uploads URL to sightengine.com -- US SaaS). "
-        "Sightengine GenAI free tier; requires API keys env."
+        "DEPRECATED: AI-image detection via Sightengine (third-party upload, "
+        "conflicts with target-data-handling-policy.md). Use "
+        "image_ai_local_detect instead. Kept for back-compat; emits "
+        "tool-run-error without explicit OSINT_SIGHTENGINE_API_USER + _SECRET."
+    ),
+)
+_REGISTRY.register(
+    "image_ai_local_detect",
+    image_ai_local_detect,
+    synthetic_mode=_image_ai_local_detect_synthetic,
+    in_process=True,
+    description=(
+        "Local-only AI-image heuristic detector. Heuristic ensemble (EXIF + "
+        "dimensions + filename + PNG chunks + C2PA byte-scan) -- not proof. "
+        "Zero third-party upload. Catches lazy AI-listings well; laundered "
+        "images may slip past."
     ),
 )
 _REGISTRY.register(

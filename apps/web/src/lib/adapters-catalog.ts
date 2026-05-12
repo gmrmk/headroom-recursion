@@ -513,6 +513,13 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     group: "image",
   },
   {
+    id: "image_ai_local_detect",
+    label: "AI-image — local heuristic ensemble (no upload)",
+    hint: "Local-only. EXIF + dimensions + filename + PNG chunks + C2PA byte-scan. Heuristic, not proof. Catches lazy AI-listings well; laundered images may slip past.",
+    examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
+    group: "image",
+  },
+  {
     id: "phash_dedupe",
     label: "pHash dedupe — multi-listing photo theft",
     hint: "Catches same photo reused across cases. Append-only local DB.",

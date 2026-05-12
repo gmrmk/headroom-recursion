@@ -180,7 +180,7 @@ WORKFLOWS: dict[str, Workflow] = {
     "w4.im": Workflow(
         id="w4.im",
         name="Image OSINT",
-        description="Reverse-image aggregator + EXIF + provenance + geo.",
+        description="Reverse-image aggregator + EXIF + provenance + AI-tell heuristics + geo.",
         steps=[
             WorkflowStep(
                 "reverse_image_aggregator",
@@ -191,6 +191,12 @@ WORKFLOWS: dict[str, Workflow] = {
                 "image_provenance_check",
                 {"image_url": "{image_url}"},
                 required_seed_keys=("image_url",),
+            ),
+            WorkflowStep(
+                "image_ai_local_detect",
+                {"image_url": "{image_url}"},
+                required_seed_keys=("image_url",),
+                description="Local AI-image heuristic ensemble (no upload)",
             ),
             WorkflowStep(
                 "phash_dedupe",
@@ -391,6 +397,12 @@ WORKFLOWS: dict[str, Workflow] = {
                 "image_provenance_check",
                 {"image_url": "{photo_url}"},
                 required_seed_keys=("photo_url",),
+            ),
+            WorkflowStep(
+                "image_ai_local_detect",
+                {"image_url": "{photo_url}"},
+                required_seed_keys=("photo_url",),
+                description="Local AI-image heuristic ensemble on the listing photo",
             ),
             WorkflowStep(
                 "true_people_search",
