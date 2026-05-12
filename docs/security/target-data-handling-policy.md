@@ -42,6 +42,9 @@ The reason: LLM providers retain prompts, train on them, and process them throug
 - The Hudson Rock + IntelBase adapters strip credential fields recursively via `_redact_credentials` before emit.
 - The partial-pivot adapters redact partial-value strings by default; raw values opt-in via `OSINT_PARTIAL_KEEP_VALUES=1` for live review only.
 - Zero adapters in the registry use any LLM API as of 2026-05-11.
+- **Worker process silences `httpx` / `httpcore` / `urllib3` / `dramatiq` / `redis` loggers to WARNING** in `apps/workers/.../__main__.py`. `httpx` INFO-logs every outbound URL — for our adapters those URLs include target identifiers (Gravatar's `/profiles/<sha256(email)>`, ip-api's `/json/<ip>`, etc.). Silencing prevents disk persistence of these strings via the worker's stderr/stdout.
+- **API process silences `uvicorn.access` logger to WARNING** in `apps/api/.../main.py`. The uvicorn access log writes one INFO line per request including the full path (`/investigations/<id>/run`, `/investigations/<id>/stream`). That's a per-target trace at the HTTP layer — exactly what the logless contract forbids.
+- The `data/` directory still contains *artifact* files (flipped image variants, ELA glow-maps) with filenames derived from `sha256(source_url)[:16]`. These are investigator-owned evidence artifacts (the dossier `.html` embeds them); they are NOT logs of "what was queried." Investigator manages this directory like any other evidence locker.
 
 ### What we don't do (and won't add)
 
