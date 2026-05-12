@@ -162,6 +162,98 @@ def test_address_nearby_features_unparseable_lat_returns_error() -> None:
     assert events[0]["event_type"] == "tool-run-error"
 
 
+def test_address_nearby_features_self_geocodes_when_only_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Address-fallback path: lat/lon absent but address present should
+    call nominatim_geocode inline, extract lat/lon, then proceed to
+    Overpass. Both nominatim + overpass HTTP responses mocked."""
+    import httpx as _httpx
+
+    nominatim_response = [
+        {
+            "lat": "39.78",
+            "lon": "-89.65",
+            "display_name": "123 Main St, Springfield, IL",
+            "place_id": 1,
+            "type": "house",
+            "importance": 0.5,
+        }
+    ]
+    overpass_response = {
+        "elements": [
+            {"type": "way", "tags": {"landuse": "residential"}},
+            {"type": "node", "tags": {"amenity": "cafe"}},
+        ]
+    }
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        # Nominatim is the only GET in this flow.
+        return _httpx.Response(200, json=nominatim_response, request=_httpx.Request("GET", url))
+
+    def fake_post(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        # Overpass is the only POST in this flow.
+        return _httpx.Response(200, json=overpass_response, request=_httpx.Request("POST", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    monkeypatch.setattr(_httpx.Client, "post", fake_post)
+
+    events = address_nearby_features({"address": "123 Main St, Springfield IL"})
+    # Should have run end-to-end without errors.
+    error_events = [e for e in events if e["event_type"] == "tool-run-error"]
+    assert not error_events, f"unexpected errors: {error_events}"
+    listing_matches = [e for e in events if e["event_type"] == "listing-match"]
+    assert len(listing_matches) == 2  # residential + food_drink
+    # Summary carries lat/lon from the self-geocode result.
+    summary = events[-1]["payload"]
+    assert summary["lat"] == 39.78
+    assert summary["lon"] == -89.65
+
+
+def test_address_nearby_features_address_no_match_returns_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When Nominatim returns zero matches for an address, the adapter
+    should surface a self-geocode-failed error, NOT proceed to Overpass
+    with no coords."""
+    import httpx as _httpx
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(200, json=[], request=_httpx.Request("GET", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+
+    events = address_nearby_features({"address": "nonexistent garbage address"})
+    assert events[0]["event_type"] == "tool-run-error"
+    assert "self-geocode" in events[0]["payload"]["reason"].lower()
+
+
+def test_address_nearby_features_empty_string_lat_triggers_self_geocode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Workflow payload templates produce empty strings when a key
+    isn't in the seed (the _DefaultEmpty pattern). Empty lat should
+    trigger the self-geocode path, not be treated as a valid value."""
+    import httpx as _httpx
+
+    nominatim_response = [{"lat": "39.78", "lon": "-89.65", "display_name": "X", "place_id": 1}]
+    overpass_response = {"elements": []}
+
+    def fake_get(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(200, json=nominatim_response, request=_httpx.Request("GET", url))
+
+    def fake_post(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(200, json=overpass_response, request=_httpx.Request("POST", url))
+
+    monkeypatch.setattr(_httpx.Client, "get", fake_get)
+    monkeypatch.setattr(_httpx.Client, "post", fake_post)
+
+    events = address_nearby_features({"address": "123 Main St", "lat": "", "lon": ""})
+    # Should have self-geocoded (lat="" treated as absent), no error.
+    error_events = [e for e in events if e["event_type"] == "tool-run-error"]
+    assert not error_events
+
+
 def test_address_nearby_features_categorizes_real_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

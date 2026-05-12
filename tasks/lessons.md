@@ -37,6 +37,21 @@ User interrupting mid-build IS "something going sideways." The protocol is STOP 
 
 ---
 
+## 2026-05-11 — Self-geocoding fallback is a band-aid; workflow output-mapping is the real fix
+
+**Context:** the Overpass adapter (`address_nearby_features`) needs lat/lon, but W9.pv's workflow runs `nominatim_geocode` as a prior step and currently can't chain that output into the next step's input. Investigator had to paste lat/lon manually.
+
+**Quick fix shipped:** the Overpass adapter accepts `address` as a fallback, self-geocodes via `nominatim_geocode` inline when lat/lon are absent. Costs one extra Nominatim call per W9.pv run.
+
+**Why it's a band-aid:** the pattern will recur. Person-search results → email-feeding-HIBP. Image-EXIF GPS → reverse-geocode → property records. Each new chain forces a self-call inside the dependent adapter.
+
+**Self-rule:** when a workflow needs output-of-step-N as input-to-step-N+1 and there are only one or two such chains, ship the self-call. When the count hits three, stop and build workflow output-mapping properly. Track each new band-aid here so the count is visible.
+
+**Band-aids deployed (count → 1):**
+- `address_nearby_features` self-geocodes via `nominatim_geocode` when only address is in payload (commit pending)
+
+---
+
 ## 2026-05-11 — Privacy directives override persona recommendations
 
 **Context:** Naomi (legal/compliance persona) recommended a per-query audit log so the investigator could prove single-target use. User overrode with "I want it logless. Anyones data fed through this should never be stored."

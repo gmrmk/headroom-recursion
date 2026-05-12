@@ -278,17 +278,52 @@ def address_nearby_features(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Query OSM Overpass for nearby features around a lat/lon and
     categorize them for property-vetting.
 
-    Payload:
+    Payload (lat/lon preferred):
       {"lat": 39.78, "lon": -89.65, "radius_m": 200}
+    Payload (address fallback -- self-geocodes via Nominatim):
+      {"address": "123 Main St, Springfield IL", "radius_m": 200}
+      or {"q": "..."}.
 
     Emits one `listing-match` event per non-empty category (with count
     + a sample of top tags) plus a `tool-run-result` summary with the
     full category-count map.
+
+    Note: address-fallback self-geocoding is a band-aid -- the real fix
+    is workflow output-mapping (chain Nominatim's lat/lon into the next
+    step's payload automatically). See tasks/lessons.md.
     """
     global _OVERPASS_LAST_CALL_AT
 
     lat = payload.get("lat")
     lon = payload.get("lon")
+    # Self-geocode fallback when lat/lon absent (or empty strings, which
+    # is what workflow payload templates produce when {lat}/{lon} aren't
+    # in the seed).
+    if lat in (None, "") or lon in (None, ""):
+        address = payload.get("address") or payload.get("q") or ""
+        if not address:
+            return [
+                {
+                    "event_type": "tool-run-error",
+                    "payload": {
+                        "reason": "missing 'lat'/'lon' AND 'address'/'q' in payload",
+                    },
+                }
+            ]
+        geo_events = nominatim_geocode({"q": address})
+        match = next((e for e in geo_events if e.get("event_type") == "geocode-match"), None)
+        if match is None:
+            return [
+                {
+                    "event_type": "tool-run-error",
+                    "payload": {
+                        "reason": "self-geocode found no match",
+                        "address": address,
+                    },
+                }
+            ]
+        lat = match["payload"].get("lat")
+        lon = match["payload"].get("lon")
     if lat is None or lon is None:
         return [
             {

@@ -382,9 +382,18 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
             WorkflowStep(
                 "address_nearby_features",
-                {"lat": "{lat}", "lon": "{lon}", "radius_m": 200},
-                required_seed_keys=("lat", "lon"),
-                description="OSM Overpass neighborhood profile (optional; needs lat/lon in seed)",
+                {
+                    "address": "{address}",
+                    "lat": "{lat}",
+                    "lon": "{lon}",
+                    "radius_m": 200,
+                },
+                required_seed_keys=("address",),
+                description=(
+                    "OSM Overpass neighborhood profile. Self-geocodes from "
+                    "{address} if {lat}/{lon} aren't set; pastes from "
+                    "nominatim_geocode if they are."
+                ),
             ),
             WorkflowStep(
                 "inside_airbnb_listings",
