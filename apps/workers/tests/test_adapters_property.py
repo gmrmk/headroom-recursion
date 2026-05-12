@@ -652,15 +652,15 @@ def test_eu_guardrail_noop_for_non_eu_region(monkeypatch: pytest.MonkeyPatch) ->
     mod._check_region_guardrail()  # no raise
 
 
-def test_audit_log_writes_per_query_record(
+def test_no_audit_log_written_on_live_path(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: pytest.TempPathFactory,
 ) -> None:
-    """Naomi #4: every live query appends a NDJSON record to
-    data/partial-pivots-audit/<date>.jsonl with platform + target +
-    account_signal. Never includes partial values."""
+    """Logless contract (user directive 2026-05-11): no audit log
+    function exists in the wrapper, and no `partial-pivots-audit`
+    directory is ever created. Target data flows through the event
+    stream to the one-shot report ONLY, never to a side channel."""
     import importlib.util
-    from datetime import UTC, datetime
     from pathlib import Path
 
     wrapper_path = (
@@ -671,52 +671,26 @@ def test_audit_log_writes_per_query_record(
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
 
+    # No audit function exists at all.
+    assert not hasattr(
+        mod, "_audit_log"
+    ), "audit log removed per logless contract; do not re-introduce"
+
+    # The data-root override should never spawn a partial-pivots-audit
+    # subdir from the wrapper's other code paths either.
     data_root = Path(str(tmp_path)) / "data"
     monkeypatch.setenv("OSINT_DATA_ROOT", str(data_root))
+    # Touch the rate-limit path to confirm THAT is the only thing the
+    # wrapper writes (and it carries zero target data).
     monkeypatch.delenv("OSINT_ADAPTER_MODE", raising=False)
-
-    mod._audit_log("instagram", "user@example.com", "exists")
-
-    audit_file = (
-        data_root / "partial-pivots-audit" / f"{datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
-    )
-    assert audit_file.is_file()
-    line = audit_file.read_text(encoding="utf-8").strip()
-    import json as _json
-
-    record = _json.loads(line)
-    assert record["platform"] == "instagram"
-    assert record["target"] == "user@example.com"
-    assert record["account_signal"] == "exists"
-    # Audit must NOT carry partial values.
-    assert "email_partial" not in record
-    assert "phone_partial" not in record
-
-
-def test_audit_log_noop_in_synthetic_mode(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: pytest.TempPathFactory,
-) -> None:
-    """Synthetic-mode queries don't audit (no real query happened)."""
-    import importlib.util
-    from pathlib import Path
-
-    wrapper_path = (
-        Path(__file__).resolve().parents[3] / "adapters" / "partial_recovery" / "wrapper.py"
-    )
-    spec = importlib.util.spec_from_file_location("partial_wrapper", wrapper_path)
-    assert spec is not None and spec.loader is not None
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-
-    data_root = Path(str(tmp_path)) / "data"
-    monkeypatch.setenv("OSINT_DATA_ROOT", str(data_root))
-    monkeypatch.setenv("OSINT_ADAPTER_MODE", "synthetic")
-
-    mod._audit_log("instagram", "user@example.com", "exists")
-
+    mod._enforce_rate_limit("instagram")
+    rate_limit_dir = data_root / "partial-pivots-rate-limit"
     audit_dir = data_root / "partial-pivots-audit"
-    assert not audit_dir.exists() or not list(audit_dir.iterdir())
+    assert rate_limit_dir.exists(), "rate-limit lockfile should exist"
+    assert not audit_dir.exists(), "audit dir must never be created -- logless contract"
+    # The rate-limit lockfile carries platform + timestamp only.
+    contents = (rate_limit_dir / "instagram.last").read_text()
+    assert "@" not in contents, "lockfile must contain zero target data"
 
 
 def test_user_scanner_synthetic_emits_person_match_and_summary() -> None:

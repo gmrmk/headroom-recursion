@@ -41,14 +41,26 @@ With OSINT_PARTIAL_KEEP_VALUES=1 (live investigator review only):
     raw strings as the platform displayed them. Do not persist these
     into dossier exports; this mode is for in-session review.
 
-Operational hardening (Naomi 2026-05-11):
+Operational hardening (Naomi 2026-05-11, with user override 2026-05-11):
   - Per-platform rate-limit at the wrapper layer (30-45s with random
     jitter). Persists across subprocess invocations via a lockfile.
-  - Per-query audit log written to data/partial-pivots-audit/<date>.jsonl
-    so the investigator can prove single-target investigative use.
+    NB: the lockfile stores ONLY platform-name + unix-timestamp; it
+    contains zero target data.
   - EU-target guardrail requires OSINT_PARTIAL_LAWFUL_BASIS_CONFIRMED=1.
   - Partial *values* redacted by default; only the *fact* of account
     existence + partial metadata (length + domain) emitted.
+
+Logless contract (user directive 2026-05-11):
+  NO TARGET DATA PERSISTS TO DISK. The previous Naomi #4 audit log was
+  removed at the user's instruction. Target emails / phones flow through
+  the event stream to the one-shot report ONLY. The rate-limit lockfile
+  records platform-name + timestamp -- never target data. The wrapper's
+  stderr (sleep notices, parse warnings) never includes target data
+  either; check the source if you want to verify.
+
+  Also: NO LLM FEEDING. Target data must never be sent to any LLM
+  provider via any adapter or tooling. See
+  docs/security/target-data-handling-policy.md for the binding scope.
 
 Discipline: account-existence enumeration on investigative targets with
 a documented basis, per-target only. Bulk discovery is misuse. Per the
@@ -156,31 +168,6 @@ def _check_region_guardrail() -> None:
         }
     )
     sys.exit(5)
-
-
-def _audit_log(platform: str, target: str, account_signal: str) -> None:
-    """Naomi #4: per-query audit trail (target, platform, signal, ts).
-    NEVER includes partial values -- the audit is about what was queried,
-    not what was harvested. Append-only NDJSON keyed by UTC date."""
-    if os.environ.get("OSINT_ADAPTER_MODE", "").strip().lower() == "synthetic":
-        return
-    dir_ = _data_dir() / "partial-pivots-audit"
-    try:
-        dir_.mkdir(parents=True, exist_ok=True)
-        path = dir_ / f"{datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
-        line = json.dumps(
-            {
-                "ts": _now_iso(),
-                "platform": platform,
-                "target": target,
-                "account_signal": account_signal,
-            },
-            separators=(",", ":"),
-        )
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(line + "\n")
-    except OSError as exc:
-        sys.stderr.write(f"audit log write failed (will proceed): {exc}\n")
 
 
 def _redact_email_partial(raw: str) -> dict[str, Any]:
@@ -480,9 +467,6 @@ def _run_live(platform: str, config: dict[str, Any], payload: dict[str, Any]) ->
                 if keep_values:
                     person_payload["phone_partial"] = v
             _emit({"event_type": "person-match", "payload": person_payload})
-
-    # Naomi #4: per-query audit trail. Never includes partial values.
-    _audit_log(platform, target, signal)
 
     _emit(
         {
