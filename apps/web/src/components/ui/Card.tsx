@@ -38,6 +38,8 @@ interface CardProps {
   padding?: CardPadding;
   /** Optional inline-style escape hatch for one-off overrides. */
   style?: CSSProperties;
+  /** Optional className for animation utilities like `stream-in`. */
+  className?: string;
 }
 
 export function Card({
@@ -45,6 +47,7 @@ export function Card({
   variant = "plain",
   padding = "md",
   style,
+  className,
 }: CardProps) {
   const baseStyle: CSSProperties = {
     background: "var(--color-surface)",
@@ -58,5 +61,9 @@ export function Card({
     baseStyle.borderLeftWidth = 3;
     baseStyle.borderLeftColor = accent;
   }
-  return <div style={{ ...baseStyle, ...style }}>{children}</div>;
+  return (
+    <div className={className} style={{ ...baseStyle, ...style }}>
+      {children}
+    </div>
+  );
 }
