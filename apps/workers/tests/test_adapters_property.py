@@ -54,6 +54,10 @@ from osint_goblin_workers.adapters_property import (
         "github_commit_email_search",
         "hudson_rock_email_check",
         "user_scanner",
+        "microsoft_partial_pivot",
+        "linkedin_partial_pivot",
+        "instagram_partial_pivot",
+        "twitter_partial_pivot",
         "inside_airbnb_listings",
         "true_people_search",
         "tineye_image",
@@ -504,6 +508,29 @@ def test_hudson_rock_empty_stealers_returns_summary_only(
     assert all(e["event_type"] != "breach-hit" for e in events)
     assert events[-1]["event_type"] == "tool-run-result"
     assert events[-1]["payload"]["stealer_count"] == 0
+
+
+def test_partial_pivot_synthetic_emits_partial_per_platform() -> None:
+    """Each of the four partial-recovery adapters has a synthetic mode
+    that emits the wire shape the live path produces: one person-match
+    with `<platform>_partial` source + email_partial + account_exists,
+    and a tool-run-result summary."""
+    from osint_goblin_workers.adapters import get_registry
+
+    registry = get_registry()
+    for platform in ("microsoft", "linkedin", "instagram", "twitter"):
+        adapter_id = f"{platform}_partial_pivot"
+        entry = registry.get(adapter_id)
+        assert entry is not None, f"{adapter_id} not registered"
+        assert entry.synthetic_mode is not None
+        events = entry.synthetic_mode({"target": "user@example.com"})
+        types = [e["event_type"] for e in events]
+        assert "person-match" in types, f"{platform}: missing person-match"
+        assert types[-1] == "tool-run-result", f"{platform}: missing summary"
+        # Source field marks platform so dossier can distinguish.
+        for e in events:
+            if e["event_type"] != "tool-run-accepted":
+                assert e["payload"].get("source") == f"{platform}_partial"
 
 
 def test_user_scanner_synthetic_emits_person_match_and_summary() -> None:

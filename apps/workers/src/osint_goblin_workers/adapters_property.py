@@ -2693,6 +2693,112 @@ else:
         ),
     )
 
+# Partial-recovery adapters (ship A+F+B+C, 2026-05-11). Castrickclues's
+# marquee technique: submit a target to a platform's forgot-password flow
+# and harvest the obfuscated partial email/phone the platform displays.
+# One shared wrapper, four registered adapters dispatched via the
+# OSINT_PARTIAL_PLATFORM env var. Same Patchright-subprocess pattern as
+# true_people_search.
+_PARTIAL_WRAPPER = _REPO_ROOT_PROP / "adapters" / "partial_recovery" / "wrapper.py"
+
+
+def _make_partial_in_process_stub(platform: str) -> Any:
+    def _stub(payload: dict[str, Any]) -> list[dict[str, Any]]:
+        target = (
+            payload.get("target")
+            or payload.get("email")
+            or payload.get("phone")
+            or "user@example.com"
+        )
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": (
+                        f"{platform}_partial_pivot wrapper or empirical venv not "
+                        "present; live mode unavailable."
+                    ),
+                    "target": target,
+                },
+            }
+        ]
+
+    return _stub
+
+
+def _make_partial_in_process_synthetic(platform: str) -> Any:
+    def _synth(payload: dict[str, Any]) -> list[dict[str, Any]]:
+        target = (
+            payload.get("target")
+            or payload.get("email")
+            or payload.get("phone")
+            or "user@example.com"
+        )
+        return [
+            {
+                "event_type": "person-match",
+                "payload": {
+                    "source": f"{platform}_partial",
+                    "target": target,
+                    "email_partial": "s***c@e***le.com",
+                    "account_exists": True,
+                    "synthetic": True,
+                },
+            },
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "source": f"{platform}_partial",
+                    "target": target,
+                    "partials_found": 1,
+                    "account_signal": "exists",
+                    "synthetic": True,
+                },
+            },
+        ]
+
+    return _synth
+
+
+_PARTIAL_PLATFORMS: tuple[tuple[str, str], ...] = (
+    ("microsoft", "MS account password-reset partial-email/phone leak (Ship A)."),
+    ("linkedin", "LinkedIn forgot-password partial-email leak (Ship F)."),
+    ("instagram", "Instagram forgot-password partial-email/phone leak (Ship B)."),
+    ("twitter", "Twitter/X forgot-password partial-email/phone leak (Ship C)."),
+)
+
+for _platform, _description in _PARTIAL_PLATFORMS:
+    _adapter_id = f"{_platform}_partial_pivot"
+    if _PARTIAL_WRAPPER.is_file() and _EMPIRICAL_PY.is_file():
+        _REGISTRY.register(
+            _adapter_id,
+            make_subprocess_adapter(
+                _PARTIAL_WRAPPER,
+                timeout_s=45.0,  # browser launch + nav + parse, generous
+                python_executable=str(_EMPIRICAL_PY),
+                extra_env={"OSINT_PARTIAL_PLATFORM": _platform},
+            ),
+            synthetic_mode=make_subprocess_adapter(
+                _PARTIAL_WRAPPER,
+                timeout_s=10.0,
+                python_executable=str(_EMPIRICAL_PY),
+                extra_env={
+                    "OSINT_PARTIAL_PLATFORM": _platform,
+                    "OSINT_ADAPTER_MODE": "synthetic",
+                },
+            ),
+            in_process=False,
+            description=_description,
+        )
+    else:
+        _REGISTRY.register(
+            _adapter_id,
+            _make_partial_in_process_stub(_platform),
+            synthetic_mode=_make_partial_in_process_synthetic(_platform),
+            in_process=True,
+            description=_description + " (in-process stub; empirical venv missing).",
+        )
+
 _REGISTRY.register(
     "github_profile",
     github_profile,

@@ -295,6 +295,34 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     examplePayload: '{\n  "email": "user@example.com"\n}',
     group: "email",
   },
+  {
+    id: "microsoft_partial_pivot",
+    label: "Microsoft — partial email/phone via password reset",
+    hint: "Castrickclues technique: submit phone or email to MS account recovery, harvest the obfuscated linked email/phone hint.",
+    examplePayload: '{\n  "target": "user@example.com"\n}',
+    group: "email",
+  },
+  {
+    id: "linkedin_partial_pivot",
+    label: "LinkedIn — partial email via password reset",
+    hint: "Forgot-password flow leaks a redacted email hint. Confirms account existence on LinkedIn.",
+    examplePayload: '{\n  "target": "user@example.com"\n}',
+    group: "email",
+  },
+  {
+    id: "instagram_partial_pivot",
+    label: "Instagram — partial email via password reset",
+    hint: "Forgot-password flow leaks a redacted email hint. Useful for STR host vetting (hosts often link Instagram).",
+    examplePayload: '{\n  "target": "user@example.com"\n}',
+    group: "email",
+  },
+  {
+    id: "twitter_partial_pivot",
+    label: "Twitter/X — partial email via password reset",
+    hint: "Forgot-password flow leaks a redacted email/phone hint.",
+    examplePayload: '{\n  "target": "user@example.com"\n}',
+    group: "email",
+  },
   // Person — name-based
   {
     id: "true_people_search",
