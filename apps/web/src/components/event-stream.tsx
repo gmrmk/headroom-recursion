@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { useInvestigationStream } from "@/hooks/useInvestigationStream";
 import type { InvestigationEvent, InvestigationEventType, StreamStatus } from "@/types/api";
 
+import { VerdictBanner } from "./verdict-banner";
+
 interface EventStreamProps {
   investigationId: string;
 }
@@ -171,6 +173,8 @@ export function EventStream({ investigationId }: EventStreamProps) {
 
   return (
     <div>
+      <VerdictBanner events={events} />
+
       <div
         style={{
           display: "flex",
