@@ -457,9 +457,18 @@ def address_nearby_features(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _address_nearby_features_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Synthetic: a residential-dominant neighborhood profile."""
-    lat = float(payload.get("lat", 39.78))
-    lon = float(payload.get("lon", -89.65))
+    """Synthetic: a residential-dominant neighborhood profile.
+
+    Robust to workflow-template empty strings (the `_DefaultEmpty` pattern
+    resolves missing seed keys to "" not None).
+    """
+    lat_raw = payload.get("lat", 39.78)
+    lon_raw = payload.get("lon", -89.65)
+    try:
+        lat = float(lat_raw) if lat_raw not in (None, "") else 39.78
+        lon = float(lon_raw) if lon_raw not in (None, "") else -89.65
+    except (TypeError, ValueError):
+        lat, lon = 39.78, -89.65
     counts = {"residential": 18, "food_drink": 4, "transit": 2, "green_space": 1}
     events: list[dict[str, Any]] = []
     for category, count in sorted(counts.items(), key=lambda kv: -kv[1]):
