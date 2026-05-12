@@ -1,5 +1,4 @@
-import { EventStream } from "@/components/event-stream";
-import { RunToolForm } from "@/components/run-tool-form";
+import { InvestigationDashboard } from "@/components/investigation-dashboard";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -8,16 +7,43 @@ interface PageProps {
 export default async function DossierPage({ params }: PageProps) {
   const { id } = await params;
   return (
-    <section>
-      <header style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 16, margin: 0 }}>Dossier</h2>
-        <p style={{ color: "#737373", fontSize: 13, margin: "4px 0 0 0" }}>
-          Case <code style={{ color: "#a3a3a3" }}>{id}</code>
-        </p>
+    <section
+      style={{
+        maxWidth: 1100,
+        marginInline: "auto",
+        padding: "var(--space-5) var(--space-5)",
+      }}
+    >
+      <header
+        style={{
+          marginBottom: "var(--space-5)",
+          display: "flex",
+          alignItems: "baseline",
+          gap: "var(--space-3)",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: "var(--text-lg)",
+            margin: 0,
+            color: "var(--color-text-primary)",
+            fontWeight: 600,
+          }}
+        >
+          Dossier
+        </h2>
+        <code
+          style={{
+            color: "var(--color-text-muted)",
+            fontSize: "var(--text-xs)",
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          {id}
+        </code>
       </header>
 
-      <RunToolForm investigationId={id} />
-      <EventStream investigationId={id} />
+      <InvestigationDashboard investigationId={id} />
     </section>
   );
 }
