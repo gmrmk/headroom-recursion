@@ -381,6 +381,12 @@ WORKFLOWS: dict[str, Workflow] = {
                 required_seed_keys=("address",),
             ),
             WorkflowStep(
+                "address_nearby_features",
+                {"lat": "{lat}", "lon": "{lon}", "radius_m": 200},
+                required_seed_keys=("lat", "lon"),
+                description="OSM Overpass neighborhood profile (optional; needs lat/lon in seed)",
+            ),
+            WorkflowStep(
                 "inside_airbnb_listings",
                 {
                     "csv_path": "{csv_path}",

@@ -200,6 +200,269 @@ def _nominatim_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# 1b. Overpass nearby-features (OSM, free, lat/lon -> neighborhood profile)
+#
+# Property-vetting use: does this address's neighborhood match the
+# listing claim? An "urban downtown apartment" should land near amenities
+# + commercial + transit; a "quiet residential cottage" should be near
+# residential land use + buildings, not industrial yards. Strong tell
+# when there's a category mismatch.
+#
+# Overpass is OSM's query API: free, no key, polite-use rate-limit
+# (max 1 req/sec sustained, 25-180s query timeout). Same User-Agent
+# discipline as Nominatim.
+# ---------------------------------------------------------------------------
+
+
+_OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+_OVERPASS_MIN_INTERVAL_S = 1.0
+_OVERPASS_LAST_CALL_AT: float = 0.0
+
+
+def _classify_overpass_element(tags: dict[str, str]) -> str | None:
+    """Map an OSM element's tags to one of our property-vetting categories.
+    Returns None if the element isn't useful for the neighborhood profile."""
+    landuse = tags.get("landuse", "").lower()
+    building = tags.get("building", "").lower()
+    amenity = tags.get("amenity", "").lower()
+    shop = tags.get("shop", "").lower()
+    tourism = tags.get("tourism", "").lower()
+    public_transport = tags.get("public_transport", "").lower()
+    highway = tags.get("highway", "").lower()
+    leisure = tags.get("leisure", "").lower()
+
+    if landuse in ("residential",) or building in (
+        "residential",
+        "apartments",
+        "house",
+        "detached",
+        "semidetached_house",
+        "terrace",
+        "bungalow",
+        "dormitory",
+    ):
+        return "residential"
+    if landuse in ("commercial", "retail") or building in (
+        "commercial",
+        "retail",
+        "office",
+        "supermarket",
+    ):
+        return "commercial"
+    if landuse in ("industrial",) or building in ("industrial", "warehouse", "factory"):
+        return "industrial"
+    if tourism in ("hotel", "motel", "hostel", "guest_house", "apartment", "chalet"):
+        return "tourism_lodging"
+    if shop:
+        return "shop"
+    if amenity:
+        # Coarse-group amenities -- the dossier just wants the count, not
+        # the long-tail breakdown.
+        if amenity in ("restaurant", "cafe", "bar", "pub", "fast_food", "food_court"):
+            return "food_drink"
+        if amenity in ("school", "university", "kindergarten", "college"):
+            return "education"
+        if amenity in ("hospital", "clinic", "doctors", "pharmacy"):
+            return "healthcare"
+        return "amenity"
+    if public_transport in ("station", "stop_position", "platform"):
+        return "transit"
+    if highway in ("bus_stop",):
+        return "transit"
+    if leisure in ("park", "playground", "pitch", "garden"):
+        return "green_space"
+    return None
+
+
+def address_nearby_features(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Query OSM Overpass for nearby features around a lat/lon and
+    categorize them for property-vetting.
+
+    Payload:
+      {"lat": 39.78, "lon": -89.65, "radius_m": 200}
+
+    Emits one `listing-match` event per non-empty category (with count
+    + a sample of top tags) plus a `tool-run-result` summary with the
+    full category-count map.
+    """
+    global _OVERPASS_LAST_CALL_AT
+
+    lat = payload.get("lat")
+    lon = payload.get("lon")
+    if lat is None or lon is None:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'lat' or 'lon' in payload"},
+            }
+        ]
+    try:
+        lat_f = float(lat)
+        lon_f = float(lon)
+    except (TypeError, ValueError):
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "'lat'/'lon' not parseable as float"},
+            }
+        ]
+    radius_m = int(payload.get("radius_m", 200))
+    radius_m = max(25, min(1500, radius_m))  # safe envelope
+
+    # Polite-use rate-limit per Overpass etiquette.
+    elapsed = time.monotonic() - _OVERPASS_LAST_CALL_AT
+    if elapsed < _OVERPASS_MIN_INTERVAL_S:
+        time.sleep(_OVERPASS_MIN_INTERVAL_S - elapsed)
+
+    query = (
+        f"[out:json][timeout:25];"
+        f"(node(around:{radius_m},{lat_f},{lon_f});"
+        f"way(around:{radius_m},{lat_f},{lon_f}););"
+        f"out tags 300;"
+    )
+
+    try:
+        with _client(timeout_s=30.0) as c:
+            r = c.post(_OVERPASS_URL, data={"data": query})
+        _OVERPASS_LAST_CALL_AT = time.monotonic()
+    except httpx.RequestError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"overpass {type(exc).__name__}: {exc}",
+                    "lat": lat_f,
+                    "lon": lon_f,
+                },
+            }
+        ]
+
+    if r.status_code != 200:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"overpass HTTP {r.status_code}",
+                    "lat": lat_f,
+                    "lon": lon_f,
+                },
+            }
+        ]
+
+    try:
+        data = r.json()
+    except ValueError:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "overpass non-JSON response"},
+            }
+        ]
+    if not isinstance(data, dict) or not isinstance(data.get("elements"), list):
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "overpass unexpected response shape"},
+            }
+        ]
+
+    counts: dict[str, int] = {}
+    samples: dict[str, list[str]] = {}
+    for el in data["elements"]:
+        if not isinstance(el, dict):
+            continue
+        tags = el.get("tags") or {}
+        if not isinstance(tags, dict):
+            continue
+        category = _classify_overpass_element(tags)
+        if category is None:
+            continue
+        counts[category] = counts.get(category, 0) + 1
+        # Pull one representative tag value for the sample
+        name = tags.get("name") or tags.get("brand") or ""
+        if name and len(samples.get(category, [])) < 3:
+            samples.setdefault(category, []).append(str(name))
+
+    events: list[dict[str, Any]] = []
+    # Emit one listing-match per non-empty category, sorted by count desc
+    # for predictable dossier ordering.
+    for category, count in sorted(counts.items(), key=lambda kv: -kv[1]):
+        events.append(
+            {
+                "event_type": "listing-match",
+                "payload": {
+                    "source": "overpass",
+                    "lat": lat_f,
+                    "lon": lon_f,
+                    "radius_m": radius_m,
+                    "category": category,
+                    "count": count,
+                    "samples": samples.get(category, []),
+                },
+            }
+        )
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "overpass",
+                "lat": lat_f,
+                "lon": lon_f,
+                "radius_m": radius_m,
+                "elements_total": len(data["elements"]),
+                "categorized": sum(counts.values()),
+                "category_counts": counts,
+                "dominant_category": (
+                    max(counts.items(), key=lambda kv: kv[1])[0] if counts else None
+                ),
+            },
+        }
+    )
+    return events
+
+
+def _address_nearby_features_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Synthetic: a residential-dominant neighborhood profile."""
+    lat = float(payload.get("lat", 39.78))
+    lon = float(payload.get("lon", -89.65))
+    counts = {"residential": 18, "food_drink": 4, "transit": 2, "green_space": 1}
+    events: list[dict[str, Any]] = []
+    for category, count in sorted(counts.items(), key=lambda kv: -kv[1]):
+        events.append(
+            {
+                "event_type": "listing-match",
+                "payload": {
+                    "source": "overpass",
+                    "lat": lat,
+                    "lon": lon,
+                    "radius_m": 200,
+                    "category": category,
+                    "count": count,
+                    "samples": ["Synthetic Cafe"] if category == "food_drink" else [],
+                    "synthetic": True,
+                },
+            }
+        )
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "source": "overpass",
+                "lat": lat,
+                "lon": lon,
+                "radius_m": 200,
+                "elements_total": 25,
+                "categorized": sum(counts.values()),
+                "category_counts": counts,
+                "dominant_category": "residential",
+                "synthetic": True,
+            },
+        }
+    )
+    return events
+
+
+# ---------------------------------------------------------------------------
 # 2. Email MX validate (DNS lookup, no third-party service)
 # ---------------------------------------------------------------------------
 
@@ -2539,6 +2802,18 @@ _REGISTRY.register(
     synthetic_mode=_nominatim_synthetic,
     in_process=True,
     description="OSM Nominatim address -> lat/lon. R-5 Sprint 2 property-vetting primitive.",
+)
+
+_REGISTRY.register(
+    "address_nearby_features",
+    address_nearby_features,
+    synthetic_mode=_address_nearby_features_synthetic,
+    in_process=True,
+    description=(
+        "OSM Overpass nearby-features categorization. Property-vetting: "
+        "neighborhood profile (residential vs commercial vs industrial vs "
+        "tourism) around a lat/lon. Free, no key."
+    ),
 )
 
 _REGISTRY.register(

@@ -145,6 +145,14 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     group: "addrgeo",
   },
   {
+    id: "address_nearby_features",
+    label: "Overpass — neighborhood profile (residential / commercial / industrial)",
+    hint: "Free OSM. Categorizes nearby POIs + land use within radius. Tell if listing's claimed neighborhood matches reality.",
+    examplePayload:
+      '{\n  "lat": 39.78,\n  "lon": -89.65,\n  "radius_m": 200\n}',
+    group: "addrgeo",
+  },
+  {
     id: "inside_airbnb_listings",
     label: "Inside Airbnb — host fingerprint",
     hint: "Search pre-downloaded city CSV; flags commercial operators.",

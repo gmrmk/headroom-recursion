@@ -18,6 +18,8 @@ from typing import Any
 import pytest
 from osint_goblin_workers.adapters import get_registry
 from osint_goblin_workers.adapters_property import (
+    _address_nearby_features_synthetic,
+    _classify_overpass_element,
     _email_mx_synthetic,
     _github_commit_email_synthetic,
     _gravatar_synthetic,
@@ -29,6 +31,7 @@ from osint_goblin_workers.adapters_property import (
     _tineye_synthetic,
     _true_people_synthetic,
     _user_scanner_synthetic,
+    address_nearby_features,
     email_mx_validate,
     github_commit_email_search,
     gravatar_profile_lookup,
@@ -47,6 +50,7 @@ from osint_goblin_workers.adapters_property import (
     "adapter_id",
     [
         "nominatim_geocode",
+        "address_nearby_features",
         "email_mx_validate",
         "hibp_breach_check",
         "intelbase_email_lookup",
@@ -84,6 +88,123 @@ def test_nominatim_synthetic_emits_geocode_match_and_summary() -> None:
     assert "lon" in events[0]["payload"]
     assert events[1]["event_type"] == "tool-run-result"
     assert events[1]["payload"]["matches"] == 1
+
+
+def test_overpass_classify_residential_landuse() -> None:
+    assert _classify_overpass_element({"landuse": "residential"}) == "residential"
+
+
+def test_overpass_classify_residential_building() -> None:
+    assert _classify_overpass_element({"building": "apartments"}) == "residential"
+    assert _classify_overpass_element({"building": "house"}) == "residential"
+
+
+def test_overpass_classify_commercial() -> None:
+    assert _classify_overpass_element({"landuse": "commercial"}) == "commercial"
+    assert _classify_overpass_element({"building": "office"}) == "commercial"
+    assert _classify_overpass_element({"building": "supermarket"}) == "commercial"
+
+
+def test_overpass_classify_industrial() -> None:
+    assert _classify_overpass_element({"landuse": "industrial"}) == "industrial"
+    assert _classify_overpass_element({"building": "warehouse"}) == "industrial"
+
+
+def test_overpass_classify_tourism_lodging() -> None:
+    assert _classify_overpass_element({"tourism": "hotel"}) == "tourism_lodging"
+    assert _classify_overpass_element({"tourism": "guest_house"}) == "tourism_lodging"
+
+
+def test_overpass_classify_amenity_subgroups() -> None:
+    assert _classify_overpass_element({"amenity": "restaurant"}) == "food_drink"
+    assert _classify_overpass_element({"amenity": "school"}) == "education"
+    assert _classify_overpass_element({"amenity": "hospital"}) == "healthcare"
+    assert _classify_overpass_element({"amenity": "bench"}) == "amenity"  # fallback
+
+
+def test_overpass_classify_transit() -> None:
+    assert _classify_overpass_element({"public_transport": "station"}) == "transit"
+    assert _classify_overpass_element({"highway": "bus_stop"}) == "transit"
+
+
+def test_overpass_classify_unrecognized_returns_none() -> None:
+    assert _classify_overpass_element({"natural": "tree"}) is None
+    assert _classify_overpass_element({}) is None
+
+
+def test_address_nearby_features_synthetic_emits_residential_dominant() -> None:
+    """Synthetic Overpass: residential-dominant neighborhood profile.
+    Locks the wire shape (listing-match per category + summary)."""
+    events = _address_nearby_features_synthetic({"lat": 39.78, "lon": -89.65})
+    types = [e["event_type"] for e in events]
+    assert "listing-match" in types
+    assert types[-1] == "tool-run-result"
+    # All listing-match events carry source=overpass + category
+    listing_matches = [e for e in events if e["event_type"] == "listing-match"]
+    for e in listing_matches:
+        assert e["payload"].get("source") == "overpass"
+        assert "category" in e["payload"]
+        assert "count" in e["payload"]
+    # Summary carries the category_counts map + dominant_category
+    summary = events[-1]["payload"]
+    assert summary["dominant_category"] == "residential"
+    assert summary["category_counts"]["residential"] >= 1
+
+
+def test_address_nearby_features_missing_lat_lon_returns_error() -> None:
+    events = address_nearby_features({})
+    assert events[0]["event_type"] == "tool-run-error"
+    assert "lat" in events[0]["payload"]["reason"].lower()
+
+
+def test_address_nearby_features_unparseable_lat_returns_error() -> None:
+    events = address_nearby_features({"lat": "not-a-float", "lon": -89.65})
+    assert events[0]["event_type"] == "tool-run-error"
+
+
+def test_address_nearby_features_categorizes_real_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mock Overpass response with mixed elements; verify the adapter
+    emits one listing-match per category, ordered by count desc, plus a
+    summary with the dominant_category set correctly."""
+    fake_response = {
+        "elements": [
+            {"type": "way", "tags": {"landuse": "residential"}},
+            {"type": "way", "tags": {"building": "apartments", "name": "Maple Apts"}},
+            {"type": "way", "tags": {"building": "house"}},
+            {"type": "node", "tags": {"amenity": "cafe", "name": "Bean There"}},
+            {"type": "node", "tags": {"amenity": "restaurant", "name": "Pizzeria"}},
+            {"type": "node", "tags": {"highway": "bus_stop"}},
+            {"type": "way", "tags": {"natural": "tree"}},  # unclassified
+        ]
+    }
+
+    import httpx as _httpx
+
+    def fake_post(self: Any, url: str, **kwargs: Any) -> _httpx.Response:
+        return _httpx.Response(200, json=fake_response, request=_httpx.Request("POST", url))
+
+    monkeypatch.setattr(_httpx.Client, "post", fake_post)
+
+    events = address_nearby_features({"lat": 39.78, "lon": -89.65, "radius_m": 200})
+    listing_matches = [e for e in events if e["event_type"] == "listing-match"]
+    # Categories present: residential (3), food_drink (2), transit (1).
+    by_category = {e["payload"]["category"]: e["payload"]["count"] for e in listing_matches}
+    assert by_category["residential"] == 3
+    assert by_category["food_drink"] == 2
+    assert by_category["transit"] == 1
+    # Ordering: residential first (highest count).
+    assert listing_matches[0]["payload"]["category"] == "residential"
+    # Sample collection: only named elements
+    by_cat_event = {e["payload"]["category"]: e["payload"] for e in listing_matches}
+    assert "Maple Apts" in by_cat_event["residential"]["samples"]
+    assert "Bean There" in by_cat_event["food_drink"]["samples"]
+    # Summary
+    summary = events[-1]["payload"]
+    assert summary["dominant_category"] == "residential"
+    assert summary["categorized"] == 6  # 3+2+1; tree skipped
+    assert summary["elements_total"] == 7  # includes the tree
 
 
 def test_email_mx_synthetic_format_only() -> None:
