@@ -264,11 +264,18 @@ def main() -> int:
     totals = {"events": 0, "errors": 0, "person_match": 0, "breach_hit": 0}
     per_step: list[tuple[str, float, dict[str, int]]] = []
     all_events: list[dict[str, Any]] = []
+    # Mirror workflow_runner: accumulate each step's events so subsequent
+    # steps can resolve `inputs_from` against prior outputs.
+    from osint_goblin_workers.workflows import resolve_inputs_from
+
+    step_results: list[list[dict[str, Any]]] = []
 
     for step in workflow.steps:
         if only and step.adapter_id not in only:
+            step_results.append([])
             continue
         if step.adapter_id in skip:
+            step_results.append([])
             continue
         payload = step.build_payload(seed)
         if payload is None:
@@ -280,12 +287,21 @@ def main() -> int:
                 )
             )
             print()
+            step_results.append([])
             continue
+
+        # Apply inputs_from overrides (Margaret ship #2). Resolves
+        # step{N}.payload.{key} references against prior step events.
+        if step.inputs_from:
+            overrides = resolve_inputs_from(step.inputs_from, step_results)
+            if overrides:
+                payload = {**payload, **overrides}
 
         print(_color(f"-- {step.adapter_id}", "bold"))
         if step.description:
             print(_color(f"   {step.description}", "grey"))
         elapsed, events = _run_step(step.adapter_id, payload, args.synthetic)
+        step_results.append(events)
         for ev in events:
             print(_summarize_event(ev))
         counts = {

@@ -1,107 +1,140 @@
-# tasks/todos.md — AI-image detection adapter
+# tasks/todos.md — Workflow output-mapping (Margaret ship #2)
 
 **Status:** plan-pending-verification
-**Created:** 2026-05-11
-**Trigger:** user ask "figure out if the images searched are AI-created" + "Let's align with the CLAUDE.md"
-
-Aligning with CLAUDE.md: plan first, verify before implementing, no laziness, simplicity first, demand elegance, research & reuse mandatory.
+**Created:** 2026-05-11 (replaces the AI-detector plan from earlier in the session)
+**Trigger:** Margaret ship #2 + band-aid count #1 already in (Overpass self-geocode); next band-aid triggers a stop-and-fix
 
 ---
 
-## Research findings (GitHub-first, completed)
+## Goal
 
-A general-purpose subagent surveyed the FOSS local-inference AI-detector landscape (2026 reality). Key findings:
+Let workflow step N+1 read step N's output via a declarative reference. Concretely: W9.pv's `address_nearby_features` step should read `lat`/`lon` from the prior `nominatim_geocode` step's emitted events, instead of the seed.
 
-### State of the field
-
-- Every academic detector with published weights (AIDE / DRCT / NPR / UnivFD / SPAI / SSP / SAFE / C2P-CLIP) collapses to **18–30% on FLUX Dev / Firefly v4 / MJ v7 / Imagen 4** per ICCV 2025 benchmarks. DALL-E 3 hovers at 31%.
-- No single FOSS detector breaks 80% accuracy overall in 2026 real-world tests.
-- The defensible architecture is **ensemble + provenance + heuristics + human review** — never a single score.
-
-### Practical FOSS options
-
-| Layer | What | Cost | Signal |
-|---|---|---|---|
-| **A. Provenance + heuristic** | C2PA byte-scan + PNG `parameters` chunk + EXIF anomaly + dimensions | $0, CPU, ~50ms/image | Catches 100% of *lazy* AI-listings; very few false positives when signal fires |
-| **B. ML classifier** | `Organika/sdxl-detector` (Swin Transformer, 86.8M params, CC-BY-NC-3.0) via `transformers`, weights cached to `~/.cache/huggingface/`, fully local after first download | ~347 MB disk, ~1-2s/image CPU | Good on SDXL-era; falls off on FLUX/SD3/DALL-E 3 |
-| **C. Cloud SaaS** | Sightengine, Hive, Optic | $ + sends image to third party | **Disqualified** per target-data-handling policy (cdc1a92d) |
-
-### License notes
-
-- `transformers` is permitted by `llm-import-lint` (it's a generic ML lib, not LLM provider). The `huggingface_hub` package IS blocked (Inference API); we'd use `transformers` only for local weight load + inference.
-- `Organika/sdxl-detector` weights are **CC-BY-NC-3.0** (non-commercial). The user's stated use is personal property-vetting, which is non-commercial. Mixed-license risk: the model weights aren't redistributed with the codebase; user downloads them via `transformers` at runtime. The codebase's Apache-2.0 license isn't compromised.
+This clears band-aid #1 (Overpass self-geocoding from address) and prevents band-aid #2 (any future "I need person results to feed into the next adapter" pattern).
 
 ---
 
-## Plan
+## Architecture branch point (the one decision worth verifying)
 
-### v1: Layer A only — `image_ai_local_detect` adapter
+The current `workflow_runner` is a Dramatiq actor that dispatches each step via `tool_runner.send()` — fire-and-forget. It returns before any step actually executes. There's no way for it to see step N's output to feed into step N+1.
 
-Already drafted (uncommitted) in `apps/workers/.../adapters_image.py`. Heuristic stack:
+Two real ways forward:
 
-1. EXIF anomalies (no camera make/model, no datetime, no GPS, generator string in Software/Artist/Copyright)
-2. Dimension fingerprints (exact match to known AI default sizes; both axes /64)
-3. Filename heuristic (URL contains generator-name marker)
-4. PNG chunk scanner (`parameters` / `prompt` / `workflow` tEXt or iTXt keys → near-confirmation)
-5. C2PA byte-scan (JUMBF box presence as a fact, not a verdict)
+### Option A — In-process serialized steps inside workflow_runner
 
-Wire shape: one `image-match` event with `source: ai_local_detect`, `ai_likelihood: none|low|medium|high`, total `score`, `reasons[]`, and per-signal breakdown.
+`workflow_runner` calls each step's adapter callable **directly** (same registry, same code that `tool_runner` calls — but synchronous, no separate Dramatiq actor invocation per step). Events get published to the store via the same `publish_event` mechanism so SSE clients see them in real-time.
 
-**Cost:** zero new deps, pure-Python, CPU-only, ~50ms/image. Currently ~300 lines.
+- **Pros:** simple data flow, trivial inputs_from resolution, one Dramatiq invocation per workflow (cleaner mental model)
+- **Cons:** workflow steps share one 10-min ceiling; no per-step Dramatiq retry; long workflow occupies a worker thread
 
-### v2 (deferred): Layer B — `image_ai_ml_detect` adapter
+### Option B — Async with await-via-store
 
-Subprocess wrapper (empirical venv) invoking `Organika/sdxl-detector` via `transformers`. Gated behind explicit env flag `OSINT_AI_ML_ENABLED=1` so the model weights download only happens with explicit investigator opt-in. Returns raw logit + label + confidence; treat <0.7 as "inconclusive."
+`workflow_runner` keeps `tool_runner.send()` but polls the store for each step's `tool-run-result` before dispatching the next.
 
-**Cost:** ~347 MB one-time disk + ~1-2s/image CPU. New subprocess wrapper + transformers + torch deps in empirical venv only (not the worker venv).
+- **Pros:** preserves per-step Dramatiq retry; existing tool_runner unchanged
+- **Cons:** workflow_runner needs a polling loop or subscribe; per-step actor lifecycle adds latency; more complex
 
-### Workflow integration
+### Margaret's call (and recommendation): **Option A**
 
-- Add `image_ai_local_detect` to **W4.im** (Image OSINT) as the final step
-- Add to **W9.pv** (Property Vetting) under the photo-vetting branch
-- Surface in cmd-K via single-source catalog (image group)
+- Workflows are sequential by definition — per-step parallelism wasn't a real benefit
+- Per-step retry rarely matters for read-only OSINT adapters
+- All 11 workflows complete in under 2 min total; the 10-min ceiling has plenty of room
+- The code becomes simpler, not more complex
+- Dramatiq is still in the loop at the workflow-level boundary; just not per-step
 
-### Tests
-
-- Synthetic mode wire-shape (event_type, source, ai_likelihood)
-- Score-rubric thresholds (score → likelihood mapping)
-- Heuristic unit tests (each function in isolation)
-- Integration test with a sample PNG that has A1111 parameters chunk (controlled fixture, no external fetch)
-
-### Constraints carried forward
-
-- No third-party upload (per `docs/security/target-data-handling-policy.md`)
-- No LLM feeding (per same)
-- No audit log (logless contract)
-- Honest "this is heuristic, not proof" framing in catalog hint + event payload
+If you'd rather Option B, say so before I start; it's a meaningfully different implementation.
 
 ---
 
-## Decisions needed from user before implementation
+## Plan (assuming Option A)
 
-1. **Ship v1 (Layer A only) now and defer v2?**  Or  **ship v1 + v2 together?**
-   - v1 alone catches "lazy" AI listings. Good 80/20.
-   - v2 adds SDXL-era ML signal but requires `transformers` + `torch` in empirical venv (~3 GB disk for torch+model) and the CC-BY-NC license caveat.
+### Step 1: WorkflowStep gets `inputs_from`
 
-2. **Naming.** `image_ai_local_detect` is descriptive but long. Alternatives: `ai_detect`, `image_ai_heuristic`, `genai_check`. Prefer descriptive — investigators don't grep often.
+Add an optional `inputs_from: dict[str, str] | None = None` field to `WorkflowStep`. Maps payload keys → reference strings of the form `step{N}.payload.{key}`.
 
-3. **Should the existing `ai_image_detection` (Sightengine) adapter be deregistered?**  Its docstring now warns about the third-party-upload policy conflict. Keeping it registered means it shows up in cmd-K, which could trip up an investigator.
+Example:
+```python
+WorkflowStep(
+    "address_nearby_features",
+    {"radius_m": 200},
+    inputs_from={
+        "lat": "step0.payload.lat",
+        "lon": "step0.payload.lon",
+    },
+    required_seed_keys=(),  # everything comes from prior step
+    description="...",
+)
+```
 
-4. **Where does the rule go for the existing `c2pa_verify` adapter?** It's already in the registry. The new heuristic detector includes a *presence* C2PA byte-scan (doesn't need c2patool installed); `c2pa_verify` is the cryptographic verification path. Keep both? Mark `c2pa_verify` as "deep" / opt-in?
+### Step 2: Reference resolver
+
+`_resolve_inputs_from(inputs_from, step_results) -> dict[str, Any]`:
+- Parse `step{N}.payload.{key}` syntax
+- For each: scan step_results[N] for the first event whose payload contains `key`, return that value
+- If not found → leave the key absent from the override dict (let `required_seed_keys` enforce)
+- Returns a dict that's merged into the step's payload AFTER `build_payload(seed)`
+
+### Step 3: Refactor workflow_runner to run in-process
+
+```python
+step_results: list[list[dict]] = []
+for step_idx, step in enumerate(workflow.steps):
+    payload = step.build_payload(payload.seed) or {}
+    if step.inputs_from:
+        overrides = _resolve_inputs_from(step.inputs_from, step_results)
+        payload = {**payload, **overrides}
+    # required_seed_keys check after overrides
+    entry = get_registry().get(step.adapter_id)
+    events = entry.callable(payload)
+    for e in events:
+        e["payload"]["from_workflow"] = workflow.id
+        publish_event(payload.investigation_id, {...wrap...})
+    step_results.append(events)
+```
+
+### Step 4: W9.pv update
+
+Change the `address_nearby_features` step to use `inputs_from={"lat": "step0.payload.lat", "lon": "step0.payload.lon"}` instead of relying on the band-aid self-geocode.
+
+Keep the self-geocode fallback in the adapter for direct-dispatch users (cmd-K → run individual adapter against an address). Band-aid count goes back to 0 for workflow paths.
+
+### Step 5: Tests
+
+- Unit: `_resolve_inputs_from` for `step{N}.payload.{key}` syntax, missing references, malformed references
+- Unit: `WorkflowStep` accepts and stores `inputs_from`
+- Integration: workflow_runner runs a fixture workflow with two steps where step 1 reads step 0's output
+
+### Step 6: Update tasks/lessons.md
+
+Add: "2026-05-11 — Band-aid count #1 cleared by shipping workflow output-mapping (Margaret ship #2). Threshold reset to 0."
+
+---
+
+## Risk audit
+
+| Risk | Mitigation |
+|---|---|
+| In-process steps share one 10min ceiling | Current workflows complete in <2min; reassess when we add a slow workflow |
+| Removing tool_runner.send() loses per-step retry | OSINT adapters are read-only; retry value is low; surface in dossier as tool-run-error |
+| Existing tests for workflow_runner depend on Dramatiq send semantics | Audit + update; expect ~2-3 test edits |
+| `inputs_from` syntax could grow into a query language | Lock the syntax to `step{N}.payload.{key}` only; refuse anything else |
 
 ---
 
 ## Definition of done
 
-- Adapter committed, registered, in catalog, in W4.im and W9.pv workflows
-- Tests cover wire shape + each heuristic + score rubric
-- Live smoke against a known AI image (e.g., Stable Diffusion PNG with parameters chunk) returns `ai_likelihood: high`
-- Live smoke against a known camera image returns `ai_likelihood: none`
-- Docs note that this is heuristic ensemble, not proof
-- Reasoning lessons captured in tasks/lessons.md if any correction came up
+- WorkflowStep accepts `inputs_from`
+- workflow_runner resolves it via in-process serialized step execution
+- W9.pv uses `inputs_from` instead of self-geocode for the Overpass step
+- All Python tests pass (existing + new)
+- Live W9.pv smoke via `smoke-workflow.py w9.pv --synthetic` still clean
+- Lessons.md band-aid count reset
 
 ---
 
-## Lessons (CLAUDE.md §self-improvement)
+## Out of scope
 
-- **2026-05-11:** "Wait, look on github" — user enforced the GitHub-first research discipline AFTER I'd started building. Future rule: for any new ML / detection / classification feature, dispatch a parallel GitHub-recon subagent IN THE PLAN-FIRST step. Don't start hand-rolling until research has been delivered.
+- Output paths richer than `step{N}.payload.{key}` (no JSONPath, no event-type filters)
+- Cross-workflow references
+- Conditional steps ("only run step 5 if step 4 verdict is X")
+- Replacing tool_runner for direct (non-workflow) adapter dispatches

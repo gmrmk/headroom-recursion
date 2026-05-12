@@ -22,14 +22,27 @@ Property-vetting (W9.pv) is the user's daily-driver workflow.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
 class WorkflowStep:
     """One step in a workflow. The adapter id is dispatched against the
-    investigation; the payload is built from the seed via the template."""
+    investigation; the payload is built from the seed via the template.
 
-    __slots__ = ("adapter_id", "payload_template", "required_seed_keys", "description")
+    `inputs_from` declares output-mapping from prior steps:
+      inputs_from={"lat": "step0.payload.lat", "lon": "step0.payload.lon"}
+    workflow_runner resolves the references after this step's seed-based
+    payload is built and merges the override values on top.
+    """
+
+    __slots__ = (
+        "adapter_id",
+        "payload_template",
+        "required_seed_keys",
+        "description",
+        "inputs_from",
+    )
 
     def __init__(
         self,
@@ -37,11 +50,13 @@ class WorkflowStep:
         payload_template: dict[str, Any],
         required_seed_keys: tuple[str, ...] = (),
         description: str = "",
+        inputs_from: dict[str, str] | None = None,
     ) -> None:
         self.adapter_id = adapter_id
         self.payload_template = payload_template
         self.required_seed_keys = required_seed_keys
         self.description = description
+        self.inputs_from = inputs_from or {}
 
     def build_payload(self, seed: dict[str, Any]) -> dict[str, Any] | None:
         """Return the formatted payload, or None if a required seed key
@@ -67,6 +82,44 @@ class WorkflowStep:
             else:
                 out[k] = v
         return out
+
+
+# Reference syntax: `step{N}.payload.{key}` where N is the 0-indexed
+# prior step. The resolver scans step_results[N] for the first event
+# whose payload contains `key` and returns that value.
+_INPUTS_FROM_RE = re.compile(r"^step(\d+)\.payload\.([A-Za-z0-9_]+)$")
+
+
+def resolve_inputs_from(
+    inputs_from: dict[str, str],
+    step_results: list[list[dict[str, Any]]],
+) -> dict[str, Any]:
+    """Resolve every reference in `inputs_from` against accumulated
+    `step_results`. Returns a dict of payload-key overrides to merge.
+
+    Missing references (step index out of range, no event carrying the
+    key, malformed syntax) are silently omitted -- the dependent step's
+    required_seed_keys / template defaults take over.
+    """
+    out: dict[str, Any] = {}
+    for key, ref in inputs_from.items():
+        if not isinstance(ref, str):
+            continue
+        m = _INPUTS_FROM_RE.match(ref.strip())
+        if m is None:
+            continue
+        step_idx = int(m.group(1))
+        field = m.group(2)
+        if step_idx < 0 or step_idx >= len(step_results):
+            continue
+        for event in step_results[step_idx]:
+            payload = event.get("payload") if isinstance(event, dict) else None
+            if isinstance(payload, dict) and field in payload:
+                value = payload[field]
+                if value is not None and value != "":
+                    out[key] = value
+                    break
+    return out
 
 
 class _DefaultEmpty(dict):
@@ -382,17 +435,16 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
             WorkflowStep(
                 "address_nearby_features",
-                {
-                    "address": "{address}",
-                    "lat": "{lat}",
-                    "lon": "{lon}",
-                    "radius_m": 200,
+                {"radius_m": 200},
+                required_seed_keys=(),
+                inputs_from={
+                    "lat": "step0.payload.lat",
+                    "lon": "step0.payload.lon",
                 },
-                required_seed_keys=("address",),
                 description=(
-                    "OSM Overpass neighborhood profile. Self-geocodes from "
-                    "{address} if {lat}/{lon} aren't set; pastes from "
-                    "nominatim_geocode if they are."
+                    "OSM Overpass neighborhood profile. Reads lat/lon "
+                    "from the prior nominatim_geocode step via "
+                    "inputs_from output-mapping."
                 ),
             ),
             WorkflowStep(

@@ -47,8 +47,8 @@ User interrupting mid-build IS "something going sideways." The protocol is STOP 
 
 **Self-rule:** when a workflow needs output-of-step-N as input-to-step-N+1 and there are only one or two such chains, ship the self-call. When the count hits three, stop and build workflow output-mapping properly. Track each new band-aid here so the count is visible.
 
-**Band-aids deployed (count → 1):**
-- `address_nearby_features` self-geocodes via `nominatim_geocode` when only address is in payload (commit pending)
+**Band-aids deployed (count → 0):**
+- (none currently) Margaret ship #2 cleared band-aid #1 by shipping workflow output-mapping; the Overpass adapter still self-geocodes for direct-dispatch cmd-K users but W9.pv now chains lat/lon via `inputs_from`. Counter reset 2026-05-11.
 
 ---
 
