@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useInvestigationStream } from "@/hooks/useInvestigationStream";
 import type { InvestigationEvent, InvestigationEventType, StreamStatus } from "@/types/api";
 
+import { DossierExportButton } from "./dossier-export-button";
 import { VerdictBanner } from "./verdict-banner";
 
 interface EventStreamProps {
@@ -197,6 +198,12 @@ export function EventStream({ investigationId }: EventStreamProps) {
         <span style={{ color: "#a3a3a3", fontSize: 12 }}>
           Stream {STATUS_LABEL[status]} &middot; {events.length} event
           {events.length === 1 ? "" : "s"}
+        </span>
+        <span style={{ marginLeft: "auto" }}>
+          <DossierExportButton
+            events={events}
+            context={{ investigationId }}
+          />
         </span>
       </div>
 
