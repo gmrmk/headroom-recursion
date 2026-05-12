@@ -34,7 +34,7 @@
   /* --- Borders ----------------------------------------------------- */
   --color-border: oklch(28% 0.005 240);
   --color-border-strong: oklch(38% 0.005 240);
-  --color-border-accent: oklch(50% 0.04 250);
+  --color-border-accent: oklch(50% 0.06 230);
 
   /* --- Text -------------------------------------------------------- */
   --color-text-primary: oklch(96% 0.005 240);
@@ -43,9 +43,13 @@
   --color-text-dim: oklch(48% 0.015 240);
   --color-text-faint: oklch(32% 0.01 240);
 
-  /* --- Semantic / verdict accents --------------------------------- */
-  --color-accent: oklch(72% 0.16 250);
-  --color-accent-soft: oklch(72% 0.16 250 / 0.12);
+  /* --- Semantic / verdict accents ---------------------------------
+   * Accent locked to cyan-blue per IntelBase visual recon (2026-05-11):
+   * single saturated cool accent, never gradient, never multi-accent.
+   * Hue 230 sits between pure cyan and electric-blue.
+   */
+  --color-accent: oklch(72% 0.18 230);
+  --color-accent-soft: oklch(72% 0.18 230 / 0.12);
   --color-success: oklch(74% 0.16 150);
   --color-success-soft: oklch(74% 0.16 150 / 0.12);
   --color-warn: oklch(82% 0.14 80);
@@ -85,6 +89,31 @@
   --duration-fast: 150ms;
   --duration-normal: 250ms;
   --duration-slow: 400ms;
+}
+
+/* Streaming-row fade-in. Per IntelBase recon: never block on a
+ * spinner; let new findings fade in as the backend resolves them.
+ * Components opt in with `className="stream-in"`.
+ */
+@keyframes stream-in-fade {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stream-in {
+  animation: stream-in-fade var(--duration-normal) var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-in {
+    animation: none;
+  }
 }
 
 /* Base body. Keeps layout.tsx free of inline body styles so the dark theme
