@@ -631,6 +631,24 @@ WORKFLOWS: dict[str, Workflow] = {
                     "shared URLs TENTATIVE -> MEDIUM (methodology §2.1)."
                 ),
             ),
+            WorkflowStep(
+                "dork_sweep_yandex",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),
+                description=(
+                    "Yandex through Scrapling StealthyFetcher (keyless 5th "
+                    "engine, RU/UA/PL/CZ/EE coverage Western engines miss). "
+                    "Direct URL anchors (no redirect unwrap); native site: "
+                    "operator support (no query rewrite needed)."
+                ),
+            ),
         ],
     ),
 }

@@ -11,6 +11,7 @@ from osint_goblin_workers.adapters_dork import (
     _build_dork_queries,
     _parse_bing_html,
     _parse_ddg_html,
+    _parse_yandex_html,
     _rewrite_query_for_bing,
     _strip_bing_redirect,
     _strip_ddg_redirect,
@@ -19,6 +20,7 @@ from osint_goblin_workers.adapters_dork import (
     dork_sweep_brave,
     dork_sweep_ddg,
     dork_sweep_serper,
+    dork_sweep_yandex,
 )
 
 # ---------------------------------------------------------------------------
@@ -434,3 +436,122 @@ class TestUrlMatchesDomain:
 
     def test_invalid_url_returns_false(self):
         assert _url_matches_domain("not a url", ["linkedin.com"]) is False
+
+
+# ---------------------------------------------------------------------------
+# _parse_yandex_html -- extract OrganicTitle-Link + OrganicTextContentSpan
+# ---------------------------------------------------------------------------
+
+
+# Fixture mirrors Yandex's 2026 result structure: per-result generated-class
+# <li>, with <a class="OrganicTitle-Link" href="<DIRECT-URL>"> wrapping a
+# <span class="OrganicTitleContentSpan">TITLE</span>, then a separate
+# <div class="Organic-ContentWrapper"> containing <div class="OrganicText">
+# with <span class="OrganicTextContentSpan">SNIPPET</span>.
+_YANDEX_FIXTURE = (
+    "<html><body>"
+    '<li class="ujeRJBw1">'
+    '<div class="OrganicTitle">'
+    '<a class="OrganicTitle-Link link" target="_blank" '
+    'href="https://www.linkedin.com/in/alice-smith">'
+    '<h2 class="OrganicTitle-LinkText">'
+    '<span class="OrganicTitleContentSpan">'
+    "<b>Alice</b> <b>Smith</b> - Senior Engineer | LinkedIn</span>"
+    "</h2></a></div>"
+    "<button class='Extralinks'></button>"
+    '<div class="Organic-ContentWrapper">'
+    '<div class="OrganicText Typo Typo_text_m">'
+    '<span class="OrganicTextContentSpan">'
+    "Experience: Acme Corp · Boston, MA · 500+ connections on <b>LinkedIn</b>."
+    "</span></div></div></li>"
+    '<li class="ujeRJBw2">'
+    '<div class="OrganicTitle">'
+    '<a class="OrganicTitle-Link link" '
+    'href="https://github.com/alicesmith">'
+    '<h2 class="OrganicTitle-LinkText">'
+    '<span class="OrganicTitleContentSpan">'
+    "alice <b>smith</b>&#39;s GitHub</span>"
+    "</h2></a></div>"
+    '<div class="Organic-ContentWrapper">'
+    '<div class="OrganicText">'
+    '<span class="OrganicTextContentSpan">'
+    "Public repositories by alicesmith on GitHub."
+    "</span></div></div></li>"
+    "</body></html>"
+)
+
+
+class TestParseYandexHtml:
+    def test_extracts_two_hits_from_fixture(self):
+        hits = _parse_yandex_html(_YANDEX_FIXTURE)
+        assert len(hits) == 2
+
+    def test_first_hit_url_title_and_snippet(self):
+        hits = _parse_yandex_html(_YANDEX_FIXTURE)
+        assert hits[0]["url"] == "https://www.linkedin.com/in/alice-smith"
+        assert "Alice Smith" in hits[0]["title"]
+        assert "LinkedIn" in hits[0]["title"]
+        assert "Experience: Acme Corp" in hits[0]["snippet"]
+        assert "Boston, MA" in hits[0]["snippet"]
+
+    def test_strips_inline_html_from_title(self):
+        hits = _parse_yandex_html(_YANDEX_FIXTURE)
+        # Fixture has <b>smith</b> + &#39; entity; both stripped/unescaped.
+        assert hits[1]["title"] == "alice smith's GitHub"
+
+    def test_strips_inline_html_from_snippet(self):
+        hits = _parse_yandex_html(_YANDEX_FIXTURE)
+        # First snippet has <b>LinkedIn</b>; stripped to "LinkedIn".
+        assert "<b>" not in hits[0]["snippet"]
+        assert "</b>" not in hits[0]["snippet"]
+
+    def test_empty_input_returns_empty_list(self):
+        assert _parse_yandex_html("") == []
+        assert _parse_yandex_html("<html><body>no results</body></html>") == []
+
+    def test_skips_relative_urls(self):
+        relative_fixture = (
+            '<a class="OrganicTitle-Link" href="/search/internal?q=foo">'
+            '<span class="OrganicTitleContentSpan">Internal</span></a>'
+            '<a class="OrganicTitle-Link" href="https://example.com/real">'
+            '<span class="OrganicTitleContentSpan">Real</span></a>'
+        )
+        hits = _parse_yandex_html(relative_fixture)
+        assert len(hits) == 1
+        assert hits[0]["url"] == "https://example.com/real"
+
+    def test_dedupes_repeated_urls(self):
+        # Yandex sometimes renders the same URL in multiple result containers
+        # (e.g., as a deeplink variant under the same canonical result).
+        dup_fixture = (
+            '<a class="OrganicTitle-Link" href="https://example.com/page">'
+            '<span class="OrganicTitleContentSpan">First</span></a>'
+            '<span class="OrganicTextContentSpan">First snippet.</span>'
+            '<a class="OrganicTitle-Link" href="https://example.com/page">'
+            '<span class="OrganicTitleContentSpan">Duplicate</span></a>'
+            '<span class="OrganicTextContentSpan">Dup snippet.</span>'
+        )
+        hits = _parse_yandex_html(dup_fixture)
+        assert len(hits) == 1
+
+    def test_handles_missing_snippet_gracefully(self):
+        no_snippet = (
+            '<a class="OrganicTitle-Link" href="https://example.com/a">'
+            '<span class="OrganicTitleContentSpan">A</span></a>'
+            '<a class="OrganicTitle-Link" href="https://example.com/b">'
+            '<span class="OrganicTitleContentSpan">B</span></a>'
+            '<span class="OrganicTextContentSpan">Only B snippet.</span>'
+        )
+        hits = _parse_yandex_html(no_snippet)
+        assert len(hits) == 2
+        # B's snippet should attach to B, not bleed back to A.
+        assert hits[0]["snippet"] == ""
+        assert "B snippet" in hits[1]["snippet"]
+
+
+class TestYandexAdapter:
+    def test_yandex_returns_skip_event_with_empty_seed(self):
+        events = dork_sweep_yandex({})
+        assert len(events) == 1
+        assert events[0]["event_type"] == "tool-run-result"
+        assert events[0]["payload"]["skipped"] is True

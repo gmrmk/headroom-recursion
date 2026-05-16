@@ -1564,6 +1564,264 @@ def _dork_sweep_bing_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 # ===========================================================================
+# Yandex main-UI HTML scrape (keyless 5th engine; RU/EU/Eastern European)
+# ===========================================================================
+#
+# Endpoint: https://yandex.com/search/?text=<query>
+# Auth: none. Anti-bot: ML-driven. JS-rendered results layer same as Bing.
+#
+# Why Yandex matters for PV: indexes a substantial set of RU/UA/PL/CZ
+# Eastern-European sites that Google de-prioritizes and Bing rarely
+# surfaces. For a host claiming Eastern European residence/identity,
+# Yandex frequently returns the canonical local-language record while
+# Western engines miss entirely.
+#
+# Yandex result structure (2026, rendered):
+#   <a class="OrganicTitle-Link" href="<DIRECT-URL>">
+#     <h2 class="OrganicTitle-LinkText">
+#       <span class="OrganicTitleContentSpan">TITLE (with <b> match tags)</span>
+#     </h2>
+#   </a>
+#   ...intervening chrome / extralinks...
+#   <div class="Organic-ContentWrapper">
+#     <div class="...OrganicText...">
+#       <span class="OrganicTextContentSpan">SNIPPET</span>
+#     </div>
+#   </div>
+#
+# Direct URLs (no redirect wrapping) -- nice change vs Bing's ck/a pattern.
+# `site:` operator works on Yandex (unlike Bing) so no query rewrite needed.
+
+_YANDEX_URL = "https://yandex.com/search/"
+
+# Capture title anchor (URL + title-text span). Each result has exactly
+# one OrganicTitle-Link; we use it as the structural anchor for the result.
+_YANDEX_TITLE_ANCHOR_RE = re.compile(
+    r'<a[^>]*\bclass="[^"]*\bOrganicTitle-Link\b[^"]*"[^>]*href="([^"]+)"[^>]*>'
+    r".*?"
+    r'<span[^>]*\bclass="[^"]*\bOrganicTitleContentSpan\b[^"]*"[^>]*>'
+    r"(.*?)"
+    r"</span>"
+    r".*?"
+    r"</a>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Capture snippet text span. Anchored on OrganicTextContentSpan -- the
+# direct child span inside Organic-ContentWrapper / OrganicText.
+_YANDEX_SNIPPET_SPAN_RE = re.compile(
+    r'<span[^>]*\bclass="[^"]*\bOrganicTextContentSpan\b[^"]*"[^>]*>' r"(.*?)" r"</span>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _parse_yandex_html(html_body: str) -> list[dict[str, str]]:
+    """Parse Yandex search results into hits with url + title + snippet.
+
+    Yandex paths title anchor and snippet span separately within each
+    result li (which uses generated random class names per page-load,
+    so we can't anchor on the li class). Strategy: find each title
+    anchor, then scan forward in a bounded window for the matching
+    OrganicTextContentSpan; pair them up in document order.
+
+    Naomi gate: only result text leaves this function -- the page bytes
+    never touch disk past the SSE bus.
+    """
+    title_matches = list(_YANDEX_TITLE_ANCHOR_RE.finditer(html_body))
+    snippet_matches = list(_YANDEX_SNIPPET_SPAN_RE.finditer(html_body))
+
+    # Strict pairing: a snippet belongs to title T iff it falls between
+    # T and the next title T+1. If no snippet exists in that window, the
+    # title gets an empty snippet (no bleed-back from later results).
+    hits: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+    for i, t in enumerate(title_matches):
+        raw_url = t.group(1).strip()
+        title_html = t.group(2)
+        # Normalize URL: skip relative + javascript: + Yandex internal.
+        if raw_url.startswith("//"):
+            raw_url = "https:" + raw_url
+        if not raw_url.startswith(("http://", "https://")):
+            continue
+        try:
+            host = raw_url.split("/", 3)[2]
+        except IndexError:
+            continue
+        if host.endswith("yandex.com") or host.endswith("yandex.ru") or host == "yandex.com":
+            # Yandex-internal links (translate.yandex.com, etc.) -- skip.
+            continue
+        # Dedup by URL within a single page; Yandex sometimes renders the
+        # same URL in multiple result containers (deeplink variants).
+        if raw_url in seen_urls:
+            continue
+        seen_urls.add(raw_url)
+
+        # Window for this title's snippet: from end-of-title to start of
+        # next title (or end of document for the last title).
+        win_start = t.end()
+        win_end = title_matches[i + 1].start() if i + 1 < len(title_matches) else len(html_body)
+
+        snippet_text = ""
+        for snip in snippet_matches:
+            if snip.start() < win_start:
+                continue
+            if snip.start() >= win_end:
+                break
+            snippet_text = _clean_html_fragment(snip.group(1), max_len=300)
+            break  # first snippet in window wins
+
+        title_text = _clean_html_fragment(title_html, max_len=200)
+        hits.append({"url": raw_url, "title": title_text, "snippet": snippet_text})
+
+    return hits
+
+
+def _yandex_fetch(url: str, timeout_s: float = 60.0) -> tuple[int, str]:
+    """Fetch a Yandex search URL via Scrapling's StealthyFetcher.
+
+    Same JS-render rationale as Bing: Yandex's results are populated
+    after page load via XHR. Plain HTTP gets the page chrome only.
+    """
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        return (0, "")
+    try:
+        page = StealthyFetcher.fetch(
+            url,
+            headless=True,
+            network_idle=True,
+            timeout=int(timeout_s * 1000),
+        )
+        body = getattr(page, "html_content", None) or getattr(page, "text", "") or ""
+        if isinstance(body, bytes | bytearray):
+            body = bytes(body).decode("utf-8", errors="replace")
+        return (int(getattr(page, "status", 0) or 0), body)
+    except Exception:
+        return (0, "")
+
+
+def dork_sweep_yandex(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Dork-sweep via Yandex through Scrapling StealthyFetcher.
+
+    Routes through Patchright headless Chrome with network_idle wait so
+    the JS-rendered OrganicTitle-Link anchors are populated before we
+    serialize. Plain httpx gets the page chrome only.
+
+    Yandex supports `site:` operator natively, so no query-rewrite
+    pre-processing is needed (unlike Bing). Direct URLs in results --
+    no redirect-unwrap step needed either.
+
+    Payload: same as dork_sweep_ddg.
+
+    Naomi gate: queries never logged; only result URLs + titles +
+    snippets surface back through the event stream.
+
+    Cost tier: 5-15s per query (browser boot + render). Run in parallel
+    with DDG/Brave/Serper/Bing from the workflow step list.
+
+    Coverage rationale: Yandex indexes ~98% of the RU-language web,
+    plus significant UA/BY/KZ/PL/CZ coverage that Western engines miss.
+    Highest-value engine for hosts/targets in those regions.
+    """
+    seed = payload or {}
+    limit_per = min(
+        int(seed.get("limit_per_query", _HIT_LIMIT_PER_DORK) or _HIT_LIMIT_PER_DORK), 25
+    )
+    queries = _build_dork_queries(seed)
+    if not queries:
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "adapter_id": "dork_sweep_yandex",
+                    "skipped": True,
+                    "reason": "no dork templates matched available seed keys",
+                    "templates_total": len(_PV_TEMPLATES),
+                },
+            }
+        ]
+
+    events: list[dict[str, Any]] = []
+    queries_run = 0
+    queries_failed = 0
+    total_hits = 0
+    for idx, q in enumerate(queries):
+        if idx > 0:
+            jitter = 0.5 * ((idx * 7) % 11) / 10
+            time.sleep(1.0 + jitter)
+        encoded_q = urllib.parse.quote_plus(q["query"])
+        url = f"{_YANDEX_URL}?text={encoded_q}"
+        status, body = _yandex_fetch(url)
+        if status != 200 or not body:
+            queries_failed += 1
+            continue
+        hits = _parse_yandex_html(body)[:limit_per]
+        queries_run += 1
+        for h in hits:
+            total_hits += 1
+            events.append(
+                {
+                    "event_type": "dork-hit",
+                    "payload": {
+                        "source": "dork-sweep",
+                        "engine": "yandex",
+                        "template_id": q["id"],
+                        "template_label": q["label"],
+                        "url": h["url"],
+                        "title": h["title"],
+                        "snippet": h.get("snippet", ""),
+                        "confidence": "tentative",
+                    },
+                }
+            )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_yandex",
+                "queries_attempted": len(queries),
+                "queries_run": queries_run,
+                "queries_failed": queries_failed,
+                "total_hits": total_hits,
+                "fetch_method": "scrapling-stealthy-patchright",
+            },
+        }
+    )
+    return events
+
+
+def _dork_sweep_yandex_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    name = payload.get("name") or "Test Host"
+    return [
+        {
+            "event_type": "dork-hit",
+            "payload": {
+                "source": "dork-sweep",
+                "engine": "yandex",
+                "template_id": "name_linkedin",
+                "template_label": "Host name on LinkedIn profiles",
+                "url": "https://www.linkedin.com/in/test-host",
+                "title": f"{name} — LinkedIn (synthetic via yandex)",
+                "snippet": "Synthetic snippet preview for Yandex engine smoke test.",
+                "confidence": "tentative",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_yandex",
+                "queries_run": 1,
+                "total_hits": 1,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ===========================================================================
 # Registry installation
 # ===========================================================================
 
@@ -1600,5 +1858,15 @@ _REGISTRY.register(
     description=(
         "Dork-sweep via Bing main-UI HTML scrape (W13.dk, keyless 4th engine, "
         "UA-rotated for per-IP burst-protection softening)."
+    ),
+)
+_REGISTRY.register(
+    "dork_sweep_yandex",
+    dork_sweep_yandex,
+    synthetic_mode=_dork_sweep_yandex_synthetic,
+    in_process=True,
+    description=(
+        "Dork-sweep via Yandex through Scrapling StealthyFetcher (W13.dk, "
+        "keyless 5th engine, RU/EU/Eastern European coverage)."
     ),
 )
