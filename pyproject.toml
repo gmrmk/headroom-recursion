@@ -40,6 +40,12 @@ extend-exclude = [".venv", "adapters"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "RUF", "SIM"]
 
+[tool.ruff.lint.per-file-ignores]
+# The dork-sweep adapter holds verbatim search-engine query templates and
+# multi-host site:() OR-lists; reflowing them changes what the engine sees.
+# E501 silenced for this file by design (templates intentionally long).
+"apps/workers/src/osint_goblin_workers/adapters_dork.py" = ["E501"]
+
 [tool.mypy]
 strict = true
 warn_unused_ignores = true

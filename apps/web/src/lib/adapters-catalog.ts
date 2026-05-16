@@ -166,6 +166,16 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     examplePayload: '{\n  "lat": 39.78,\n  "lon": -89.65,\n  "radius_m": 200\n}',
     group: "addrgeo",
   },
+  // W4-SUB-BRAND (Margaret wave-4 §4, Tomás owner, 2026-05-12).
+  {
+    id: "badges_sub_brand_detect",
+    label: "Listing copy — verification sub-brand detect",
+    hint:
+      "Regex scan for AirCover / Autohost / Truvi / GuestVerify / Shield Suite / Screen & Protect mentions. Infers platform-side verification floor. Pure in-process, no network.",
+    examplePayload:
+      '{\n  "listing_text": "This unit is AirCover-protected and all guests are screened by Autohost."\n}',
+    group: "addrgeo",
+  },
   // Phone
   {
     id: "phone_format_validate",
@@ -533,6 +543,13 @@ export const ADAPTERS: ReadonlyArray<AdapterMeta> = [
     hint: "Catches same photo reused across cases. Append-only local DB.",
     examplePayload:
       '{\n  "image_url": "https://example.com/photo.jpg",\n  "case_id": "case-2026-05-alice"\n}',
+    group: "image",
+  },
+  {
+    id: "image_pdq_hash",
+    label: "PDQ photo-hash — Facebook ThreatExchange",
+    hint: "256-bit perceptual hash (BSD-3). >95% TPR at <1% FPR on JPEG/scale/color manipulation. <10ms/image. W4-PDQ-PIPE.",
+    examplePayload: '{\n  "image_url": "https://example.com/photo.jpg"\n}',
     group: "image",
   },
   {

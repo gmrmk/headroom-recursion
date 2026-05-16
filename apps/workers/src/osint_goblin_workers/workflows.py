@@ -38,10 +38,10 @@ class WorkflowStep:
 
     __slots__ = (
         "adapter_id",
-        "payload_template",
-        "required_seed_keys",
         "description",
         "inputs_from",
+        "payload_template",
+        "required_seed_keys",
     )
 
     def __init__(
@@ -132,7 +132,7 @@ class _DefaultEmpty(dict):
 
 
 class Workflow:
-    __slots__ = ("id", "name", "description", "steps")
+    __slots__ = ("description", "id", "name", "steps")
 
     def __init__(
         self,
@@ -261,7 +261,10 @@ WORKFLOWS: dict[str, Workflow] = {
     "w5.do": Workflow(
         id="w5.do",
         name="Domain + CT Timeline",
-        description="CT log + Wayback CDX + subfinder + amass subdomain enum.",
+        description=(
+            "CT log + Wayback CDX + DNS prefix sweep + M365 autodiscover "
+            "+ subfinder/amass (if installed)."
+        ),
         steps=[
             WorkflowStep(
                 "ct_log_lookup",
@@ -272,6 +275,32 @@ WORKFLOWS: dict[str, Workflow] = {
                 "wayback_cdx_subdomains",
                 {"domain": "{domain}", "limit": 200},
                 required_seed_keys=("domain",),
+            ),
+            WorkflowStep(
+                "dns_prefix_sweep",
+                {"domain": "{domain}", "limit": 200},
+                required_seed_keys=("domain",),
+                description=(
+                    "Active prefix-probe enumeration; closes the 20-40% gap "
+                    "left by passive CT/Wayback."
+                ),
+            ),
+            WorkflowStep(
+                "wayback_legacy_files",
+                {"domain": "{domain}", "limit": 150},
+                required_seed_keys=("domain",),
+                description=(
+                    "Legacy server-side files (.asp/.cfm/.jsp/.php) -- "
+                    "decade-old-business pivot (Phase 4, 2026-05-12)."
+                ),
+            ),
+            WorkflowStep(
+                "m365_autodiscover_probe",
+                {"domain": "{domain}"},
+                required_seed_keys=("domain",),
+                description=(
+                    "Passive Microsoft 365 tenancy confirmation via autodiscover DNS landing."
+                ),
             ),
             WorkflowStep(
                 "subfinder_subprocess",
@@ -395,7 +424,7 @@ WORKFLOWS: dict[str, Workflow] = {
         id="w10.ip",
         name="IP Vetting",
         description=(
-            "Geolocation + reverse DNS + ASN + reputation " "(closes 6-primitive triangulation)."
+            "Geolocation + reverse DNS + ASN + reputation (closes 6-primitive triangulation)."
         ),
         steps=[
             WorkflowStep(
@@ -480,6 +509,108 @@ WORKFLOWS: dict[str, Workflow] = {
                 "hibp_breach_check",
                 {"email": "{email}"},
                 required_seed_keys=("email",),
+            ),
+        ],
+    ),
+    "w12.id": Workflow(
+        id="w12.id",
+        name="Identity Fabric / Domain Posture",
+        description=(
+            "RDAP + TXT SaaS inference + SPF/DMARC/MX audit + M365 "
+            "autodiscover + SSO/OIDC discovery. Answers 'does the host's "
+            "claimed digital identity stand up?' (Tomás Phase 2, 2026-05-12)."
+        ),
+        steps=[
+            WorkflowStep(
+                "domain_rdap",
+                {"domain": "{domain}"},
+                required_seed_keys=("domain",),
+                description="Registrant / NS / status / dates (P6).",
+            ),
+            WorkflowStep(
+                "dns_txt_saas_inference",
+                {"domain": "{domain}"},
+                required_seed_keys=("domain",),
+                description="SaaS tenancy fingerprints from TXT tokens (P2).",
+            ),
+            WorkflowStep(
+                "dns_email_security_audit",
+                {"domain": "{domain}"},
+                required_seed_keys=("domain",),
+                description="SPF/DMARC/MX -> tenancy + spoof feasibility (P1).",
+            ),
+            WorkflowStep(
+                "m365_autodiscover_probe",
+                {"domain": "{domain}"},
+                required_seed_keys=("domain",),
+                description="M365 confirmation via autodiscover landing (P3).",
+            ),
+            WorkflowStep(
+                "sso_discovery",
+                {"domain": "{domain}"},
+                required_seed_keys=("domain",),
+                description="SSO subdomain prefix probe + OIDC discovery (P5).",
+            ),
+            WorkflowStep(
+                "tls_cert_audit",
+                {"domain": "{domain}"},
+                required_seed_keys=("domain",),
+                description=(
+                    "TLS handshake + cert parse: issuer, SANs, validity "
+                    "window, posture signals (P7, Phase 4 2026-05-12)."
+                ),
+            ),
+        ],
+    ),
+    "w13.dk": Workflow(
+        id="w13.dk",
+        name="Dork Sweep (open-web acquisition)",
+        description=(
+            "Open-web search engine sweep across DDG (default), Brave "
+            "(env-gated), and Serper/Google (env-gated). Property-vetting "
+            "curated dork corpus (~15 templates) from offensive-osint §18. "
+            "All hits TENTATIVE until investigator opens in-tab "
+            "(methodology §2.1). Phase 5 (2026-05-12)."
+        ),
+        steps=[
+            WorkflowStep(
+                "dork_sweep_ddg",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),  # any seed combo runs; empty seed -> no-op
+                description="DuckDuckGo HTML scrape (keyless default).",
+            ),
+            WorkflowStep(
+                "dork_sweep_brave",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),
+                description="Brave Search API (env-gated OSINT_BRAVE_API_KEY).",
+            ),
+            WorkflowStep(
+                "dork_sweep_serper",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),
+                description="Serper.dev / Google results (env-gated OSINT_SERPER_API_KEY).",
             ),
         ],
     ),

@@ -47,3 +47,14 @@ repos:
         language: system
         pass_filenames: true
         files: \.ps1$
+      - id: rubric-coverage-lint
+        name: Dossier-section rubric-coverage lint (ADR-0026)
+        # Asserts every `severity_basis: "matrix:<id>"` literal in
+        # apps/web/src/lib/dossier-shape.ts (and breach-synthesis.ts) resolves
+        # to an entry in apps/web/src/lib/severity-rubric.ts RUBRIC.
+        # Mechanism mirrors ADR-0022 import-linter: a string-convention
+        # contract the type system cannot enforce.
+        entry: python tools/ci/rubric_coverage_lint.py
+        language: system
+        pass_filenames: false
+        files: ^apps/web/src/lib/(dossier-shape|severity-rubric|breach-synthesis)\.ts$

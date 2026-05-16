@@ -8,8 +8,38 @@ import type { InvestigationEvent, InvestigationEventType, StreamStatus } from "@
 import { DossierExportButton } from "./dossier-export-button";
 import { VerdictBanner } from "./verdict-banner";
 
+// W4-FIG-GROUND (wave-4, Hideo §12 #3 Datadog Watchdog pattern): when a
+// finding cites a specific time window, render that window as a tinted
+// band overlay and fade events outside it to 60% opacity. The opacity
+// contrast is the redundant signal that survives screen readers and
+// colorblind users — the band is purely additive sighted-signal.
+//
+// Sprint-5 W4-TIMELINE will wire `time_window` from a real consumer; for
+// now the prop ships unused.
+interface TimeWindow {
+  readonly start: string; // ISO 8601
+  readonly end: string; // ISO 8601
+  readonly label?: string; // optional caption shown at the band edge
+}
+
 interface EventStreamProps {
-  investigationId: string;
+  readonly investigationId: string;
+  readonly time_window?: TimeWindow | undefined;
+}
+
+function parseIsoMs(iso: string): number {
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? Number.NaN : t;
+}
+
+function isInTimeWindow(eventTs: string, window: TimeWindow): boolean {
+  const ts = parseIsoMs(eventTs);
+  const start = parseIsoMs(window.start);
+  const end = parseIsoMs(window.end);
+  if (Number.isNaN(ts) || Number.isNaN(start) || Number.isNaN(end)) {
+    return false;
+  }
+  return ts >= start && ts <= end;
 }
 
 const EVENT_COLORS: Record<InvestigationEventType, string> = {
@@ -30,6 +60,18 @@ const EVENT_COLORS: Record<InvestigationEventType, string> = {
   "person-match": "#fbbf24",
   "breach-hit": "#f87171",
   "image-match": "#fbbf24",
+  // W12.id identity-fabric event types (Phase 2, 2026-05-12).
+  "tenant-match": "#22d3ee",
+  "infra-fact": "#94a3b8",
+  "email-posture": "#a78bfa",
+  "sso-discovery": "#22d3ee",
+  // W13.dk dork-sweep event type (Phase 5, 2026-05-12).
+  "dork-hit": "#f472b6",
+  // W4-SUB-BRAND wave-4 §4 (2026-05-12). Soft green: verification is a
+  // trust-positive signal -- distinct from the alert-red breach-hit and
+  // the alert-yellow listing/image-match (which surfaces a contradiction
+  // candidate, not a verified floor).
+  platform_verification_floor: "#86efac",
 };
 
 const STATUS_LABEL: Record<StreamStatus, string> = {
@@ -145,7 +187,7 @@ function buildRenderItems(ordered: ReadonlyArray<InvestigationEvent>): ReadonlyA
   return out;
 }
 
-export function EventStream({ investigationId }: EventStreamProps) {
+export function EventStream({ investigationId, time_window }: EventStreamProps) {
   const { events, status } = useInvestigationStream(investigationId);
   const [facet, setFacet] = useState<Facet>("all");
   const [expandedUrls, setExpandedUrls] = useState<ReadonlySet<string>>(new Set());
@@ -234,31 +276,110 @@ export function EventStream({ investigationId }: EventStreamProps) {
             : `No events match the ${facet} facet yet.`}
         </p>
       ) : (
-        <ul
+        <div style={{ position: "relative" }}>
+          {time_window ? (
+            <FigGroundBand window={time_window} />
+          ) : null}
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+              position: "relative",
+            }}
+          >
+            {renderItems.map((item) => {
+              if (item.kind === "event") {
+                const inWindow = time_window
+                  ? isInTimeWindow(item.event.ts, time_window)
+                  : true;
+                return (
+                  <EventRow
+                    key={item.event.sequence}
+                    event={item.event}
+                    dimmed={!inWindow}
+                  />
+                );
+              }
+              // Group is "in window" if ANY child event falls inside —
+              // dimming an aggregate row that contains in-window evidence
+              // would hide the finding.
+              const groupInWindow = time_window
+                ? item.events.some((e) => isInTimeWindow(e.ts, time_window))
+                : true;
+              return (
+                <ImageMatchGroup
+                  key={`group:${item.imageUrl}`}
+                  imageUrl={item.imageUrl}
+                  events={item.events}
+                  expanded={expandedUrls.has(item.imageUrl)}
+                  onToggle={() => toggleExpanded(item.imageUrl)}
+                  dimmed={!groupInWindow}
+                />
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface FigGroundBandProps {
+  readonly window: TimeWindow;
+}
+
+// Band overlay: tinted region behind the event rows that survives PDF
+// export (print-color-adjust: exact). The opacity contrast on the rows
+// themselves is the redundant signal for screen-reader + colorblind
+// users — this band is sighted-signal only.
+function FigGroundBand({ window }: FigGroundBandProps) {
+  const labelText =
+    window.label ?? `${window.start} to ${window.end}`;
+  return (
+    <div
+      role="img"
+      aria-label={`Time window: ${labelText}`}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(252, 211, 77, 0.18)",
+        border: "1px solid rgba(252, 211, 77, 0.4)",
+        borderRadius: 4,
+        pointerEvents: "none",
+        zIndex: 0,
+        // Camille print-export gate: Chromium drops background colors on
+        // print by default. print-color-adjust: exact forces preservation
+        // so the band survives the evidence-bundle PDF.
+        printColorAdjust: "exact",
+        WebkitPrintColorAdjust: "exact",
+      }}
+    >
+      {window.label ? (
+        <span
           style={{
-            listStyle: "none",
-            padding: 0,
-            margin: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
+            position: "absolute",
+            top: 4,
+            left: 8,
+            fontSize: 10,
+            fontFamily: "ui-monospace, SFMono-Regular, monospace",
+            color: "#fbbf24",
+            background: "#0a0a0a",
+            padding: "1px 6px",
+            borderRadius: 3,
+            border: "1px solid rgba(252, 211, 77, 0.4)",
+            pointerEvents: "none",
           }}
         >
-          {renderItems.map((item) =>
-            item.kind === "event" ? (
-              <EventRow key={item.event.sequence} event={item.event} />
-            ) : (
-              <ImageMatchGroup
-                key={`group:${item.imageUrl}`}
-                imageUrl={item.imageUrl}
-                events={item.events}
-                expanded={expandedUrls.has(item.imageUrl)}
-                onToggle={() => toggleExpanded(item.imageUrl)}
-              />
-            ),
-          )}
-        </ul>
-      )}
+          {window.label}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -344,7 +465,13 @@ function collectPreviews(
   return out;
 }
 
-function EventRow({ event }: { event: InvestigationEvent }) {
+function EventRow({
+  event,
+  dimmed = false,
+}: {
+  event: InvestigationEvent;
+  dimmed?: boolean;
+}) {
   const previews = collectPreviews(event.payload);
   // Fallback for older synthetic events that emit only flipped_path (no
   // _rel sibling). Drop when the synthetic-only path is retired.
@@ -352,8 +479,14 @@ function EventRow({ event }: { event: InvestigationEvent }) {
     previews.length === 0 && typeof event.payload?.flipped_path === "string"
       ? event.payload.flipped_path
       : "";
+  // W4-FIG-GROUND: events outside the cited time_window fade to 60% so
+  // colorblind and screen-reader users (who can't see the band tint) get
+  // the same figure-ground signal as sighted users.
+  const rowStyle: React.CSSProperties = dimmed
+    ? { ...ROW_STYLE, opacity: 0.6, position: "relative", zIndex: 1 }
+    : { ...ROW_STYLE, position: "relative", zIndex: 1 };
   return (
-    <li style={ROW_STYLE}>
+    <li style={rowStyle}>
       <span style={{ color: "#525252" }}>#{event.sequence}</span>
       <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <span style={{ color: EVENT_COLORS[event.event_type], fontWeight: 600 }}>
@@ -410,9 +543,16 @@ interface ImageMatchGroupProps {
   events: ReadonlyArray<InvestigationEvent>;
   expanded: boolean;
   onToggle: () => void;
+  dimmed?: boolean;
 }
 
-function ImageMatchGroup({ imageUrl, events, expanded, onToggle }: ImageMatchGroupProps) {
+function ImageMatchGroup({
+  imageUrl,
+  events,
+  expanded,
+  onToggle,
+  dimmed = false,
+}: ImageMatchGroupProps) {
   // Engine count = distinct payload.source values.
   const sources = new Set<string>();
   for (const e of events) {
@@ -429,6 +569,9 @@ function ImageMatchGroup({ imageUrl, events, expanded, onToggle }: ImageMatchGro
         border: "1px solid #1f1f1f",
         borderRadius: 4,
         overflow: "hidden",
+        opacity: dimmed ? 0.6 : 1,
+        position: "relative",
+        zIndex: 1,
       }}
     >
       <button

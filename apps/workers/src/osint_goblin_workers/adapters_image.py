@@ -58,10 +58,15 @@ from typing import Any
 
 import httpx
 
+from ._ua import default_ua
 from .adapters import get_registry
 from .subprocess_adapter import make_subprocess_adapter
 
-_DEFAULT_UA = "osint-goblin/0.1 (https://github.com/local; personal-investigator)"
+# W4-UA (Margaret wave-4 roadmap §3): default UA is now Chrome-on-Win11
+# so a target webserver's access logs don't attribute probes back to
+# the operator. OSINT_TRANSPARENT_UA=1 restores the osint-goblin literal.
+# OSINT_USER_AGENT still wins if explicitly set (lets ops pin any string).
+_DEFAULT_UA = default_ua()
 _USER_AGENT = os.environ.get("OSINT_USER_AGENT", _DEFAULT_UA)
 
 # Empirical venv (Scrapling) -- same pattern as adapters_property.py
@@ -1806,7 +1811,7 @@ def _seasonal_metadata_check_synthetic(payload: dict[str, Any]) -> list[dict[str
                 "photo_year": 2025,
                 "season_mismatch": claimed != "summer",
                 "mismatch_note": (
-                    f"listing claims '{claimed}' but photo EXIF dates to " f"2025-06-15 (summer)"
+                    f"listing claims '{claimed}' but photo EXIF dates to 2025-06-15 (summer)"
                     if claimed != "summer"
                     else ""
                 ),
@@ -2095,6 +2100,176 @@ def _reverse_image_aggregator_synthetic(payload: dict[str, Any]) -> list[dict[st
 
 
 # ---------------------------------------------------------------------------
+# W4-PDQ-PIPE -- image_pdq_hash (Margaret wave-4 roadmap §4)
+#
+# severity_basis: matrix:PV_LISTING_PHOTO_PDQ_CROSS_PLATFORM
+#
+# PDQ (Perceptual Difference Quantization) is Facebook ThreatExchange's
+# 256-bit perceptual hash. Steinebach PHASER benchmark: >95% TPR at <1% FPR
+# on JPEG compression / scaling / color manipulation -- the manipulations
+# that dominate listing-photo fraud. FOSS (BSD-3), <10ms per image.
+#
+# This card is single-investigation compute path only. Cross-investigation
+# PDQ-INDEX (persistent hash store with NN lookup) is deferred to a later
+# card pending Camille's retention-policy ADR.
+# ---------------------------------------------------------------------------
+
+try:
+    import pdqhash as _pdqhash_mod  # type: ignore[import-not-found]
+
+    _PDQ_AVAILABLE = True
+except ImportError:
+    _pdqhash_mod = None  # type: ignore[assignment]
+    _PDQ_AVAILABLE = False
+
+
+def _pdq_bits_to_hex(hash_bits: Any) -> str:
+    """Convert pdqhash output (numpy array of 256 uint8 bits) to 64-char hex.
+
+    Facebook's reference PDQ format packs the 256 bits MSB-first into 32
+    bytes, then hex-encodes -> 64 hex chars. pdqhash returns a length-256
+    numpy array of 0/1 values; pack with numpy.packbits.
+    """
+    import numpy as np
+
+    arr = np.asarray(hash_bits, dtype=np.uint8)
+    if arr.size != 256:
+        raise ValueError(f"PDQ hash must be 256 bits; got {arr.size}")
+    packed = np.packbits(arr)  # MSB-first by default -> matches PDQ reference
+    return packed.tobytes().hex()
+
+
+def image_pdq_hash(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Compute PDQ (Perceptual Difference Quantization) hash for a listing photo.
+
+    Payload:
+      {"image_url": "https://example.com/photo.jpg"}
+
+    PDQ is Facebook ThreatExchange's 256-bit perceptual hash (BSD-3, FOSS).
+    Steinebach PHASER benchmark reports >95% TPR at <1% FPR on JPEG
+    compression / scaling / color manipulation -- the manipulation set
+    that dominates listing-photo fraud. Compute is <10ms per image.
+
+    severity_basis: matrix:PV_LISTING_PHOTO_PDQ_CROSS_PLATFORM
+    Per W4-PDQ-PIPE (Margaret wave-4 §4). Single-investigation compute
+    path; cross-investigation index (PDQ-INDEX) is a separate deferral
+    pending Camille retention-policy ADR.
+    """
+    image_url = (payload.get("image_url") or "").strip()
+    if not image_url:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": "missing 'image_url'"},
+            }
+        ]
+    if not _PDQ_AVAILABLE:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": (
+                        "pdqhash extension not available; install pdqhash>=0.2.5 "
+                        "(may require MSVC build tools on Windows)"
+                    ),
+                    "image_url": image_url,
+                },
+            }
+        ]
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {"reason": f"Pillow not installed: {exc}"},
+            }
+        ]
+    try:
+        data, ctype = _fetch_image_bytes(image_url, timeout_s=20.0)
+    except Exception as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"fetch failed: {type(exc).__name__}: {exc}",
+                    "image_url": image_url,
+                },
+            }
+        ]
+    try:
+        import numpy as np
+
+        img = Image.open(io.BytesIO(data)).convert("RGB")
+        # pdqhash.compute() takes a HxWx3 numpy uint8 array, returns
+        # (hash_bits, quality). hash_bits is a length-256 numpy array of
+        # 0/1 values; quality is an int in [0, 100].
+        arr = np.asarray(img, dtype=np.uint8)
+        hash_bits, quality = _pdqhash_mod.compute(arr)  # type: ignore[union-attr]
+        pdq_hex = _pdq_bits_to_hex(hash_bits)
+    except Exception as exc:
+        return [
+            {
+                "event_type": "tool-run-error",
+                "payload": {
+                    "reason": f"pdq compute failed: {type(exc).__name__}: {exc}",
+                    "image_url": image_url,
+                },
+            }
+        ]
+    return [
+        {
+            "event_type": "image-match",
+            "payload": {
+                "source": "image_pdq_hash",
+                "image_url": image_url,
+                "pdq_hash_hex": pdq_hex,
+                "pdq_quality": int(quality),
+                "content_type": ctype,
+                "severity_basis": "matrix:PV_LISTING_PHOTO_PDQ_CROSS_PLATFORM",
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "image_url": image_url,
+                "pdq_hash_hex": pdq_hex,
+                "pdq_quality": int(quality),
+            },
+        },
+    ]
+
+
+def _image_pdq_hash_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    url = payload.get("image_url") or "https://example.com/synthetic.jpg"
+    # Deterministic synthetic PDQ hash (64 hex chars = 256 bits).
+    fake_hex = "f" * 32 + "0" * 32
+    return [
+        {
+            "event_type": "image-match",
+            "payload": {
+                "source": "image_pdq_hash",
+                "image_url": url,
+                "pdq_hash_hex": fake_hex,
+                "pdq_quality": 100,
+                "content_type": "image/jpeg",
+                "severity_basis": "matrix:PV_LISTING_PHOTO_PDQ_CROSS_PLATFORM",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "image_url": url,
+                "pdq_hash_hex": fake_hex,
+                "pdq_quality": 100,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Registry installation -- in-process adapters + subprocess wrappers
 # ---------------------------------------------------------------------------
 
@@ -2193,6 +2368,17 @@ _REGISTRY.register(
     synthetic_mode=_reverse_image_aggregator_synthetic,
     in_process=True,
     description="Fan-out to TinEye + Yandex + Google Lens + Bing reverse engines.",
+)
+_REGISTRY.register(
+    "image_pdq_hash",
+    image_pdq_hash,
+    synthetic_mode=_image_pdq_hash_synthetic,
+    in_process=True,
+    description=(
+        "PDQ (Perceptual Difference Quantization) photo-hash via Facebook "
+        "ThreatExchange (BSD-3). 256-bit hash, <10ms/image. W4-PDQ-PIPE; "
+        "severity_basis matrix:PV_LISTING_PHOTO_PDQ_CROSS_PLATFORM."
+    ),
 )
 
 # Scrapling subprocess wrappers (live in adapters/<id>/wrapper.py)

@@ -44,6 +44,7 @@ from typing import Any
 
 import httpx
 
+from ._ua import default_ua
 from .adapters import get_registry
 from .subprocess_adapter import make_subprocess_adapter
 
@@ -60,7 +61,14 @@ _REPO_ROOT_PROP = Path(__file__).resolve().parents[4]
 # Stable identifier surfaced to upstream services. Email is OPSEC-leaky
 # if used directly; the env var lets the deploy override with a real
 # contact address that the user is OK exposing to OSM/HIBP.
-_DEFAULT_UA = "osint-goblin/0.1 (https://github.com/local; personal-investigator)"
+#
+# W4-UA (Margaret wave-4 roadmap §3): default UA is now Chrome-on-Win11
+# so a target webserver's access logs don't attribute probes back to the
+# operator. OSINT_TRANSPARENT_UA=1 restores the osint-goblin literal.
+# OSINT_USER_AGENT still wins if explicitly set (lets ops pin any string
+# -- recommended for Nominatim/HIBP where a descriptive UA helps the
+# service rate-limit specifically rather than nuking the whole IP).
+_DEFAULT_UA = default_ua()
 _USER_AGENT = os.environ.get("OSINT_USER_AGENT", _DEFAULT_UA)
 
 # Nominatim's published usage policy: max 1 req/sec sustained.
@@ -1906,6 +1914,21 @@ def bluesky_followers(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     "https://public.api.bsky.app/xrpc/app.bsky.graph.getFollowers",
                     params=params,
                 )
+                if r.status_code == 400:
+                    # 400 from app.bsky.graph.getFollowers means the
+                    # handle didn't resolve (doesn't exist, malformed,
+                    # or not a public profile). That's a legitimate
+                    # "no match" result, not an adapter error.
+                    return [
+                        {
+                            "event_type": "tool-run-result",
+                            "payload": {
+                                "handle": handle,
+                                "followers": 0,
+                                "note": "handle did not resolve on bluesky",
+                            },
+                        }
+                    ]
                 if r.status_code != 200:
                     return [
                         {
@@ -2022,7 +2045,7 @@ def mastodon_followers(payload: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "event_type": "tool-run-error",
                 "payload": {
-                    "reason": ("need 'acct' (e.g. alice@mastodon.social) or " "full 'profile_url'"),
+                    "reason": ("need 'acct' (e.g. alice@mastodon.social) or full 'profile_url'"),
                 },
             }
         ]
@@ -2363,8 +2386,7 @@ def mastodon_post_likes(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "event_type": "tool-run-error",
                 "payload": {
                     "reason": (
-                        "post_url must look like https://<instance>/@<user>/<id> "
-                        "or .../notice/<id>"
+                        "post_url must look like https://<instance>/@<user>/<id> or .../notice/<id>"
                     ),
                     "got": post_url,
                 },
@@ -2648,12 +2670,9 @@ def inside_airbnb_listings(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
                 matched = False
                 if (
-                    host_id
-                    and row_host_id == host_id
-                    or listing_id
-                    and row_listing_id == listing_id
-                    or host_name
-                    and host_name in row_host_name
+                    (host_id and row_host_id == host_id)
+                    or (listing_id and row_listing_id == listing_id)
+                    or (host_name and host_name in row_host_name)
                 ):
                     matched = True
 
@@ -3228,7 +3247,7 @@ else:
         synthetic_mode=_true_people_synthetic,
         in_process=True,
         description=(
-            "TruePeopleSearch -- empirical venv or wrapper missing; " "in-process stub only."
+            "TruePeopleSearch -- empirical venv or wrapper missing; in-process stub only."
         ),
     )
 
@@ -3285,8 +3304,7 @@ for _social_id, _social_dir in (
             ),
             in_process=False,
             description=(
-                f"{_social_id} -- public bio + counts via Scrapling "
-                "(no login, no follower-list)."
+                f"{_social_id} -- public bio + counts via Scrapling (no login, no follower-list)."
             ),
         )
 

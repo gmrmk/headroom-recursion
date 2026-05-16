@@ -168,3 +168,34 @@ export const BUCKET_COLOR: Record<VerdictBucket, string> = {
   "low-footprint": "#fbbf24",
   mixed: "#60a5fa",
 };
+
+// Business-impact translation layer -- methodology §31.3 risk-translation
+// matrix applied to our verdict buckets. Adopted 2026-05-12 (Margaret
+// Phase 1 doctrine, Mei-Lan ownership). The technical `why` line is for
+// the investigator's mental model; this layer is what they'd tell a
+// stakeholder who doesn't speak OSINT.
+const BUCKET_BUSINESS_IMPACT: Record<VerdictBucket, string> = {
+  "compromised-real":
+    "This is a real person whose account has been compromised. Stolen credentials may be in active use; messages from this host could be the attacker, not the owner. Treat any urgent or unusual asks with extra scrutiny.",
+  "real-careful":
+    "This appears to be a real person managing their own digital footprint deliberately. No compromise signals; identity is consistent across sources. Normal counterparty-risk posture is appropriate.",
+  "real-active":
+    "This is a real person with a large, active online presence. Many surfaces means more attack surface, but no specific compromise signal. Standard hygiene applies.",
+  "suspicious-churn":
+    "Identity signals are thin while compromise signals are present. Pattern is consistent with a compromised, impersonated, or fabricated account. Defer high-trust actions until corroborated by a second channel (video call, in-person, known-good contact).",
+  "low-footprint":
+    "Almost no digital trail in any source we checked. Could be a deliberately private real person OR a fabricated identity. Verify through a non-digital channel before extending trust.",
+  mixed:
+    "Signals don't fit a clean pattern. Treat as inconclusive; gather one more independent data point before deciding.",
+};
+
+/**
+ * Plain-language business-impact translation of a verdict bucket.
+ *
+ * Adopted from osint-methodology §31.3 (risk-translation matrix). The
+ * verdict's `why` line is the technical reasoning; this is what to tell
+ * someone who needs the consequence, not the analysis.
+ */
+export function businessImpactForVerdict(verdict: Verdict): string {
+  return BUCKET_BUSINESS_IMPACT[verdict.bucket];
+}

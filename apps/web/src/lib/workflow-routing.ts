@@ -15,6 +15,7 @@
 //   - W5.do      domain timeline     requires: domain
 //   - W1.un      username dossier    requires: username
 //   - W4.im      image OSINT         requires: photo_url (when no address)
+//   - W13.dk     dork sweep          requires: any of host_name/email/phone/domain/username/address
 //
 // Note: W9.pv is the umbrella for property-vetting. If address +
 // photo_url are both provided, run W9.pv (which internally covers the
@@ -142,6 +143,38 @@ export function routeWorkflows(
       label: "Username Dossier",
       seed: { username },
       why: "Maigret + Twitter/GitHub/Bluesky social fan-out",
+    });
+  }
+
+  // Dork sweep — open-web acquisition across DDG (keyless) + Brave +
+  // Serper (env-gated). Fires whenever ANY identifier seed is present;
+  // each template inside the adapter independently skips when its
+  // required seed keys are absent. The dork corpus is tuned for
+  // property-vetting (paste leaks, social presence, file-type exposure,
+  // rental-platform mentions, etc.). Naomi gate: queries never logged.
+  const dorkSeedKeys: ReadonlyArray<[keyof InvestigationFields, string]> = [
+    ["host_name", host_name],
+    ["email", email],
+    ["phone", phone],
+    ["domain", domain],
+    ["username", username],
+    ["address", address],
+  ];
+  const dorkFilled = dorkSeedKeys.filter(([, v]) => nonempty(v));
+  if (dorkFilled.length > 0) {
+    out.push({
+      id: "w13.dk",
+      label: "Dork Sweep (open-web)",
+      // The workflow template uses {name} not {host_name}; map host_name -> name.
+      seed: {
+        name: host_name,
+        email,
+        phone,
+        domain,
+        username,
+        address,
+      },
+      why: `Multi-engine open-web sweep across ${dorkFilled.length} identifier${dorkFilled.length === 1 ? "" : "s"}: paste leaks, file exposure, social presence, rental-platform mentions`,
     });
   }
 

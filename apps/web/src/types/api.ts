@@ -46,7 +46,20 @@ export type InvestigationEventType =
   | "listing-match"
   | "person-match"
   | "breach-hit"
-  | "image-match";
+  | "image-match"
+  // W5.do + W12.id identity-fabric adapters (Tomás Phase 2, 2026-05-12).
+  // Keep in sync with InvestigationEvent.event_type Literal in
+  // apps/api/src/osint_goblin_api/models.py -- the SSE bridge drops any
+  // event whose type isn't in BOTH lists.
+  | "tenant-match"
+  | "infra-fact"
+  | "email-posture"
+  | "sso-discovery"
+  // W13.dk dork-sweep adapters (Phase 5, 2026-05-12).
+  | "dork-hit"
+  // W4-SUB-BRAND wave-4 §4 (Tomás highest-ROI, 2026-05-12):
+  // verification sub-brand mention -> inferred platform/vendor floor.
+  | "platform_verification_floor";
 
 export interface InvestigationEvent {
   event_type: InvestigationEventType;

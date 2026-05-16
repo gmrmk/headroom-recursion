@@ -4,7 +4,10 @@
 # in the global registry. Must run before tool_runner is imported so
 # that dispatches against the new adapter ids resolve.
 from . import (
+    adapters_badges,  # noqa: F401  (W4-SUB-BRAND wave-4 §4, 2026-05-12)
     adapters_domain,  # noqa: F401
+    adapters_dork,  # noqa: F401  (W13.dk Phase 5, 2026-05-12)
+    adapters_identity,  # noqa: F401  (W12.id Phase 2, 2026-05-12)
     adapters_image,  # noqa: F401
     adapters_ip,  # noqa: F401
     adapters_phone,  # noqa: F401

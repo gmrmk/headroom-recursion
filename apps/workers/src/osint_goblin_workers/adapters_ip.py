@@ -24,9 +24,14 @@ from typing import Any
 
 import httpx
 
+from ._ua import default_ua
 from .adapters import get_registry
 
-_DEFAULT_UA = "osint-goblin/0.1 (https://github.com/local; personal-investigator)"
+# W4-UA (Margaret wave-4 roadmap §3): default UA is now Chrome-on-Win11
+# so a target webserver's access logs don't attribute probes back to
+# the operator. OSINT_TRANSPARENT_UA=1 restores the osint-goblin literal.
+# OSINT_USER_AGENT still wins if explicitly set (lets ops pin any string).
+_DEFAULT_UA = default_ua()
 _USER_AGENT = os.environ.get("OSINT_USER_AGENT", _DEFAULT_UA)
 
 
@@ -386,14 +391,17 @@ def ip_reputation(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """
     api_key = os.environ.get("OSINT_ABUSEIPDB_KEY", "").strip()
     if not api_key:
+        # Missing optional API key isn't an adapter failure -- emit a
+        # result-shaped skip so the dossier doesn't log it as an error.
         return [
             {
-                "event_type": "tool-run-error",
+                "event_type": "tool-run-result",
                 "payload": {
+                    "adapter_id": "ip_reputation",
+                    "skipped": True,
                     "reason": "AbuseIPDB API key not set",
                     "suggest": (
-                        "Sign up free at abuseipdb.com (1000/day); set "
-                        "OSINT_ABUSEIPDB_KEY env var"
+                        "Sign up free at abuseipdb.com (1000/day); set OSINT_ABUSEIPDB_KEY env var"
                     ),
                 },
             }
