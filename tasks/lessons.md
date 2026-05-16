@@ -178,3 +178,39 @@ EOF
 **Self-rule:** when a hook injects an instruction (PreToolUse / PostToolUse / SessionStart system reminders), treat it as a user-given directive, not a suggestion. Dispatch the named agent / run the named command immediately. The hook configuration is durable user intent.
 
 **Trigger phrase:** "hook says dispatch X" → "dispatch X now, in background if it's not blocking, foreground if it gates the next step."
+
+---
+
+## 2026-05-16 — Synthetic fixtures lie about modern Next.js/RSC platforms
+
+**Context:** four bespoke parsers (VRBO, TripAdvisor, Yanolja, Leboncoin) were authored against synthetic fixtures matching the documented schema.org / `__NEXT_DATA__` shapes for each platform. All 4 tests passed. The user asked "Will that work" and I had to live-pressure-test before answering. VRBO came back clean (the parser's documented gaps matched reality). Yanolja came back broken: the platform migrated to Next.js App-Router RSC streaming chunks (`self.__next_f.push(...)`) and no longer ships Hotel/LodgingBusiness JSON-LD at all — the synthetic fixture was authored against a layout the live URL hadn't served in months.
+
+**Self-rule:** synthetic fixtures encode a SPECIFIC point-in-time understanding of a platform's HTML shape. They are NOT evidence that the parser handles the LIVE platform. For any platform that uses a modern JS framework (Next.js, Remix, Nuxt, Astro), live-pressure-test BEFORE the parser ships, not after. If you can't fetch a live body during development (anti-bot wall), document that and ship the parser with an explicit "unverified-against-live" flag in its docstring + a tracking issue.
+
+**Why:** CLAUDE.md `## Verification before done`: "Never mark a task complete without demonstrably proving that it works." Synthetic fixtures = proof of "the parser is internally consistent with my mental model of the platform." Live bodies = proof of "the parser actually works." The gap between those is where bugs hide.
+
+**Trigger phrase:** when writing a new bespoke parser for a platform using a JS framework, the prompt for me reflexively becomes "have I fetched ONE real body for this platform yet?" If no, don't mark the work shipped.
+
+---
+
+## 2026-05-16 — Vendor-map labels need empirical re-verification
+
+**Context:** `humanize.py PLATFORM_ANTIBOT_MAP` had `"leboncoin": "didomi-only"` meaning patchright was the recommended fetch tier. Live pressure-test 2026-05-16 showed all three Playwright tiers + zendriver getting 403 from public leboncoin URLs — the live edge is DataDome. The "didomi-only" label was either wrong from the start or outdated (DataDome rolled out after the original mapping). Without live testing, the routing was silently wrong and every leboncoin investigation would hit 403.
+
+**Self-rule:** any vendor-map label that classifies a platform's anti-bot tier MUST be verifiable with a recent timestamped probe. Stale labels rot silently. Build a periodic probe job (in `tools/dev/pressure-test-tiers.py`) that runs against the whole map and flags drift. Run it quarterly minimum; before any significant new sprint.
+
+**Why:** routing decisions cascade — wrong vendor label → wrong tier → wasted proxy budget + 403 cluster → false "platform is blocked" diagnosis. The cost of stale map labels is investigation hours, not just code quality.
+
+**Trigger phrase:** before relying on a `PLATFORM_ANTIBOT_MAP` entry that hasn't been touched in 90+ days, the prompt for me reflexively becomes "run the tier probe against this platform first; treat the map as a hypothesis until confirmed."
+
+---
+
+## 2026-05-16 — User-confirmed cookie-injection path is durable evidence
+
+**Context:** the pressure-test report concluded leboncoin was DataDome-blocked across all browser tiers, with cookie-injection as the documented-but-unexercised operator path. The user replied "You can use the cookies with Leboncoin I did it" — empirical confirmation that the cookie-injection path actually works for that platform.
+
+**Self-rule:** when the user reports a successful manual operator path that contradicts the test report's "blocked" verdict, treat their report as authoritative. Update the documentation (docstring + map comment) to record the working path, AND add a regression test if the path is deterministic enough to test (it usually isn't — cookies expire — so usually just docstring update).
+
+**Why:** the cookie-injection path is built specifically for cases where automated tiers fail. A "blocked across all tiers" finding is the EXPECTED state for cookie-injection-required platforms; that's WHY the feature exists. Not flagging the manual path in docs is the bug, not the blocked tiers.
+
+**Trigger phrase:** when seeing "blocked across all browser tiers" in a pressure-test report, the prompt for me reflexively becomes "is this a cookie-injection-required platform? document it explicitly so the investigator knows the manual path exists."

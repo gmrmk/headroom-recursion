@@ -1,6 +1,6 @@
 # tasks/todos.md
 
-## ACTIVE: Sprint — Stabilize + Verify (resumed 2026-05-16)
+## COMPLETED: Sprint — Stabilize + Verify (2026-05-16, closed same day)
 
 **Trigger:** Last session shipped ~3000 LOC across 8 modified + 20+ untracked files
 without intermediate commits. Memory snapshot of "424 pass, 1 skip" describes work
@@ -79,6 +79,41 @@ bodies. Then move on with a clean tree.
 | Real body exposes schema drift on all 3 parsers simultaneously | Patch one at a time, pin each real body as fixture; don't try to make one giant generic fix |
 | Test failure mid-commit-chain because of cross-file coupling | Run pytest after each commit; if red, stop and split the offending commit further |
 | Subagent commit-grouping proposal misclassifies a file | User checkpoint after subagent returns; adjust before execution |
+
+---
+
+### Review section (CLAUDE.md task-management step 5)
+
+**Outcome (2026-05-16):**
+
+- 17 commits landed across the chain (planned 14; +3 from Step E/F + Step G).
+- Tests: started 424 pass / 1 skip on dirty tree; ended 428 pass / 1 skip
+  after adding 4 regression tests covering the leboncoin map drift + the
+  Yanolja RSC-shell skip path.
+- Working tree clean. The documented Ship-10 verify gap (4 new parsers
+  untested against live bodies) is now closed:
+  - **VRBO**: PASS. 4 satisfied / 1 partial / 2 platform-design-empty.
+  - **TripAdvisor**: BLOCKED (zendriver 403 on the Ritz London URL).
+    Likely URL-specific; revisit with a less-famous listing.
+  - **Yanolja**: FAIL → fixed. Pages now ship as Next.js App-Router RSC
+    shells (only Organization JSON-LD). Parser emits `_skipped=True`
+    rather than near-empty listing-data. RSC-chunk decoder = future ship.
+  - **Leboncoin**: BLOCKED → vendor map drift identified + fixed.
+    `PLATFORM_ANTIBOT_MAP` updated from "didomi-only" to "datadome";
+    cookie-injection is the documented operator path.
+- 3 new lessons captured: bash HEREDOC for multi-line git commit -m,
+  verify-after-commit non-negotiable, hook reminders are user-given
+  protocol.
+- 1 user-given product directive captured as DEFERRED phase: pre-release
+  scrub of persona names + AI-flair before public GitHub upload.
+
+**What's now queued:**
+1. Identity Triangulation sprint (5-source IP consensus + Google Reviews
+   + NER + photo PV + temporal pattern + Google Maps popout)
+2. Operator OPSEC Hardening sprint (hard passthru + browser disk-cache
+   lockdown + humanized-captcha routing slider + 404-emoji dead-link
+   indicator + VM run-target + log scrubber + network egress audit +
+   burn-rate + ToS pre-flight + consent attestation)
 
 ---
 
@@ -305,6 +340,163 @@ split (investigator review prompt).
 | Source disagreement (e.g. one says VPN, others say residential) | `consensus_strength` surfaces the split rather than forcing one answer |
 | Investigator pastes email headers from a victim, not target | Document the consent model; never assume the paster is the source |
 | Reference databases become stale | Refresh cadence in `make ip-refdata`; staleness warning in card if last refresh > 30 days |
+
+---
+
+## QUEUED AFTER ID SPRINT: Operator OPSEC Hardening
+
+**Status:** plan only; kicks off after the Identity Triangulation sprint
+closes. The ID sprint introduces new target-data surfaces (IPs, review
+text, photos) that need the hardened sandbox in place around them.
+
+**Trigger sequence (2026-05-16):**
+- "Is there anything I can do to harden security for the user, I dont
+  want their real IP getting out and then theyre in trouble because
+  Scrapling made someone really mad by scraping something, thats why
+  I dont want the files or the shit at all, its a passthru system, how
+  do I make sure the files never even touch my hard drive"
+- "Id like to run this software on a VM as well"
+- "Sometimes a link will 404, still supply the linked URL but a little
+  emoji next to it that says it 404'd"
+- (on the routing-mode UI) "Its a slider you click and drag" +
+  "It starts oriented left, on the button itself you have to hold it
+  down and move it to the right in a humanized way until it reaches
+  the far right orientation" + "Thats it, thats literally the captcha"
+
+### Vision
+
+The investigator's threat model has three vectors:
+1. Their real IP leaking to scraped sites (Scrapling activity → angry
+   site → retaliation chain → investigator gets in trouble).
+2. Target data touching the investigator's hard drive (image bytes,
+   HTML bodies, IPs, logs).
+3. Anti-bot detection escalating into ToS-violation territory.
+
+This sprint hardens against all three with five layers + a VM target.
+
+### Phases
+
+#### Phase 1 — Hard passthru mode (architectural flagship)
+- `apps/workers/src/osint_goblin_workers/passthru.py`: runtime guard
+  module that monkey-patches `builtins.open`, `pathlib.Path.write_*`,
+  `os.write` at worker startup. Any write outside the whitelist
+  (`%TEMP%/osint-goblin-<random>/`, `data/reference/`) raises
+  `PassthruViolationError`.
+- Default-on in production (`OSINT_PASSTHRU=1`); explicit opt-out for
+  dev (`OSINT_PASSTHRU=0`).
+- CI test: monkey-patches the test runner to launch a worker, dispatch
+  a synthetic adapter that tries to write to `data/`, and assert the
+  violation is raised.
+
+#### Phase 2 — Browser tier disk-cache lockdown + log scrubber
+- Each Playwright/Patchright/zendriver tier launched with
+  `--disk-cache-size=1 --media-cache-size=1`, per-fetch random tempdir,
+  and atexit cleanup. Audit existing humanize.py; tighten any gaps.
+- Log scrubber: audit ALL log emitters (Dramatiq, Playwright stderr,
+  zendriver stderr, uvicorn-access, app-level logger) and gate them
+  through a `_scrub()` that strips URLs, IPs, emails, names in
+  production mode. Dev-mode opt-in via `OSINT_DEV=1`.
+
+#### Phase 3 — Network egress audit + DNS leak prevention
+- CI test that monkey-patches `socket.connect` and asserts every
+  connection goes via the configured proxy when one is set. Catches
+  any new adapter that bypasses the proxy.
+- Force DNS-over-HTTPS via httpx + ban system resolver in the worker
+  process. Even with Tor mode on, the OS resolver previously leaked
+  A-record lookups; close that hole.
+- Surface the proxy + DNS state in the dashboard sidebar.
+
+#### Phase 4 — Routing-mode UI: the "humanized captcha" slider
+- `apps/web/src/components/routing-slider.tsx`:
+  - Visual: horizontal track, button starts at far-left ("BARE — your
+    real IP", red).
+  - Mechanic: investigator MUST hold pointer down on the button and
+    drag rightward in a humanized motion (non-linear velocity, natural
+    pauses/wobble). Pure straight-line slides at constant velocity
+    fail the bot-vs-human heuristic and the button snaps back.
+  - End states (left to right): BARE (red) → Tor (yellow) → Residential
+    proxy (green) → Tor + Residential chain (dark green, max).
+  - Symbolism: the same anti-bot CAPTCHA gesture the investigator is
+    trying to defeat on target sites, used here as the affirmative-
+    consent gate for their own OPSEC level. Friction by design.
+  - On reach far-right: lock + confirmation toast "Routing: maximum.
+    All worker traffic now egress-locked to <tier>".
+- Routing state persists in-memory only; never on disk.
+
+#### Phase 5 — Anti-bot retaliation safeguards
+- Burn-rate dashboard: per-platform rate counters with daily caps
+  (LinkedIn <50/day documented; others empirical). UI warns at 80% cap.
+- Pre-flight ToS check: lookup-table of platforms known to litigate
+  scrapers (LinkedIn, Meta). Warn investigator at first-fetch with a
+  modal: "this platform has retaliated against scrapers before; your
+  lawful basis: ___".
+- Burnt-IP backoff: any tier returning 403/429 auto-disables that
+  platform for the rest of the investigation session. No retry spam.
+
+#### Phase 6 — Dead-link indicator
+- `lib/link-check.ts`: background pass that HEAD-requests every URL
+  surfaced in the dossier and tags status.
+- Dossier rendering: dead links still display the URL (preserve the
+  evidentiary trail) but with a status emoji next to them:
+  - 200 OK: no marker
+  - 3xx redirect: tiny ↪
+  - 404 / 410: 🚫 (gone)
+  - 403 / 401: 🔒 (locked)
+  - 5xx / timeout: ⚠ (server problem)
+- Tooltip on the emoji explains the status + last-checked timestamp.
+- The check runs through the routing slider's configured proxy (same
+  egress) so it doesn't deanonymize the investigator.
+
+#### Phase 7 — VM run-target + deployment recipes
+- `infra/vagrant/`: Vagrantfile + provisioning script for a Debian
+  LTS VM with:
+  - All deps pre-installed (uv + pnpm + Playwright browsers + spaCy
+    model + IP refdata)
+  - tmpfs-mounted /tmp (RAM-backed; browser tempdirs never on disk)
+  - Encrypted root (LUKS) — investigator sets passphrase at first boot
+  - VPN client pre-installed (WireGuard); investigator BYO config
+  - Snapshot-restore baseline (vagrant snapshot save baseline)
+- `infra/docker/passthru/`: alternative Docker Compose stack with
+  `--network=none` worker + proxy egress sidecar (Tor or BYO WireGuard).
+- Documentation in README: "Recommended deployment shapes":
+  1. Direct on dev machine (default, friction-warned)
+  2. WSL2 with a dedicated VPN profile (Win11-native middle ground)
+  3. Vagrant VM (recommended for serious recon)
+  4. Whonix Workstation (maximum anonymity, advanced)
+
+#### Phase 8 — Consent attestation + accountability log
+- Investigator types a one-liner before each investigation: "lawful
+  basis: ___". Common examples surfaced as one-click chips: "GDPR
+  Art.6(1)(f) legitimate interests — fraud detection", "consent of
+  the data subject (paste link to consent record)".
+- Attestation stored in-memory only (Naomi-strict), surfaced in the
+  static HTML export as visible accountability evidence.
+- Counts as the consent receipt the investigator can show their legal
+  team without ever having held target data.
+
+### Definition of done
+
+- Passthru mode default-on; CI test catches any code path writing
+  outside the whitelist.
+- Browser tiers verified to leave zero artifacts on disk after a fetch
+  (tested via filesystem watcher in a CI integration test).
+- Network egress audit catches a deliberately-misrouted test adapter.
+- Routing slider lands as the only entrypoint to changing routing mode;
+  pure-velocity drags fail the humanization gate.
+- Dead-link indicator surfaces in both UI and static export.
+- Vagrant VM target boots, runs the full smoke test, and snapshot-
+  restore drops every trace.
+- Consent attestation lives in every investigation export.
+
+### Risk audit
+
+| Risk | Mitigation |
+|---|---|
+| Passthru mode breaks legitimate framework writes (Playwright extracts) | Whitelist all known framework tempdir patterns; failing-loud is acceptable during initial rollout |
+| Routing slider feels gimmicky / annoying | Single one-time interaction per investigation; the friction IS the point |
+| VM target adds complexity for casual users | Default-direct-machine path stays supported, just warned; VM is "recommended" not required |
+| DoH-forced DNS breaks in restrictive corporate networks | Env override `OSINT_DOH_DISABLE=1` for these cases; warn loudly when enabled |
+| Dead-link checker generates extra noise traffic | Throttle + cache; respect the routing slider's egress; investigator can disable per-investigation |
 
 ---
 
