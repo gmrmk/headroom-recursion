@@ -2042,13 +2042,24 @@ def extract_yanolja(html_body: str, listing_url: str) -> dict[str, Any]:
 
     Strategy: same schema.org pattern as TripAdvisor + Booking. The
     Korean market uses 0-5 rating scale (matching schema.org default,
-    NOT Booking's 0-10). Yanolja's JSON-LD typically ships Hotel +
-    LodgingBusiness; older pages may use Place.
+    NOT Booking's 0-10).
+
+    Live pressure-test 2026-05-16 revealed Yanolja /places/<id> pages
+    now ship as Next.js App-Router RSC shells with only Organization
+    JSON-LD (the parent Yanolja brand, not the listing). The real
+    listing data is streamed in `self.__next_f.push([1, "<chunk>"])`
+    blocks that need an RSC chunk decoder to reassemble.
+
+    Until that decoder ships (future Ship), this parser returns
+    `_skipped=True` with a reason when no Hotel/LodgingBusiness/Place
+    JSON-LD is present, rather than emitting a near-empty
+    `listing-data` event that would mislead the dossier.
     """
     blocks = extract_jsonld_blocks(html_body)
     products = _walk_jsonld(
         blocks, ("Hotel", "LodgingBusiness", "Place", "VacationRental", "Product")
     )
+    rsc_shell = not products
     primary = products[0] if products else {}
 
     title = primary.get("name") or ""
@@ -2148,8 +2159,17 @@ def extract_yanolja(html_body: str, listing_url: str) -> dict[str, Any]:
         "property_type": primary.get("@type") or "",
         "currency": "KRW",  # Yanolja is KR-only
         "nightly_price": None,
-        "extraction_tier": "json-ld" if products else "dom",
+        "extraction_tier": "json-ld" if products else "rsc-shell-skipped",
         "raw_jsonld_count": len(blocks),
+        "_skipped": rsc_shell,
+        "_skip_reason": "yanolja-rsc-shell-no-jsonld" if rsc_shell else "",
+        "_skip_detail": (
+            "Page is a Next.js App-Router RSC shell; no Hotel/LodgingBusiness/"
+            "Place JSON-LD present. The real listing data lives in streamed RSC "
+            "chunks that need a dedicated decoder (future ship)."
+        )
+        if rsc_shell
+        else "",
     }
 
 

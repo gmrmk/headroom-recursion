@@ -20,6 +20,7 @@ from osint_goblin_workers.adapters_listing import (
     extract_generic_jsonld,
     extract_jsonld_blocks,
     extract_vrbo,
+    extract_yanolja,
     listing_scrape,
     review_owner_mention_scan,
 )
@@ -940,3 +941,59 @@ class TestListingPhotoPivotSummaries:
         # since that's the contract the dossier UI consumes.
         result = next(e for e in events if e["event_type"] == "tool-run-result")
         assert "investigation_id" not in result["payload"]
+
+
+class TestYanoljaRSCShellSkip:
+    """Yanolja /places/<id> pages serve as Next.js App-Router RSC shells
+    (live pressure-test 2026-05-16): only Organization-typed JSON-LD
+    (parent Yanolja brand), no Hotel/LodgingBusiness/Place. The parser
+    must emit `_skipped=True` rather than near-empty listing-data."""
+
+    _RSC_SHELL_BODY = """<html><head>
+        <title>NOL | wow</title>
+        <script type="application/ld+json">
+        {"@context": "https://schema.org", "@type": "Organization",
+         "name": "Yanolja", "url": "https://www.yanolja.com"}
+        </script>
+        </head><body>
+        <script>self.__next_f.push([1, "0:[\\"$\\",\\"$L1\\",null,{}]"])</script>
+        </body></html>"""
+
+    _LEGACY_HOTEL_BODY = """<html><head>
+        <script type="application/ld+json">
+        {"@context": "https://schema.org", "@type": "Hotel",
+         "name": "Test Hotel", "address": {"@type": "PostalAddress",
+         "addressLocality": "Seoul", "addressCountry": "KR"}}
+        </script></head><body></body></html>"""
+
+    def test_rsc_shell_returns_skipped_true(self):
+        out = extract_yanolja(self._RSC_SHELL_BODY, "https://www.yanolja.com/places/12345")
+        assert out["_skipped"] is True
+        assert out["_skip_reason"] == "yanolja-rsc-shell-no-jsonld"
+        assert "Next.js App-Router RSC shell" in out["_skip_detail"]
+        assert out["extraction_tier"] == "rsc-shell-skipped"
+
+    def test_rsc_shell_still_returns_listing_id_from_url(self):
+        # listing_id is URL-derived; survives the RSC-shell skip path.
+        out = extract_yanolja(self._RSC_SHELL_BODY, "https://www.yanolja.com/places/3000034028")
+        assert out["listing_id"] == "3000034028"
+
+    def test_rsc_shell_preserves_normalized_contract_shape(self):
+        # Naomi-strict: callers iterating the dict must NOT receive a
+        # different shape on the skip path. All cross-platform contract
+        # keys present with empty defaults; the `_skipped` flag is the
+        # signal, not a shape change.
+        out = extract_yanolja(self._RSC_SHELL_BODY, "https://www.yanolja.com/places/x")
+        for k in ("title", "host_name", "city", "country", "photo_urls", "currency"):
+            assert k in out
+
+    def test_legacy_hotel_jsonld_does_not_skip(self):
+        # Older Yanolja layouts (and the synthetic test fixtures) DO
+        # ship Hotel JSON-LD. Those must still parse normally.
+        out = extract_yanolja(self._LEGACY_HOTEL_BODY, "https://www.yanolja.com/places/12345")
+        assert out["_skipped"] is False
+        assert out["_skip_reason"] == ""
+        assert out["title"] == "Test Hotel"
+        assert out["city"] == "Seoul"
+        assert out["country"] == "KR"
+        assert out["extraction_tier"] == "json-ld"

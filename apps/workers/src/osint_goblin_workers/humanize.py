@@ -334,7 +334,10 @@ PLATFORM_ANTIBOT_MAP: dict[str, str] = {
     "agoda": "akamai-bma",
     # Regional / low-friction
     "yanolja": "none",  # KR; no observed anti-bot
-    "leboncoin": "didomi-only",  # FR; cookie banner only
+    # FR; DataDome confirmed via live pressure-test 2026-05-16
+    # (all 3 Playwright tiers + zendriver got 403 on public listing URLs;
+    # cookie-injection is the documented operator path).
+    "leboncoin": "datadome",
     "hipcamp": "none",  # US camping; minimal anti-bot
     "couchsurfing": "none",
     "homestay": "none",

@@ -229,8 +229,11 @@ class TestAntiBotVendorMap:
     def test_none_for_yanolja(self):
         assert get_antibot_vendor("yanolja") == "none"
 
-    def test_didomi_for_leboncoin(self):
-        assert get_antibot_vendor("leboncoin") == "didomi-only"
+    def test_datadome_for_leboncoin(self):
+        # Pressure-test 2026-05-16: patchright/camoufox/zendriver all
+        # returned 403 from public leboncoin listing URLs. The map
+        # previously claimed "didomi-only" but the live edge is DataDome.
+        assert get_antibot_vendor("leboncoin") == "datadome"
 
     def test_unknown_for_unmapped_platform(self):
         assert get_antibot_vendor("definitely-not-a-platform") == "unknown"
@@ -270,7 +273,12 @@ class TestRecommendedTier:
     def test_no_antibot_recommends_patchright(self):
         # Cheap tier for cheap platforms.
         assert recommended_tier_for_platform("yanolja") == "patchright"
-        assert recommended_tier_for_platform("leboncoin") == "patchright"
+
+    def test_datadome_routes_leboncoin_to_zendriver(self):
+        # Pressure-test 2026-05-16: leboncoin live edge serves DataDome
+        # across all three Playwright tiers; vendor map updated from
+        # "didomi-only" -> "datadome" so the dispatcher routes correctly.
+        assert recommended_tier_for_platform("leboncoin") == "zendriver"
 
     def test_unknown_falls_back_to_patchright(self):
         assert recommended_tier_for_platform("never-heard-of-it") == "patchright"
