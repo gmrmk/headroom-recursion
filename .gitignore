@@ -34,3 +34,27 @@ Thumbs.db
 # ../osint-dashboard-research/phase6/; this directory exists for
 # VSCode internal link convenience and should not be committed.
 docs/margaret/
+
+# Claude Code project-local state (agent memory + workspace settings)
+.claude/
+
+# graphify tool outputs -- regeneratable from current tree
+graphify-out/
+.graphify_ast.json
+.graphify_detect.json
+.graphify_uncached.txt
+
+# Playwright e2e run artifacts (screenshots, traces, videos)
+apps/web/test-results/
+
+# TS incremental-build caches -- not source state
+*.tsbuildinfo
+
+# Probe HTML captures + body-fixture dirs under tools/dev -- throwaway
+# empirical state behind the zendriver/DataDome routing decisions;
+# the durable record is in tasks/lessons.md + the ADRs.
+tools/dev/*.html
+tools/dev/bypass-probe-bodies/
+tools/dev/image-pipeline-bodies/
+tools/dev/listing-failure-bodies/
+tools/dev/tier-pressure-bodies/
