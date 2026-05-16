@@ -2496,6 +2496,440 @@ def listing_scrape(payload: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+# ===========================================================================
+# listing_photo_pivot -- recursive photo fan-out for fraud detection
+# ===========================================================================
+#
+# Per user directive 2026-05-16: "automatically search the photos on found
+# listings that are a positive match to find more links".
+#
+# Why this matters (PV thesis):
+#   Short-stay fraud routinely uses photos scraped from one legitimate
+#   listing on Vrbo / Booking / regional portals and reposts them as a
+#   fake listing somewhere else. A simple one-shot reverse-image search
+#   only finds the first generation of duplication. A recursive search
+#   finds the *cluster*: every listing across every platform that
+#   shares these photos. That cluster is the load-bearing fraud signal.
+#
+# Algorithm (BFS, depth-bounded per ROADMAP Ship 7 "2-hop bound"):
+#   Hop 0  Extract photos from the seed listing.
+#   Hop N  For each photo in the current frontier:
+#            - reverse_image_aggregator -> matched URLs
+#            - filter to detect_platform-recognized URLs only (skip blogs,
+#              news, social -- out of scope for listing-fraud)
+#            - dedupe via visited_listings set
+#            - listing_scrape each new URL -> extract its photos
+#            - those photos form the next-hop frontier
+#   Stop:  depth >= max_depth (default 2) OR
+#          total_listings_visited >= max_total_listings (default 20) OR
+#          frontier empty.
+#
+# Output: graph of (listing_url, hop, photos[], parent_match_url) plus a
+# photo-cluster summary keyed by canonical match URL. The dossier UI
+# renders this as a directed graph: same-photo edges between listings.
+#
+# Naomi gate: no target URLs persisted to disk. visited_listings is
+# in-memory only and dropped when the function returns.
+
+
+def listing_photo_pivot(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Recursive photo-fan-out to find cross-platform listing duplicates.
+
+    Payload:
+      listing_url       (required) seed listing URL
+      max_depth         (optional, default 2) BFS depth cap
+      max_photos_per_hop (optional, default 5) photos searched per listing
+      max_total_listings (optional, default 20) total visited cap
+      investigation_id  (optional) -- propagated to listing_scrape calls
+
+    Emits:
+      listing-data       per visited listing (from listing_scrape)
+      photo-match        per (photo, match_url) pair
+      pivot-discovered   per newly-found listing at hop >= 1
+      tool-run-result    summary: hops_run, listings_visited, total_photo_matches
+
+    Returns events list (per OSINT-goblin adapter convention).
+    """
+    from .adapters_image import reverse_image_aggregator
+
+    listing_url = (payload.get("listing_url") or "").strip()
+    if not listing_url:
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "adapter_id": "listing_photo_pivot",
+                    "skipped": True,
+                    "reason": "no listing_url provided",
+                },
+            }
+        ]
+
+    max_depth = int(payload.get("max_depth", 2))
+    max_photos_per_hop = int(payload.get("max_photos_per_hop", 5))
+    max_total_listings = int(payload.get("max_total_listings", 20))
+    investigation_id = (payload.get("investigation_id") or "default").strip() or "default"
+
+    events: list[dict[str, Any]] = []
+    # visited canonical URLs -- BFS cycle break + budget guard.
+    visited: set[str] = set()
+    # frontier: list of (listing_url, parent_match_url_or_None, hop)
+    frontier: list[tuple[str, str | None, int]] = [(listing_url, None, 0)]
+    total_photo_matches = 0
+    hops_run = 0
+
+    # Per-listing match table: keyed by listing_url, value is a list of
+    # {photo_url, matched_urls: [{url, engine, host}, ...]} entries.
+    # Used at the end to emit per-listing-match-summary events.
+    listing_matches: dict[str, dict[str, Any]] = {}
+    # Per-photo cluster table: source_photo_url -> aggregated info for
+    # the terminal photo-match-cluster event. Photos with matches across
+    # >=2 distinct hosts are the load-bearing fraud signal.
+    photo_clusters: dict[str, dict[str, Any]] = {}
+
+    while frontier and len(visited) < max_total_listings:
+        next_frontier: list[tuple[str, str | None, int]] = []
+        for current_url, parent_match, hop in frontier:
+            canonical = current_url.split("?")[0].rstrip("/").lower()
+            if canonical in visited:
+                continue
+            visited.add(canonical)
+            if len(visited) > max_total_listings:
+                break
+
+            # Fetch + parse the current listing.
+            scrape_events = listing_scrape(
+                {"listing_url": current_url, "investigation_id": investigation_id}
+            )
+            listing_data: dict[str, Any] = {}
+            for ev in scrape_events:
+                if ev.get("event_type") == "listing-data":
+                    listing_data = ev.get("payload") or {}
+                    # Decorate with hop metadata for graph rendering.
+                    listing_data = {
+                        **listing_data,
+                        "hop_depth": hop,
+                        "parent_match_url": parent_match,
+                    }
+                    events.append({"event_type": "listing-data", "payload": listing_data})
+                elif ev.get("event_type") == "pivot-discovered":
+                    events.append(ev)
+
+            # Initialize per-listing match bucket (even if 0 matches -- we
+            # want a summary entry per visited listing).
+            listing_matches[current_url] = {
+                "listing_url": current_url,
+                "platform": listing_data.get("platform", "unknown"),
+                "title": listing_data.get("title", ""),
+                "hop_depth": hop,
+                "photos_searched": 0,
+                "photo_matches": [],
+            }
+
+            if hop >= max_depth:
+                continue  # leaf: visited + extracted but don't fan out further
+
+            photo_urls = listing_data.get("photo_urls", [])[:max_photos_per_hop]
+            listing_matches[current_url]["photos_searched"] = len(photo_urls)
+            for photo_url in photo_urls:
+                # Reverse-image-search this photo. Live mode by default
+                # (set OSINT_ADAPTER_MODE=synthetic to short-circuit in tests).
+                ria_events = reverse_image_aggregator({"image_url": photo_url})
+                photo_matched_urls: list[dict[str, Any]] = []
+                for ev in ria_events:
+                    if ev.get("event_type") != "image-match":
+                        continue
+                    pl = ev.get("payload", {}) if isinstance(ev.get("payload"), dict) else {}
+                    match_url = pl.get("match_url")
+                    if not match_url:
+                        continue
+                    total_photo_matches += 1
+                    match_host = pl.get("host_domain") or pl.get("domain", "")
+                    engine = pl.get("source", "unknown")
+                    # Per-photo entry for the per-listing summary.
+                    photo_matched_urls.append(
+                        {
+                            "url": match_url,
+                            "engine": engine,
+                            "host": match_host,
+                        }
+                    )
+                    # Accumulate into the terminal cluster table.
+                    cluster = photo_clusters.setdefault(
+                        photo_url,
+                        {
+                            "source_photo_url": photo_url,
+                            "from_listings": set(),
+                            "matched_on": [],
+                            "match_hosts": set(),
+                        },
+                    )
+                    cluster["from_listings"].add(current_url)
+                    cluster["matched_on"].append(
+                        {
+                            "url": match_url,
+                            "engine": engine,
+                            "host": match_host,
+                            "hop": hop,
+                        }
+                    )
+                    if match_host:
+                        cluster["match_hosts"].add(match_host)
+                    # Emit a flattened photo-match edge for the live graph.
+                    events.append(
+                        {
+                            "event_type": "photo-match",
+                            "payload": {
+                                "from_listing": current_url,
+                                "photo_url": photo_url,
+                                "match_url": match_url,
+                                "match_host": match_host,
+                                "engine": engine,
+                                "hop": hop,
+                            },
+                        }
+                    )
+                    # Only fan out into known listing platforms.
+                    target_platform = detect_platform(match_url)
+                    if target_platform is None:
+                        continue
+                    target_canonical = match_url.split("?")[0].rstrip("/").lower()
+                    if target_canonical in visited:
+                        continue
+                    events.append(
+                        {
+                            "event_type": "pivot-discovered",
+                            "payload": {
+                                "discovered_url": match_url,
+                                "platform": target_platform,
+                                "discovered_via_photo": photo_url,
+                                "from_listing": current_url,
+                                "next_hop": hop + 1,
+                            },
+                        }
+                    )
+                    next_frontier.append((match_url, photo_url, hop + 1))
+                if photo_matched_urls:
+                    listing_matches[current_url]["photo_matches"].append(
+                        {
+                            "photo_url": photo_url,
+                            "matched_urls": photo_matched_urls,
+                        }
+                    )
+        hops_run += 1
+        frontier = next_frontier
+
+    # --- Emit per-listing match summaries (one per visited listing) ---
+    # The dossier UI uses these to render "for this listing, here are the
+    # match links" without re-aggregating the live photo-match stream.
+    for entry in listing_matches.values():
+        n_matched = sum(len(p["matched_urls"]) for p in entry["photo_matches"])
+        n_hosts = len(
+            {m["host"] for p in entry["photo_matches"] for m in p["matched_urls"] if m["host"]}
+        )
+        if n_matched == 0:
+            verdict = "no-matches"
+        elif n_hosts >= 2:
+            verdict = "cross-platform-duplicates-found"
+        else:
+            verdict = "single-platform-duplicates"
+        events.append(
+            {
+                "event_type": "listing-match-summary",
+                "payload": {
+                    **entry,
+                    "total_matches": n_matched,
+                    "distinct_match_hosts": n_hosts,
+                    "verdict": verdict,
+                },
+            }
+        )
+
+    # --- Emit one terminal photo-match-cluster aggregating every photo ---
+    # that surfaced a hit across the entire BFS. Sorted by host diversity
+    # so the strongest fraud signals appear first.
+    clusters_list: list[dict[str, Any]] = []
+    for cluster in photo_clusters.values():
+        hosts = cluster["match_hosts"]
+        if not cluster["matched_on"]:
+            continue
+        clusters_list.append(
+            {
+                "source_photo_url": cluster["source_photo_url"],
+                "from_listings": sorted(cluster["from_listings"]),
+                "matched_on": cluster["matched_on"],
+                "distinct_match_hosts": sorted(hosts),
+                "host_diversity": len(hosts),
+                "verdict": (
+                    "cross-platform-duplicate" if len(hosts) >= 2 else "single-platform-duplicate"
+                ),
+            }
+        )
+    clusters_list.sort(key=lambda c: c["host_diversity"], reverse=True)
+    events.append(
+        {
+            "event_type": "photo-match-cluster",
+            "payload": {
+                "seed_listing_url": listing_url,
+                "photos_searched": sum(e["photos_searched"] for e in listing_matches.values()),
+                "photos_with_matches": len(clusters_list),
+                "listings_visited": len(visited),
+                "clusters": clusters_list,
+            },
+        }
+    )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "listing_photo_pivot",
+                "seed_listing_url": listing_url,
+                "hops_run": hops_run,
+                "listings_visited": len(visited),
+                "total_photo_matches": total_photo_matches,
+                "photo_clusters": len(clusters_list),
+                "max_depth": max_depth,
+                # NB: investigation_id intentionally OMITTED from output --
+                # it's a routing key, not result data; logless-by-default.
+            },
+        }
+    )
+    return events
+
+
+def _listing_photo_pivot_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Synthetic mode: returns a canned pivot graph + summaries.
+
+    Shape mirrors live output so the dossier renderer can be wired
+    without running real reverse-image queries. Includes the terminal
+    photo-match-cluster + per-listing-match-summary events the UI
+    consumes for the consolidated view.
+    """
+    seed = (payload.get("listing_url") or "https://www.vrbo.com/1682245").strip()
+    photo = "https://media.vrbo.com/example.jpg"
+    match_airbnb = "https://www.airbnb.com/rooms/99999"
+    match_booking = "https://www.booking.com/hotel/us/x99.html"
+    return [
+        {
+            "event_type": "listing-data",
+            "payload": {
+                "source": "listing",
+                "platform": "vrbo",
+                "listing_url": seed,
+                "hop_depth": 0,
+                "parent_match_url": None,
+                "photo_urls": [photo],
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "photo-match",
+            "payload": {
+                "from_listing": seed,
+                "photo_url": photo,
+                "match_url": match_airbnb,
+                "match_host": "airbnb.com",
+                "engine": "yandex",
+                "hop": 0,
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "photo-match",
+            "payload": {
+                "from_listing": seed,
+                "photo_url": photo,
+                "match_url": match_booking,
+                "match_host": "booking.com",
+                "engine": "google-lens",
+                "hop": 0,
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "pivot-discovered",
+            "payload": {
+                "discovered_url": match_airbnb,
+                "platform": "airbnb",
+                "discovered_via_photo": photo,
+                "from_listing": seed,
+                "next_hop": 1,
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "listing-match-summary",
+            "payload": {
+                "listing_url": seed,
+                "platform": "vrbo",
+                "title": "Sample Listing",
+                "hop_depth": 0,
+                "photos_searched": 1,
+                "photo_matches": [
+                    {
+                        "photo_url": photo,
+                        "matched_urls": [
+                            {"url": match_airbnb, "engine": "yandex", "host": "airbnb.com"},
+                            {"url": match_booking, "engine": "google-lens", "host": "booking.com"},
+                        ],
+                    }
+                ],
+                "total_matches": 2,
+                "distinct_match_hosts": 2,
+                "verdict": "cross-platform-duplicates-found",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "photo-match-cluster",
+            "payload": {
+                "seed_listing_url": seed,
+                "photos_searched": 1,
+                "photos_with_matches": 1,
+                "listings_visited": 1,
+                "clusters": [
+                    {
+                        "source_photo_url": photo,
+                        "from_listings": [seed],
+                        "matched_on": [
+                            {
+                                "url": match_airbnb,
+                                "engine": "yandex",
+                                "host": "airbnb.com",
+                                "hop": 0,
+                            },
+                            {
+                                "url": match_booking,
+                                "engine": "google-lens",
+                                "host": "booking.com",
+                                "hop": 0,
+                            },
+                        ],
+                        "distinct_match_hosts": ["airbnb.com", "booking.com"],
+                        "host_diversity": 2,
+                        "verdict": "cross-platform-duplicate",
+                    }
+                ],
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "listing_photo_pivot",
+                "seed_listing_url": seed,
+                "hops_run": 1,
+                "listings_visited": 1,
+                "total_photo_matches": 2,
+                "photo_clusters": 1,
+                "max_depth": 2,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
 def _listing_scrape_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
     listing_url = (payload.get("listing_url") or "https://www.airbnb.com/rooms/12345").strip()
     platform = detect_platform(listing_url) or "airbnb"
@@ -2570,5 +3004,19 @@ _REGISTRY.register(
         "Expedia, Hipcamp, etc.); returns normalized host/cohost/location/"
         "GPS-pin/reviews via Scrapling StealthyFetcher + JSON-LD + DOM "
         "extraction. Naomi-logless."
+    ),
+)
+_REGISTRY.register(
+    "listing_photo_pivot",
+    listing_photo_pivot,
+    synthetic_mode=_listing_photo_pivot_synthetic,
+    in_process=True,
+    description=(
+        "Recursive photo fan-out for cross-platform listing-fraud "
+        "detection. BFS from seed listing's photos -> reverse-image "
+        "engines -> matched listings -> their photos. 2-hop default "
+        "bound (ROADMAP Ship 7 photo-fraud variant). Emits photo-match "
+        "edges + pivot-discovered nodes for graph rendering. "
+        "Naomi-logless: in-memory visited set only."
     ),
 )
