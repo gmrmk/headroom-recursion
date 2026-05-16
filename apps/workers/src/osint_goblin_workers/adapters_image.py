@@ -2019,25 +2019,64 @@ def reverse_image_aggregator(payload: dict[str, Any]) -> list[dict[str, Any]]:
     ]
     events: list[dict[str, Any]] = []
     engine_results: dict[str, int] = {}
+    # Mode selection (live by default; opt-in synthetic via payload flag
+    # OR OSINT_ADAPTER_MODE=synthetic env). 2026-05-16: flipped from
+    # hardcoded synthetic to live -- the engines have working Scrapling
+    # subprocess wrappers that defeat their bot detection well enough
+    # to surface real matches. Failed engines fall back to synthetic.
+    synthetic_mode_only = bool(payload.get("synthetic")) or (
+        os.environ.get("OSINT_ADAPTER_MODE", "").strip().lower() == "synthetic"
+    )
     for engine_id, sub_payload in engines:
         entry = reg.get(engine_id)
         if entry is None:
             engine_results[engine_id] = -1  # not registered
             continue
+        adapter_fn = entry.synthetic_mode if synthetic_mode_only else entry.callable
         try:
-            # synthetic_mode for safety in M0; live mode swapped in by the
-            # tool_runner when the user dispatches in non-synthetic mode.
-            sub_events = entry.synthetic_mode(sub_payload)
+            sub_events = adapter_fn(sub_payload)
         except Exception as exc:
-            events.append(
-                {
-                    "event_type": "tool-run-error",
-                    "payload": {
-                        "reason": f"{engine_id} {type(exc).__name__}: {exc}",
-                    },
-                }
-            )
-            continue
+            # Live mode failed -- fall back to synthetic so downstream
+            # callers always get a result shape (vs. a hard error).
+            if not synthetic_mode_only:
+                try:
+                    sub_events = entry.synthetic_mode(sub_payload)
+                    _exc_name = type(exc).__name__
+                    events.append(
+                        {
+                            "event_type": "tool-run-warning",
+                            "payload": {
+                                "engine": engine_id,
+                                "reason": (
+                                    f"live mode failed ({_exc_name}: {exc}); "
+                                    f"fell back to synthetic"
+                                ),
+                            },
+                        }
+                    )
+                except Exception as exc2:
+                    _exc2_name = type(exc2).__name__
+                    events.append(
+                        {
+                            "event_type": "tool-run-error",
+                            "payload": {
+                                "reason": (
+                                    f"{engine_id} live+synthetic both failed: " f"{_exc2_name}"
+                                ),
+                            },
+                        }
+                    )
+                    continue
+            else:
+                events.append(
+                    {
+                        "event_type": "tool-run-error",
+                        "payload": {
+                            "reason": f"{engine_id} {type(exc).__name__}: {exc}",
+                        },
+                    }
+                )
+                continue
         # Forward all image-match events; count for the summary
         engine_count = 0
         for ev in sub_events:
