@@ -9,7 +9,11 @@
 #      installs both need it).
 #   2. Enables the Windows Hyper-V feature if it isn't already enabled.
 #   3. Installs Vagrant via winget if it isn't already.
-#   4. Tells you whether you need to reboot.
+#   4. Creates the "OSINTInternal" Hyper-V Internal Switch and assigns
+#      the host a static IP (192.168.250.1) on it. This is what the VM
+#      uses for its second NIC -- the Default Switch alone is unreliable
+#      for host<->VM SSH on Win11.
+#   5. Tells you whether you need to reboot.
 #
 # What it does NOT do:
 #   - It does NOT run `vagrant up` for you. Run that yourself in
@@ -41,7 +45,7 @@ Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Step 1: Hyper-V feature check + enable if needed.
-Write-Host "[1/3] Checking Hyper-V feature state..." -ForegroundColor Yellow
+Write-Host "[1/4] Checking Hyper-V feature state..." -ForegroundColor Yellow
 $hyperv = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -ErrorAction SilentlyContinue
 
 $rebootRequired = $false
@@ -70,7 +74,7 @@ else {
 
 # Step 2: Vagrant install via winget.
 Write-Host ""
-Write-Host "[2/3] Checking Vagrant install..." -ForegroundColor Yellow
+Write-Host "[2/4] Checking Vagrant install..." -ForegroundColor Yellow
 $vagrant = Get-Command vagrant -ErrorAction SilentlyContinue
 
 if ($null -ne $vagrant) {
@@ -90,9 +94,64 @@ else {
   Write-Host "      session for the PATH update to take effect." -ForegroundColor Green
 }
 
-# Step 3: final status.
+# Step 3: Internal switch + host static IP for reliable host<->VM SSH.
 Write-Host ""
-Write-Host "[3/3] Bootstrap complete." -ForegroundColor Cyan
+Write-Host "[3/4] Checking 'OSINTInternal' Hyper-V Internal Switch..." -ForegroundColor Yellow
+
+# Skip the switch step entirely if Hyper-V was just enabled and requires
+# a reboot -- the Hyper-V cmdlets won't load until then.
+if ($rebootRequired) {
+  Write-Host "      Skipped: Hyper-V was just enabled; reboot first, then re-run this" -ForegroundColor Yellow
+  Write-Host "      script to create the switch. (Or run only step 3 manually after reboot.)" -ForegroundColor Yellow
+}
+else {
+  $switchName = "OSINTInternal"
+  $hostIp = "192.168.250.1"
+  $prefix = 24
+
+  $existing = Get-VMSwitch -Name $switchName -ErrorAction SilentlyContinue
+  if ($null -eq $existing) {
+    Write-Host "      Creating Internal switch '$switchName'..." -ForegroundColor Yellow
+    New-VMSwitch -Name $switchName -SwitchType Internal | Out-Null
+    Write-Host "      Switch created." -ForegroundColor Green
+  }
+  else {
+    Write-Host "      Switch '$switchName' already exists. OK." -ForegroundColor Green
+  }
+
+  # Find the host's virtual adapter created by the switch and ensure it
+  # has the static IP. The adapter is named "vEthernet ($switchName)".
+  $adapterAlias = "vEthernet ($switchName)"
+  $adapter = Get-NetAdapter -Name $adapterAlias -ErrorAction SilentlyContinue
+  if ($null -eq $adapter) {
+    Write-Host "      WARNING: adapter '$adapterAlias' not found yet; it may appear" -ForegroundColor Yellow
+    Write-Host "      after a moment. Re-run this script if vagrant up fails to reach" -ForegroundColor Yellow
+    Write-Host "      the VM at $hostIp." -ForegroundColor Yellow
+  }
+  else {
+    $existingIp = Get-NetIPAddress -InterfaceIndex $adapter.ifIndex `
+      -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+      Where-Object { $_.IPAddress -eq $hostIp }
+    if ($null -eq $existingIp) {
+      Write-Host "      Assigning $hostIp/$prefix to '$adapterAlias'..." -ForegroundColor Yellow
+      try {
+        New-NetIPAddress -InterfaceIndex $adapter.ifIndex `
+          -IPAddress $hostIp -PrefixLength $prefix -ErrorAction Stop | Out-Null
+        Write-Host "      Host IP assigned." -ForegroundColor Green
+      }
+      catch {
+        Write-Host "      WARNING: could not assign IP: $_" -ForegroundColor Yellow
+      }
+    }
+    else {
+      Write-Host "      Host already has $hostIp on '$adapterAlias'. OK." -ForegroundColor Green
+    }
+  }
+}
+
+# Step 4: final status.
+Write-Host ""
+Write-Host "[4/4] Bootstrap complete." -ForegroundColor Cyan
 Write-Host ""
 
 if ($rebootRequired) {

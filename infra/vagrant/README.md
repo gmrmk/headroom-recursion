@@ -13,17 +13,36 @@ Two commands:
 
 ```powershell
 # 1. From an ELEVATED PowerShell prompt, one-time host setup
-#    (enables Hyper-V + installs Vagrant via winget).
+#    (enables Hyper-V + installs Vagrant via winget + creates the
+#    OSINTInternal switch + assigns host IP 192.168.250.1).
 cd <repo-root>\infra\vagrant
 .\bootstrap-host.ps1
 
-# 2. (Reboot if step 1 told you to.) Then:
+# 2. (Reboot if step 1 told you to. Then re-run bootstrap-host.ps1
+#     so step 3 -- the Internal Switch -- can complete.) Then:
 vagrant up
 ```
 
 First `vagrant up` downloads the Debian 12 box (~500 MB) and runs the
 provisioning script. Total wall-clock: 5–15 minutes depending on
 bandwidth + disk speed. Subsequent boots are fast.
+
+## Networking
+
+The VM has two virtual NICs:
+
+| NIC | Switch | Purpose | IP |
+|---|---|---|---|
+| 1 | Default Switch (NAT) | Outbound: apt updates, box downloads, investigation egress (via WireGuard) | DHCP, dynamic |
+| 2 | OSINTInternal (Internal) | Host \<-\> VM private link for SSH + Vagrant management | Static `192.168.250.10` |
+
+The host's adapter on `OSINTInternal` is `192.168.250.1`. Use this when
+SSH-ing manually: `ssh vagrant@192.168.250.10`. Vagrant uses the same
+address.
+
+The Internal Switch sidesteps the Win11 Default Switch routing quirk
+where host and VM end up on mismatched `/24` subnets and can't reach
+each other.
 
 Once up:
 

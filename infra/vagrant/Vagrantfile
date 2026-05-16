@@ -30,11 +30,24 @@ Vagrant.configure("2") do |config|
   config.vm.box = "generic/debian12"
   config.vm.hostname = "osint-goblin-vm"
 
-  # Network: Hyper-V default switch (NAT). Egress goes through the host's
-  # default route initially. The VM's WireGuard client (installed by
-  # provision.sh) routes ALL VM traffic through the investigator's VPN
-  # once configured.
-  config.vm.network "private_network", type: "dhcp"
+  # Networking. Two NICs:
+  #
+  # NIC 1 (Default Switch, NAT'd, gets DHCP)
+  #   Outbound only -- gives the VM internet access for `apt`, box
+  #   downloads, future investigation egress (routed through WireGuard
+  #   when configured).
+  #
+  # NIC 2 (OSINTInternal, Internal Switch, static IP 192.168.250.10)
+  #   Host <-> VM private link. Vagrant uses this for SSH because the
+  #   Default Switch's dynamic IP assignment can put host + VM on
+  #   mismatched /24 subnets with no routable path (documented Win11
+  #   Hyper-V gotcha 2026-05-16).
+  #
+  # Host side: bootstrap-host.ps1 creates the "OSINTInternal" switch
+  # and assigns 192.168.250.1 to the host's vEthernet adapter on it.
+  config.vm.network "private_network",
+    ip: "192.168.250.10",
+    bridge: "OSINTInternal"
 
   # Repo mount: the host's working copy lives at /vagrant inside the VM.
   # This is convenient for dev (code changes propagate instantly) but
