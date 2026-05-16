@@ -412,6 +412,35 @@ _NAME_FALSE_POSITIVES = frozenset(
         "Trip",
         "Visit",
         "Visited",
+        "Loved",
+        "Liked",
+        "Enjoyed",
+        "Hated",
+        "Disliked",
+        "Booked",
+        "Arrived",
+        "Departed",
+        "Returned",
+        "Tried",
+        "Wanted",
+        "Needed",
+        "Got",
+        "Had",
+        "Saw",
+        "Found",
+        "Felt",
+        "Spent",
+        "Slept",
+        "Cooked",
+        "Walked",
+        "Drove",
+        "Took",
+        "Made",
+        "Helped",
+        "Provided",
+        "Booked",
+        "Checked",
+        "Used",
         "Place",
         "Property",
         "Home",
@@ -593,12 +622,13 @@ def review_owner_mention_scan(host_name: str, reviews: list[str]) -> dict[str, A
                 continue
             explicit.append(nm)
 
-        # Family-relation phrases.
+        # Family-relation phrases. NOTE: we DO record matches where the
+        # named person IS the host -- "Jolie's mother runs the place"
+        # means the mother is the actual operator regardless of whether
+        # Jolie is the listed host, and that's a real PV signal.
         for m in _FAMILY_RELATION_RE.finditer(clean):
             nm = m.group(1)
             if not nm or nm in _NAME_FALSE_POSITIVES:
-                continue
-            if nm.casefold() in host_tokens:
                 continue
             relation_chunk = clean[m.end(1) : m.end(1) + 40]
             rel_m = re.search(r"(?:'s|s')\s+(\w+)", relation_chunk, re.IGNORECASE)
@@ -1037,6 +1067,55 @@ def extract_generic_jsonld(html_body: str, listing_url: str, platform: str) -> d
         except (TypeError, ValueError):
             nightly_price = None
 
+    # ---- Review text extraction (universal owner-mention scan input) ----
+    # Generic JSON-LD path: schema.org/Review entries inline on
+    # LodgingBusiness / Hotel / Product blocks. Booking.com,
+    # TripAdvisor, Hotels.com all expose at least the most-recent N
+    # reviews this way. Per-platform parsers can override this when
+    # they want richer DOM-extracted reviews.
+    raw_reviews: list[str] = []
+    # Author-name pre-population: schema.org Review entries often carry
+    # author.name, which is the GUEST's name -- we use it to seed the
+    # name-token false-positive set so guest names don't masquerade as
+    # owner-mention drift.
+    guest_names: set[str] = set()
+    for block in blocks:
+        for rev in block.get("review") or []:
+            if not isinstance(rev, dict):
+                continue
+            body_text = rev.get("reviewBody") or rev.get("description") or rev.get("text") or ""
+            if isinstance(body_text, str) and body_text.strip():
+                raw_reviews.append(body_text.strip())
+            author = rev.get("author") or {}
+            if isinstance(author, dict):
+                an = author.get("name")
+                if isinstance(an, str) and an.strip():
+                    # Only the first-name token to match scanner conventions.
+                    first = re.split(r"[\s\-]+", an.strip())[0].strip(".,;:!?'\"")
+                    if first:
+                        guest_names.add(first)
+        if len(raw_reviews) >= 50:
+            break  # cap
+
+    # PII redaction defensively (some platforms leak email/phone in
+    # review bodies despite TOS).
+    review_sample_clean = [_redact_pii(r) for r in raw_reviews]
+
+    # Owner-mention scan. Generic JSON-LD path rarely carries host_name
+    # (schema.org LodgingBusiness doesn't standardize host identity);
+    # the scan still surfaces ownership-attribution phrasing and
+    # possessive-of-name patterns from review text, so it's worth
+    # running even with an empty host_name (tier reports as INFO).
+    owner_mention = review_owner_mention_scan("", review_sample_clean)
+    if guest_names:
+        # Filter out guest-name false positives from other_names: if a
+        # review mentions another guest from a separate review (common in
+        # group stays), that's not owner drift.
+        filtered_other = {
+            k: v for k, v in owner_mention["other_names"].items() if k not in guest_names
+        }
+        owner_mention = {**owner_mention, "other_names": filtered_other}
+
     return {
         "platform": platform,
         "listing_url": listing_url,
@@ -1060,7 +1139,9 @@ def extract_generic_jsonld(html_body: str, listing_url: str, platform: str) -> d
         "gps_source": gps_source,
         "review_count": review_count,
         "review_rating": review_rating,
-        "review_sample": [],
+        "review_sample": review_sample_clean[:10],
+        "review_extracted_count": len(review_sample_clean),
+        "owner_mention": owner_mention,
         "photo_urls": photo_urls,
         "amenities": [],
         "bedrooms": None,

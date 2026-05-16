@@ -304,6 +304,61 @@ export const RUBRIC: Readonly<Record<string, RubricEntry>> = {
     source: "osint-methodology §2 (rule-of-three for attribution) + §24.3 multi-engine corpus",
   },
 
+  // ------- Ship 10 / W20.tr -- review owner-mention drift -------
+  //
+  // Universal PV signal across every travel-platform scrape (Airbnb,
+  // VRBO, Booking, TripAdvisor, Yanolja, Leboncoin, +). Compares the
+  // host name in listing metadata against names guests use in reviews.
+  //
+  // GOOD: reviews repeatedly name the listed host (identity confirmed).
+  // WARN: reviews mention OTHER capitalized names alongside the host
+  //       OR family-relation phrases ("Jolie's mother runs it") --
+  //       investigator should review for undisclosed cohost / operator.
+  // BAD:  reviews use explicit ownership phrasing ("Bob's house",
+  //       "owner Bob", "Mike owns") for a name that is NOT the host --
+  //       strong impersonation / undisclosed-owner / relisting signal.
+  // INFO: no reviews to scan, or no host name in listing metadata.
+
+  LISTING_OWNER_DRIFT_GOOD: {
+    id: "LISTING_OWNER_DRIFT_GOOD",
+    tier: "info",
+    technical:
+      "Reviews mention the listed host name without any other personal names; identity claim is consistent with guest accounts",
+    business_impact:
+      "Multiple past guests refer to the host by the name on the listing. No drift detected; the host's claimed identity is consistent with what guests experienced.",
+    source: "user directive 2026-05-15 + osint-methodology §2 confidence-upgrade-by-corroboration",
+  },
+
+  LISTING_OWNER_DRIFT_WARN: {
+    id: "LISTING_OWNER_DRIFT_WARN",
+    tier: "warn",
+    technical:
+      "Reviews mention the listed host name AND other names (possible cohost/family operator) OR contain family-relation phrasing such as `<Host>'s mother runs it`",
+    business_impact:
+      "Past guests mention people besides the listed host (cohosts, family members, or maintenance staff). Could be legitimate operational disclosure or could indicate undisclosed party-of-interest. Investigator should read affected reviews directly.",
+    source: "user directive 2026-05-15 + offensive-osint §41 (related-party enumeration)",
+  },
+
+  LISTING_OWNER_DRIFT_BAD: {
+    id: "LISTING_OWNER_DRIFT_BAD",
+    tier: "bad",
+    technical:
+      "Reviews use explicit ownership phrasing (`Bob's house`, `owner Bob`, `Mike owns`) for a name that is NOT the listed host",
+    business_impact:
+      "Past guests attribute property ownership or hosting to a person whose name doesn't match the listing. Strong indicator of impersonation, undisclosed real owner, recent listing transfer, or co-listed property where the displayed host isn't the operator. High-priority signal for property-vetting.",
+    source: "user directive 2026-05-15 (load-bearing PV signal)",
+  },
+
+  LISTING_OWNER_DRIFT_INFO: {
+    id: "LISTING_OWNER_DRIFT_INFO",
+    tier: "info",
+    technical:
+      "Owner-mention scan ran but had no actionable signal -- either no reviews available or no host name in listing metadata to compare against",
+    business_impact:
+      "Insufficient data to assess owner-mention drift. Either the platform didn't surface review text in its schema.org payload, or the host name field was empty. No conclusion either way.",
+    source: "user directive 2026-05-15",
+  },
+
   // ------- W4-TIMELINE (Sprint-5 wave-4 keystone) -------
   //
   // Severity anchor for the forensic-timeline temporal-cluster surface.
