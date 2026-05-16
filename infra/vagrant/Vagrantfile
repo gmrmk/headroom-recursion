@@ -18,6 +18,13 @@
 # Requires: Hyper-V Windows feature enabled + Vagrant installed. The
 # host-bootstrap script `bootstrap-host.ps1` handles both.
 
+# Force Hyper-V as the provider for this Vagrantfile. Without this,
+# Vagrant defaults to VirtualBox if it's installed on the host -- which
+# fails on Win11 boxes that have a stale/corrupt VirtualBox.xml or
+# that don't have VirtualBox set up at all. Hyper-V is what
+# bootstrap-host.ps1 enables; lock it in.
+ENV["VAGRANT_DEFAULT_PROVIDER"] = "hyperv"
+
 Vagrant.configure("2") do |config|
   # Debian 12 (Bookworm) -- stable, long-support, minimal attack surface.
   config.vm.box = "generic/debian12"
