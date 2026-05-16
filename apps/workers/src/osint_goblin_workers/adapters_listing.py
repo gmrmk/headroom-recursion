@@ -132,8 +132,8 @@ _PLATFORM_HOST_MAP: dict[str, str] = {
     "vacasa.com": "vacasa",
     "sonder.com": "sonder",
     "plumguide.com": "plumguide",
-    "trip.com": "tripcom",  # CN-owned, separate from TripAdvisor
-    "ctrip.com": "tripcom",  # CN sibling brand
+    "trip.com": "tripcom",  # CN-owned (Trip Group / Ctrip), int'l brand
+    "ctrip.com": "tripcom",  # CN sibling brand (domestic)
     "9flats.com": "9flats",
     "ostrovok.ru": "ostrovok",  # RU
     "despegar.com": "despegar",  # LATAM
@@ -142,7 +142,244 @@ _PLATFORM_HOST_MAP: dict[str, str] = {
     "homestay.com": "homestay",
     "couchsurfing.com": "couchsurfing",
     "marriott.com": "marriott_homes_villas",  # /homes-and-villas/ path
-    "tujia.com": "tujia",  # CN Airbnb-equivalent
+    # --- China booking platforms ---
+    # Source for inclusion: top CN travel apps by 2024-25 MAU reporting.
+    # CN sites favor Tencent T-Sec / Geetest captcha; rough vendor
+    # classification lives in PLATFORM_ANTIBOT_MAP (humanize.py).
+    "tujia.com": "tujia",  # 途家 -- CN Airbnb-equivalent (short-term rental)
+    "xiaozhu.com": "xiaozhu",  # 小猪短租 -- short-term rentals
+    "muniao.com": "muniao",  # 木鸟短租 -- short-term rentals
+    "fliggy.com": "fliggy",  # 飞猪 -- Alibaba Travel (international brand)
+    "alitrip.com": "fliggy",  # 阿里旅行 -- Fliggy's legacy domain (still resolves)
+    "qunar.com": "qunar",  # 去哪儿 -- meta-search (Trip Group subsidiary)
+    "mafengwo.cn": "mafengwo",  # 马蜂窝 -- travel community + booking
+    "lvmama.com": "lvmama",  # 驴妈妈 -- tours + tickets + hotels
+    "tongcheng.com": "tongcheng",  # 同程旅行 -- OTA (HK-listed)
+    "ly.com": "tongcheng",  # Tongcheng's primary user-facing domain
+    "tuniu.com": "tuniu",  # 途牛 -- package tours + tickets
+    "meituan.com": "meituan",  # 美团旅行 -- hotel/travel section
+    "elong.com": "elong",  # 艺龙 -- Trip Group subsidiary
+    "elong.net": "elong",
+    # --- Germany / DACH (DE/AT/CH) ---
+    # Rationale: short-stay fraud often uses photos scraped from regional
+    # DE-market portals the operator wouldn't think to check. Reverse-
+    # image searching against these sites is a load-bearing PV move.
+    "traum-ferienwohnungen.de": "traum",  # huge DE vacation rentals (~190K)
+    "ferienwohnungen.de": "ferienwohnungen",
+    "atraveo.de": "atraveo",  # TUI brand, DE primary
+    "atraveo.com": "atraveo",
+    "bestfewo.de": "bestfewo",
+    "novasol.com": "novasol",  # Awaze (Wyndham) brand
+    "novasol.de": "novasol",
+    "novasol.dk": "novasol",
+    "e-domizil.de": "edomizil",  # DE/CH vacation rentals
+    "e-domizil.ch": "edomizil",
+    "interhome.com": "interhome",  # CH-based, EU coverage
+    "interhome.de": "interhome",
+    "interhome.ch": "interhome",
+    "belvilla.com": "belvilla",  # Awaze brand
+    "belvilla.de": "belvilla",
+    "casamundo.com": "casamundo",  # HomeToGo subsidiary
+    "casamundo.de": "casamundo",
+    # --- Spain (ES) ---
+    # Top ES property portals -- both short + long term photos commonly
+    # scraped to seed Airbnb/VRBO scam listings outside Spain.
+    "idealista.com": "idealista",  # #1 ES property portal
+    "idealista.es": "idealista",
+    "idealista.it": "idealista",  # also IT presence
+    "idealista.pt": "idealista",  # PT presence
+    "fotocasa.es": "fotocasa",  # #2 ES property portal
+    "pisos.com": "pisos",  # ES property
+    "niumba.com": "niumba",  # TripAdvisor-owned vacation rentals ES
+    "rentalia.com": "rentalia",  # ES vacation rentals
+    "toprural.com": "toprural",  # ES rural rentals
+    "spain-holiday.com": "spainholiday",
+    # --- France (FR) ---
+    "pap.fr": "pap",  # Particulier-à-Particulier rentals
+    "seloger.com": "seloger",  # FR property
+    "morningcroissant.fr": "morningcroissant",  # FR short-term rentals
+    # --- Italy (IT) ---
+    "immobiliare.it": "immobiliare",  # #1 IT property portal
+    "casa.it": "casait",  # IT property
+    "subito.it": "subito",  # IT classifieds (also rentals)
+    "casevacanza.it": "casevacanza",  # IT vacation rentals
+    # --- Pan-EU meta-search + brands ---
+    "hometogo.com": "hometogo",  # EU vacation rental meta-search
+    "hometogo.de": "hometogo",
+    "hometogo.es": "hometogo",
+    "hometogo.fr": "hometogo",
+    "hometogo.it": "hometogo",
+    "holidu.com": "holidu",  # DE-built EU vacation rental meta-search
+    "holidu.de": "holidu",
+    "onefinestay.com": "onefinestay",  # luxury short-term EU
+    # --- South Africa (ZA) ---
+    # SA short-stay scams frequently use photos from regional portals
+    # that overseas operators don't recognize. Reverse-image search
+    # against these is high-signal.
+    "lekkeslaap.co.za": "lekkeslaap",  # ZA #1 vacation rentals
+    "travelground.com": "travelground",  # ZA + safari accommodations
+    "safarinow.com": "safarinow",  # SA-focused safari + lodge
+    "nightsbridge.com": "nightsbridge",  # SA B&B / boutique-hotel platform
+    "property24.com": "property24",  # ZA property portal (long+short)
+    # --- Brazil (BR) ---
+    "hurb.com": "hurb",  # BR travel packages
+    "cvc.com.br": "cvc",  # BR OTA (CVC Corp)
+    "decolar.com": "decolar",  # BR brand of Despegar (LATAM #1)
+    "decolar.com.br": "decolar",
+    "vivareal.com.br": "vivareal",  # BR property (Grupo OLX)
+    "zapimoveis.com.br": "zapimoveis",  # BR property
+    "temporada.com.br": "temporada",  # BR short-term rentals
+    "aluguetemporada.com.br": "aluguetemporada",  # legacy Vrbo BR brand
+    "alugueltemporada.com.br": "aluguetemporada",  # common alternate spelling
+    "quintoandar.com.br": "quintoandar",  # BR long+short rentals
+    # --- Mexico (MX) ---
+    "bestday.com": "bestday",  # MX OTA
+    "bestday.com.mx": "bestday",
+    "pricetravel.com": "pricetravel",  # MX OTA
+    "pricetravel.com.mx": "pricetravel",
+    "lamudi.com.mx": "lamudi",  # MX property portal
+    "vivanuncios.com.mx": "vivanuncios",  # MX classifieds
+    # --- Mexico + Panama (shared brands) ---
+    "inmuebles24.com": "inmuebles24",  # MX/LATAM property; same brand across ccTLDs
+    "inmuebles24.com.mx": "inmuebles24",
+    "inmuebles24.com.pa": "inmuebles24",
+    # --- LATAM classifieds shared across BR/MX ---
+    "olx.com.br": "olx",  # OLX Brazil
+    "olx.com.mx": "olx",  # OLX Mexico
+    "mercadolibre.com.mx": "mercadolibre",  # MX classifieds
+    # --- Panama (PA) ---
+    "encuentra24.com": "encuentra24",  # PA+CR+SV+NI classifieds (regional)
+    "compraventa.com.pa": "compraventa",  # PA classifieds
+    # --- Nigeria (NG) ---
+    "hotels.ng": "hotelsng",  # NG OTA (different brand from hotels.com)
+    "jumia.com.ng": "jumia_travel",  # Jumia Travel Nigeria
+    "travel.jumia.com": "jumia_travel",  # Jumia Travel main domain
+    "privateproperty.com.ng": "privateproperty_ng",  # NG property portal
+    "propertypro.ng": "propertypro_ng",  # NG property portal
+    "jiji.ng": "jiji",  # NG classifieds (also covers .ke, .ug, .gh)
+    "jiji.co.ke": "jiji",  # Kenya
+    "jiji.ug": "jiji",  # Uganda
+    "jiji.com.gh": "jiji",  # Ghana
+    "wakanow.com": "wakanow",  # NG OTA
+    # --- Kenya (KE) ---
+    "buyrentkenya.com": "buyrentkenya",  # KE property portal
+    "property24.co.ke": "property24",  # ZA brand has KE presence
+    # --- Saudi Arabia (SA) ---
+    "almosafer.com": "almosafer",  # SA OTA (formerly Tajawal)
+    "tajawal.com": "almosafer",  # legacy brand
+    "rehlat.com": "rehlat",  # SA OTA
+    "bayut.sa": "bayut",  # SA property (Dubai-based brand)
+    "bayut.com": "bayut",  # UAE primary; also covers SA inventory
+    "aqar.fm": "aqar",  # SA property
+    # --- India (IN) ---
+    "goibibo.com": "goibibo",  # MakeMyTrip group, separate brand
+    "cleartrip.com": "cleartrip",  # IN OTA
+    "yatra.com": "yatra",  # IN OTA
+    "oyorooms.com": "oyo",  # IN/global budget hotel platform
+    "oyo.com": "oyo",
+    "99acres.com": "acres99",  # IN property
+    "magicbricks.com": "magicbricks",  # IN property
+    "housing.com": "housing_in",  # IN rentals/property
+    "nobroker.in": "nobroker",  # IN long+short rentals
+    "olx.in": "olx",  # IN classifieds (folded into existing olx id)
+    "sulekha.com": "sulekha",  # IN classifieds
+    # --- Sri Lanka (LK) ---
+    "lakpura.com": "lakpura",  # LK travel
+    "lankapropertyweb.com": "lankapropertyweb",
+    "ikman.lk": "ikman",  # LK classifieds (Adevinta-owned)
+    # --- Philippines (PH) ---
+    "wego.com.ph": "wego",
+    "wego.com": "wego",  # global brand, also covers MENA
+    "lamudi.com.ph": "lamudi",  # extends existing lamudi entry
+    "lamudi.co.id": "lamudi",  # PH+ID under same brand
+    "dotproperty.com.ph": "dotproperty",
+    "carousell.ph": "carousell",  # SG classifieds, big in PH
+    "carousell.com": "carousell",
+    "carousell.com.sg": "carousell",
+    "carousell.com.my": "carousell",
+    "mynimo.com": "mynimo",  # PH local rentals
+    # --- Indonesia (ID) ---
+    "traveloka.com": "traveloka",  # ID #1 OTA, multi-country in SE Asia
+    "tiket.com": "tiket",  # ID OTA
+    "pegipegi.com": "pegipegi",
+    "rumah.com": "rumah",  # ID property
+    "rumah123.com": "rumah123",  # ID property
+    "99.co": "co99",  # ID/SG property
+    # --- Vietnam (VN) ---
+    "mytour.vn": "mytour",  # VN OTA
+    "ivivu.com": "ivivu",  # VN OTA
+    "vntrip.vn": "vntrip",  # VN OTA
+    "luxstay.com": "luxstay",  # VN short-term vacation rentals
+    "batdongsan.com.vn": "batdongsan",  # VN property
+    "chotot.com": "chotot",  # VN classifieds (Adevinta)
+    # --- United Kingdom / Ireland / Scotland ---
+    # Scotland: served via .co.uk and dedicated cottage brands. .scot is
+    # rarely used for booking sites. Most Scottish vacation rentals live
+    # on Sykes Cottages / Cottages & Castles / Airbnb / Vrbo.
+    "rightmove.co.uk": "rightmove",  # UK #1 property portal
+    "zoopla.co.uk": "zoopla",  # UK #2 property portal
+    "onthemarket.com": "onthemarket",  # UK property portal
+    "spareroom.co.uk": "spareroom",  # UK shared accommodations
+    "gumtree.com": "gumtree",  # UK classifieds (also IE coverage)
+    "daft.ie": "daft",  # IE #1 property portal
+    "myhome.ie": "myhome",  # IE property portal
+    "property.ie": "property_ie",  # IE property
+    "sykescottages.co.uk": "sykescottages",  # UK vacation rentals (Scotland heavy)
+    "hoseasons.co.uk": "hoseasons",  # UK vacation rentals
+    "cottagesandcastles.co.uk": "cottagesandcastles",  # Scottish vacation rentals
+    "hostunusual.co.uk": "hostunusual",  # UK unique stays
+    # --- Portugal (PT) ---
+    # idealista.pt already covered above via "idealista" brand.
+    "imovirtual.com": "imovirtual",  # PT #1 property portal
+    "olx.pt": "olx",  # extends OLX brand to Portugal
+    "custojusto.pt": "custojusto",  # PT classifieds
+    "casa.sapo.pt": "casasapo",  # PT property portal
+    # --- Chile (CL) ---
+    "portalinmobiliario.com": "portalinmobiliario",  # CL #1 property
+    "yapo.cl": "yapo",  # CL classifieds
+    "mercadolibre.cl": "mercadolibre",  # extends ML brand to Chile
+    # --- Canada (CA) ---
+    # Toronto-priority -- the user called this out. Realtor.ca and Kijiji
+    # both serve Toronto natively; cottage sites cover Ontario rentals.
+    "realtor.ca": "realtor_ca",  # CA #1 property portal
+    "kijiji.ca": "kijiji",  # CA classifieds (eBay Group)
+    "cottagesincanada.com": "cottagesincanada",  # CA vacation rentals
+    "canadastays.com": "canadastays",  # CA vacation rentals
+    "cottagecountry.ca": "cottagecountry",  # CA vacation rentals
+    # --- Nordic (NO/SE/DK/FI/IS) ---
+    "finn.no": "finn",  # NO #1 classifieds (Adevinta flagship)
+    "hybel.no": "hybel",  # NO rentals
+    "hemnet.se": "hemnet",  # SE #1 property
+    "blocket.se": "blocket",  # SE #1 classifieds (Adevinta)
+    "bostadsportal.se": "bostadsportal",  # SE property
+    "boliga.dk": "boliga",  # DK property
+    "dba.dk": "dba",  # DK classifieds (eBay)
+    "lejebolig.dk": "lejebolig",  # DK rentals
+    "oikotie.fi": "oikotie",  # FI #1 classifieds + property
+    "tori.fi": "tori",  # FI classifieds (Adevinta)
+    "etuovi.com": "etuovi",  # FI property
+    # --- Netherlands (NL) ---
+    "funda.nl": "funda",  # NL #1 property
+    "pararius.nl": "pararius",  # NL rentals
+    "marktplaats.nl": "marktplaats",  # NL classifieds (eBay)
+    "huurwoningen.nl": "huurwoningen",  # NL rentals
+    # --- Switzerland (CH) ---
+    # e-domizil.ch / interhome.ch already covered as DACH brands.
+    "homegate.ch": "homegate",  # CH #1 property
+    "immoscout24.ch": "immoscout24",  # CH property
+    "comparis.ch": "comparis",  # CH meta-search property
+    "anibis.ch": "anibis",  # CH classifieds
+    "tutti.ch": "tutti",  # CH classifieds
+    # --- Austria (AT) ---
+    "willhaben.at": "willhaben",  # AT #1 classifieds
+    "immoscout24.at": "immoscout24",  # extends immoscout24 brand
+    "immowelt.at": "immowelt",  # AT property
+    "immowelt.de": "immowelt",  # DE primary
+    # --- Belgium (BE) ---
+    "immoweb.be": "immoweb",  # BE #1 property
+    "zimmo.be": "zimmo",  # BE property
+    "2dehands.be": "tweedehands",  # BE classifieds (Marktplaats sibling)
+    "logic-immo.be": "logicimmo",  # BE property
     "domiztel.com": "domiztel",
 }
 
