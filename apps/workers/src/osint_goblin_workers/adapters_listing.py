@@ -1386,31 +1386,48 @@ _PLATFORM_EXTRACTORS: dict[str, Any] = {
 }
 
 
-def _listing_fetch(url: str, timeout_s: float = 60.0) -> tuple[int, str]:
-    """Fetch a listing page via Scrapling's StealthyFetcher.
+def _listing_fetch(
+    url: str,
+    *,
+    platform: str | None = None,
+    investigation_id: str = "default",
+    timeout_s: float = 90.0,
+) -> tuple[int, str]:
+    """Humanized listing fetch (Ship 8 OPSEC).
 
-    Travel platforms uniformly require JS-rendered scrape: Airbnb checks
-    for browser fingerprint, Booking serves a captcha to non-browsers,
-    Yanolja redirects non-CN-IP requests through a verification page.
-    StealthyFetcher (Patchright) handles all of these.
+    Routes through `osint_goblin_workers.humanize.HumanizedFetcher` for
+    a full anti-bot bypass stack: persistent BrowserContext per
+    investigation, per-platform warm-up flow (homepage -> accept-cookies
+    -> search -> click into listing), UA + referer rotation, synthetic
+    mouse + scroll interaction, optional Tor egress via env flag.
+
+    Why humanized rather than naked StealthyFetcher: travel platforms
+    (especially VRBO + Booking) rate-limit any client that deep-links to
+    listing URLs without a believable browse session. Pressure-test
+    2026-05-15 confirmed VRBO 429s on the second deep-link from the
+    same IP within 60s. The humanized fetcher's persistent context +
+    warm-up flow avoids that detection class.
     """
+    from .humanize import HumanizedFetcher
+
+    # Per-investigation fetcher instance; falls back to default for
+    # callers that don't carry an investigation_id (synthetic tests +
+    # cmd-K manual dispatches).
+    fetcher = HumanizedFetcher(investigation_id=investigation_id)
     try:
-        from scrapling.fetchers import StealthyFetcher
-    except ImportError:
-        return (0, "")
-    try:
-        page = StealthyFetcher.fetch(
+        return fetcher.fetch(
             url,
-            headless=True,
-            network_idle=True,
-            timeout=int(timeout_s * 1000),
+            platform=platform,
+            timeout_s=timeout_s,
+            jitter=True,
+            synthetic_interaction=True,
         )
-        body = getattr(page, "html_content", None) or getattr(page, "text", "") or ""
-        if isinstance(body, bytes | bytearray):
-            body = bytes(body).decode("utf-8", errors="replace")
-        return (int(getattr(page, "status", 0) or 0), body)
-    except Exception:
-        return (0, "")
+    finally:
+        # The single-shot use here ALWAYS shreds the fetcher on exit so
+        # the browser process doesn't leak. Future Ship-10 work that
+        # wants multi-fetch session continuity will instantiate
+        # HumanizedFetcher directly + manage the lifecycle.
+        fetcher.shred()
 
 
 # ===========================================================================
@@ -1468,7 +1485,12 @@ def listing_scrape(payload: dict[str, Any]) -> list[dict[str, Any]]:
             }
         ]
 
-    status, body = _listing_fetch(listing_url)
+    investigation_id = (payload.get("investigation_id") or "default").strip() or "default"
+    status, body = _listing_fetch(
+        listing_url,
+        platform=platform,
+        investigation_id=investigation_id,
+    )
     if status != 200 or not body:
         return [
             {
@@ -1505,7 +1527,8 @@ def listing_scrape(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "platform": platform,
                 "listing_url": listing_url,
                 "extraction_tier": data.get("extraction_tier", "unknown"),
-                "fetch_method": "scrapling-stealthy-patchright",
+                "fetch_method": "humanized-patchright",  # Ship 8 OPSEC
+                "investigation_id": investigation_id,
             },
         },
     ]
