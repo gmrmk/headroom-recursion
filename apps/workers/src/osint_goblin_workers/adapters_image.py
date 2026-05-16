@@ -51,7 +51,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -293,41 +292,57 @@ def image_flip_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
             }
         ]
 
+    # Naomi-strict: ephemeral mode is the DEFAULT (override with
+    # OSINT_EPHEMERAL_MODE=0). In ephemeral mode, NO bytes touch the
+    # repo's data/ directory regardless of output_format. The flipped
+    # variant goes either to a per-process anonymous tmpdir under %TEMP%
+    # (cleaned at process exit) or inline in the event (base64).
     if fmt == "file":
-        out_dir = _REPO_ROOT / "data" / "flipped"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        # Sanitize a name from the URL
-        import hashlib
+        from .ephemeral import (
+            ephemeral_artifact_dir,
+            is_ephemeral_mode,
+            random_token,
+        )
 
-        h = hashlib.sha256(image_url.encode()).hexdigest()[:16]
-        out_path = out_dir / f"{h}.jpg"
-        out_path.write_bytes(flipped_bytes)
-        # Mei-Lan M1: emit a forward-slash rel-to-data path alongside the
-        # absolute one. The API's /files/{rel_path} surface (Camille accept)
-        # serves it inline so EventRow can render <img src="/files/...">.
-        flipped_rel = f"flipped/{h}.jpg"
-        return [
-            {
-                "event_type": "image-match",
-                "payload": {
-                    "source": "flip",
-                    "image_url": image_url,
-                    "flipped_path": str(out_path),
-                    "flipped_rel": flipped_rel,
-                    "size_bytes": len(flipped_bytes),
-                    "content_type": ctype,
-                    "note": "feed flipped_path back into tineye_image or yandex_image_reverse",
+        if is_ephemeral_mode():
+            # Strict mode: refuse to write to repo data/ AND don't write
+            # to disk at all. Fall through to base64-inline below.
+            fmt = "base64"
+        else:
+            # Operator opted out for forensic deep-dive. Write to per-
+            # process tmpdir, NOT to data/. Filename is random -- no
+            # investigation-id or image-url hash in the path so a
+            # directory listing reveals nothing about who/what was
+            # researched. The tmpdir is shred via atexit on process exit.
+            out_dir = ephemeral_artifact_dir() / "flipped"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_path = out_dir / f"{random_token()}.jpg"
+            out_path.write_bytes(flipped_bytes)
+            return [
+                {
+                    "event_type": "image-match",
+                    "payload": {
+                        "source": "flip",
+                        "image_url": image_url,
+                        "flipped_path": str(out_path),
+                        "ephemeral": True,
+                        "size_bytes": len(flipped_bytes),
+                        "content_type": ctype,
+                        "note": (
+                            "non-ephemeral run: flipped variant in per-process "
+                            "tmpdir, dropped on process exit"
+                        ),
+                    },
                 },
-            },
-            {
-                "event_type": "tool-run-result",
-                "payload": {
-                    "image_url": image_url,
-                    "flipped_path": str(out_path),
-                    "flipped_rel": flipped_rel,
+                {
+                    "event_type": "tool-run-result",
+                    "payload": {
+                        "image_url": image_url,
+                        "flipped_path": str(out_path),
+                        "ephemeral": True,
+                    },
                 },
-            },
-        ]
+            ]
     # base64 default
     b64 = base64.b64encode(flipped_bytes).decode("ascii")
     return [
@@ -423,8 +438,6 @@ def image_ela_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
             }
         ]
     try:
-        import hashlib
-
         from PIL import ImageEnhance
 
         img = Image.open(io.BytesIO(data)).convert("RGB")
@@ -447,12 +460,28 @@ def image_ela_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
             visualization = ImageEnhance.Brightness(diff).enhance(scale)
         else:
             visualization = diff
-        out_dir = _REPO_ROOT / "data" / "ela"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        h = hashlib.sha256(f"{image_url}|q={quality}".encode()).hexdigest()[:16]
-        ela_path = out_dir / f"{h}.jpg"
-        visualization.save(ela_path, format="JPEG", quality=92)
-        ela_rel = f"ela/{h}.jpg"
+        # Naomi-strict: ephemeral mode is the DEFAULT. ELA viz never
+        # touches the repo's data/ directory. In ephemeral mode the
+        # visualization is dropped after the heuristic scores are
+        # computed (the operator sees verdict + numeric stats in the
+        # event; if they want the visual they re-run with
+        # OSINT_EPHEMERAL_MODE=0). In opt-out mode it lands in the
+        # per-process tmpdir under %TEMP%, dropped at process exit.
+        from .ephemeral import (
+            ephemeral_artifact_dir,
+            is_ephemeral_mode,
+            random_token,
+        )
+
+        if is_ephemeral_mode():
+            ela_path = None
+            ela_rel = None
+        else:
+            out_dir = ephemeral_artifact_dir() / "ela"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            ela_path = out_dir / f"{random_token()}.jpg"
+            visualization.save(ela_path, format="JPEG", quality=92)
+            ela_rel = None  # no repo-relative path -- file is outside repo
     except Exception as exc:
         return [
             {
@@ -470,6 +499,8 @@ def image_ela_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
         verdict = "likely-edited"
     elif mean_diff > 6 or std_diff > 10:
         verdict = "suspicious"
+    # When ela_path is None (ephemeral mode), the visualization was
+    # dropped after stats were computed -- emit numeric scores only.
     return [
         {
             "event_type": "image-match",
@@ -481,9 +512,16 @@ def image_ela_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "max_diff": max_diff,
                 "std_diff": round(std_diff, 2),
                 "verdict": verdict,
-                "ela_path": str(ela_path),
+                "ela_path": str(ela_path) if ela_path is not None else None,
                 "ela_rel": ela_rel,
-                "note": "ELA is heuristic; visual inspection of high-diff regions confirms",
+                "ephemeral": ela_path is None,
+                "note": (
+                    "ELA heuristic verdict only; visualization dropped in "
+                    "ephemeral mode (set OSINT_EPHEMERAL_MODE=0 to materialize "
+                    "the diff image to a tmpdir for visual review)"
+                    if ela_path is None
+                    else "ELA is heuristic; visual inspection of high-diff regions confirms"
+                ),
             },
         },
         {
@@ -491,8 +529,9 @@ def image_ela_check(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "payload": {
                 "image_url": image_url,
                 "verdict": verdict,
-                "ela_path": str(ela_path),
+                "ela_path": str(ela_path) if ela_path is not None else None,
                 "ela_rel": ela_rel,
+                "ephemeral": ela_path is None,
             },
         },
     ]
@@ -1497,59 +1536,40 @@ def phash_dedupe(payload: dict[str, Any]) -> list[dict[str, Any]]:
             }
         ]
 
-    # Search prior DB for matches within threshold.
+    # Naomi-strict: the phash audit trail is process-memory only. No
+    # JSONL on disk. No case_id stored anywhere persistent. Lookup +
+    # store both go through ephemeral.phash_store(), which is a dict
+    # dropped on process exit.
+    from .ephemeral import phash_store
+
+    store = phash_store()
     matches: list[dict[str, Any]] = []
-    if _PHASH_DB_PATH.is_file():
-        try:
-            with _PHASH_DB_PATH.open("r", encoding="utf-8") as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        row = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    prior_phash = row.get("phash", "")
-                    if not prior_phash:
-                        continue
-                    dist = _hamming(phash, prior_phash)
-                    if dist <= threshold:
-                        matches.append(
-                            {
-                                "prior_image_url": row.get("image_url", ""),
-                                "prior_case_id": row.get("case_id", ""),
-                                "prior_saved_at": row.get("saved_at", ""),
-                                "hamming_distance": dist,
-                                "verdict": (
-                                    "identical"
-                                    if dist <= 4
-                                    else "visually-identical"
-                                    if dist <= 8
-                                    else "visually-similar"
-                                ),
-                            }
-                        )
-        except OSError as exc:
-            sys.stderr.write(f"phash-db read soft-fail: {exc}\n")
+    for prior_phash, prior_urls in list(store._by_hash.items()):
+        if not prior_phash:
+            continue
+        dist = _hamming(phash, prior_phash)
+        if dist > threshold:
+            continue
+        for prior_url in prior_urls:
+            if prior_url == image_url:
+                continue  # same image; not a cross-listing match
+            matches.append(
+                {
+                    "prior_image_url": prior_url,
+                    "hamming_distance": dist,
+                    "verdict": (
+                        "identical"
+                        if dist <= 4
+                        else "visually-identical"
+                        if dist <= 8
+                        else "visually-similar"
+                    ),
+                }
+            )
 
-    # Append to DB (append-only audit trail; no overwrite).
+    # Add to in-memory store (no disk write, no case_id retained).
     if not skip_store:
-        try:
-            from datetime import UTC
-            from datetime import datetime as _dt
-
-            _PHASH_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-            row = {
-                "phash": phash,
-                "case_id": case_id,
-                "image_url": image_url,
-                "saved_at": _dt.now(UTC).isoformat(),
-            }
-            with _PHASH_DB_PATH.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(row, separators=(",", ":")) + "\n")
-        except OSError as exc:
-            sys.stderr.write(f"phash-db write soft-fail: {exc}\n")
+        store.add(phash, image_url)
 
     events: list[dict[str, Any]] = []
     for m in matches[:20]:  # cap dossier noise
