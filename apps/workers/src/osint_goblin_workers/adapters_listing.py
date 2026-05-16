@@ -75,6 +75,7 @@ LICENSE / TERMS OF SERVICE
 
 from __future__ import annotations
 
+import contextlib
 import html as _html
 import json as _json
 import re
@@ -1611,15 +1612,739 @@ def extract_booking(html_body: str, listing_url: str) -> dict[str, Any]:
     }
 
 
-# Per-platform extractor dispatch. Airbnb + Booking have bespoke parsing
-# for richer data than schema.org JSON-LD alone provides; the others
-# fall through to extract_generic_jsonld until their bespoke parsers
-# land. Per-platform parsers can be added incrementally; each MUST
-# preserve the owner_mention field by calling review_owner_mention_scan
-# on extracted review text (user directive 2026-05-15).
+# ===========================================================================
+# VRBO extractor (Imperva PWA tier; zendriver-unblocked 2026-05-16)
+# ===========================================================================
+#
+# VRBO is Expedia-owned and ships listing data as schema.org **microdata**
+# (itemprop / itemtype attrs) rather than the JSON-LD blobs Airbnb +
+# Booking favor. Microdata is the cleanest extraction surface here -- the
+# Apollo state blob also has everything but is keyed by GraphQL query
+# arguments, brittle.
+#
+# What's available in the logged-out HTML:
+#   - itemtype="https://schema.org/VacationRental"  (root)
+#       itemprop="name"           -> listing title
+#       itemprop="description"    -> short blurb
+#   - itemtype="https://schema.org/PostalAddress"
+#       itemprop="addressLocality" -> city
+#       itemprop="addressRegion"   -> region/state code
+#       itemprop="addressCountry"  -> country code
+#       itemprop="streetAddress"   -> typically EMPTY (VRBO hides for privacy)
+#       itemprop="postalCode"      -> typically EMPTY
+#   - itemtype="http://schema.org/GeoCoordinates"
+#       itemprop="latitude"        -> GPS lat
+#       itemprop="longitude"       -> GPS lng
+#   - itemtype="https://schema.org/AggregateRating"
+#       itemprop="ratingValue"     -> rating (0-10 scale; VRBO uses Booking-style)
+#       itemprop="bestRating"      -> 10
+#       itemprop="reviewCount"     -> integer
+#   - itemtype="https://schema.org/Accommodation"
+#       itemprop="occupancy"       -> max guests via QuantitativeValue.value
+#
+# What's NOT available without auth:
+#   - Host / property-manager name (Expedia design: revealed only in
+#     booking flow after sign-in). We leave host_name empty; the dossier
+#     surfaces this gracefully via owner_mention=LISTING_OWNER_DRIFT_INFO.
+#   - Individual review text (lazy-loaded via GraphQL after page idle).
+#     Future Ship 12 work: follow-up GraphQL call to fetch reviews.
+#
+# og: meta tags supplement the microdata for canonical title/image/URL.
+
+# Generic microdata extractor: pulls `content="..."` from
+# <meta itemprop="X" content="Y"> tags. Scoped because some VRBO blocks
+# have null content (e.g. starRating ratingValue=null); the caller filters.
+_VRBO_META_ITEMPROP_RE = re.compile(
+    r'<meta\s+itemprop="([^"]+)"\s+content="([^"]*)"\s*/?>',
+    re.IGNORECASE,
+)
+
+# og: meta tag extractor (title/description/image/url canonicals).
+_VRBO_OG_META_RE = re.compile(
+    r'<meta[^>]+property="og:([^"]+)"[^>]+content="([^"]*)"',
+    re.IGNORECASE,
+)
+
+
+def _vrbo_extract_listing_id(listing_url: str) -> str:
+    """VRBO URL forms:
+      https://www.vrbo.com/1682245
+      https://www.vrbo.com/en-gb/p1682245vb        (locale-prefixed)
+      https://www.vrbo.com/cottage-rental/p1682245vb  (slug-prefixed)
+    The stable token is the digit run in the final path segment.
+    """
+    try:
+        path = urllib.parse.urlparse(listing_url).path
+    except Exception:
+        return ""
+    # Try plain `/digits` first (canonical).
+    m = re.search(r"/(\d{4,})(?:/|$)", path)
+    if m:
+        return m.group(1)
+    # Locale / slug variants: `/p1682245vb`.
+    m = re.search(r"/p(\d{4,})vb\b", path)
+    return m.group(1) if m else ""
+
+
+def extract_vrbo(html_body: str, listing_url: str) -> dict[str, Any]:
+    """Extract a normalized VRBO listing record.
+
+    Strategy:
+      1. Pull every `<meta itemprop="X" content="Y">` into a dict.
+      2. og:title / og:description / og:image override microdata-name
+         (og titles are the rendered marketing string; microdata-name
+         is sometimes auto-generated).
+      3. GPS from GeoCoordinates microdata (load-bearing PV signal).
+      4. AggregateRating uses 0-10 scale (Expedia convention).
+      5. Host / reviews left empty; owner_mention returns INFO.
+    """
+    # Collect all microdata meta tags into a dict. When a key appears
+    # multiple times (e.g. multiple occupancy "value" attrs in nested
+    # Accommodation blocks) the FIRST wins -- VRBO ships the listing-
+    # level value first, then per-bedroom subdivisions.
+    micro: dict[str, str] = {}
+    for m in _VRBO_META_ITEMPROP_RE.finditer(html_body):
+        key, val = m.group(1), m.group(2)
+        if key not in micro and val and val.lower() != "null":
+            micro[key] = _html.unescape(val)
+
+    og: dict[str, str] = {}
+    for m in _VRBO_OG_META_RE.finditer(html_body):
+        key, val = m.group(1), m.group(2)
+        if key not in og:
+            og[key] = _html.unescape(val)
+
+    # Title prefers og:title (cleaner marketing string), falls back to
+    # microdata name. og:title typically has " - <City> | Vrbo" suffix;
+    # strip that for a cleaner listing title.
+    title = og.get("title") or micro.get("name") or ""
+    title = re.sub(r"\s*\|\s*Vrbo\s*$", "", title).rstrip()
+
+    description = og.get("description") or micro.get("description") or ""
+    description = description[:600]
+
+    # Address: locality/region/country from PostalAddress microdata.
+    # streetAddress + postalCode are usually empty (VRBO privacy).
+    city = micro.get("addressLocality", "")
+    region = micro.get("addressRegion", "")
+    country = micro.get("addressCountry", "")
+    street = micro.get("streetAddress", "")
+    address_parts = [p for p in (street, city, region, country) if p]
+    address_displayed = ", ".join(address_parts)
+
+    # GPS from GeoCoordinates. The two meta tags sit at the top level of
+    # the microdata.
+    gps_lat: float | None = None
+    gps_lon: float | None = None
+    gps_source = "absent"
+    try:
+        if "latitude" in micro and "longitude" in micro:
+            gps_lat = float(micro["latitude"])
+            gps_lon = float(micro["longitude"])
+            gps_source = "microdata-geocoordinates"
+    except (TypeError, ValueError):
+        gps_lat = None
+        gps_lon = None
+        gps_source = "absent"
+
+    # AggregateRating. VRBO uses 0-10 (like Booking), not 0-5 (Airbnb).
+    review_count = 0
+    review_rating: float | None = None
+    try:
+        review_count = int(micro.get("reviewCount") or 0)
+    except (TypeError, ValueError):
+        review_count = 0
+    try:
+        rv = micro.get("ratingValue")
+        if rv is not None:
+            review_rating = float(rv)
+    except (TypeError, ValueError):
+        review_rating = None
+
+    # Occupancy (max guests) from Accommodation.occupancy.value.
+    max_guests: int | None = None
+    try:
+        v = micro.get("value")
+        if v:
+            max_guests = int(float(v))
+    except (TypeError, ValueError):
+        max_guests = None
+
+    # Photos: og:image is the canonical hero image; VRBO ships one og:image
+    # tag per listing in the prerendered head. Carousel images are lazy
+    # so they're not in initial HTML.
+    photo_urls: list[str] = []
+    if "image" in og:
+        photo_urls.append(og["image"])
+
+    # No host name available in logged-out HTML (Expedia design).
+    # No review-text available without GraphQL follow-up (lazy-loaded).
+    # owner_mention will return LISTING_OWNER_DRIFT_INFO -- correct
+    # behavior when there's no review corpus to scan.
+    owner_mention = review_owner_mention_scan("", [])
+
+    return {
+        "platform": "vrbo",
+        "listing_url": listing_url,
+        "listing_id": _vrbo_extract_listing_id(listing_url),
+        "title": title,
+        "host_name": "",
+        "host_url": "",
+        "host_member_since": "",
+        "host_is_superhost": False,
+        "host_verifications": [],
+        "host_response_rate": "",
+        "host_response_time": "",
+        "cohost_names": [],
+        "cohost_urls": [],
+        "address_displayed": address_displayed,
+        "neighborhood": "",
+        "city": city,
+        "country": country,
+        "gps_lat": gps_lat,
+        "gps_lon": gps_lon,
+        "gps_source": gps_source,
+        "review_count": review_count,
+        "review_rating": review_rating,
+        "review_rating_scale": "0-10",
+        "review_sample": [],
+        "review_extracted_count": 0,
+        "owner_mention": owner_mention,
+        "photo_urls": photo_urls,
+        "amenities": [],
+        "bedrooms": None,
+        "bathrooms": None,
+        "max_guests": max_guests,
+        "property_type": "VacationRental",
+        "currency": "",
+        "nightly_price": None,
+        "extraction_tier": "microdata",
+        "raw_jsonld_count": len(extract_jsonld_blocks(html_body)),
+    }
+
+
+# ===========================================================================
+# TripAdvisor extractor (DataDome tier; camoufox-unblocked 2026-05-16)
+# ===========================================================================
+#
+# TripAdvisor ships rich schema.org JSON-LD for hotel + vacation-rental
+# pages. The shape is a close cousin of Booking's:
+#   - @type=Hotel (hotels) or VacationRental (TA + FlipKey rentals)
+#   - name, description, image (string or list)
+#   - address (PostalAddress: streetAddress, addressLocality,
+#     addressRegion, addressCountry, postalCode)
+#   - geo (GeoCoordinates: latitude, longitude)  -- TA EXPOSES the pin
+#   - aggregateRating (ratingValue 0-5, reviewCount)
+#   - priceRange (free-text "$100 - $250")
+#
+# URL patterns (listing_id extraction):
+#   /Hotel_Review-g<geo>-d<id>-Reviews-<slug>.html
+#   /VacationRentalReview-g<geo>-d<id>-Reviews-<slug>.html
+#   /FlipKey listings have the same -d<id>- token
+#
+# Host data: TripAdvisor doesn't surface property-owner identity in the
+# public HTML. For rental listings it shows a "Hosted by FirstName"
+# string in rendered DOM but it's behind a JS render-tree, not in
+# initial markup. Leave host_name empty; owner_mention -> INFO.
+#
+# Review text: lazy-loaded via TripAdvisor's GraphQL after initial render.
+# Like VRBO, deferred to a future Ship 12 GraphQL follow-up adapter.
+
+
+_TRIPADVISOR_LISTING_ID_RE = re.compile(r"-d(\d{4,})-", re.IGNORECASE)
+
+
+def _tripadvisor_extract_listing_id(listing_url: str) -> str:
+    """TripAdvisor URL forms always carry `-d<digits>-` in the path.
+    e.g. /Hotel_Review-g60745-d224467-Reviews-... -> 224467.
+    Returns empty string for non-listing URLs.
+    """
+    try:
+        path = urllib.parse.urlparse(listing_url).path
+    except Exception:
+        return ""
+    m = _TRIPADVISOR_LISTING_ID_RE.search(path)
+    return m.group(1) if m else ""
+
+
+def extract_tripadvisor(html_body: str, listing_url: str) -> dict[str, Any]:
+    """Extract a normalized TripAdvisor (or FlipKey) listing record.
+
+    Strategy:
+      1. Pull schema.org JSON-LD blocks; prefer @type=Hotel or
+         VacationRental as the primary, fall back to LodgingBusiness.
+      2. Address from PostalAddress sub-block; geo from GeoCoordinates.
+      3. aggregateRating uses 0-5 scale (TripAdvisor convention).
+      4. Host empty (not in public markup); review text empty (lazy).
+      5. Owner-mention scan runs with empty inputs -> INFO tier.
+    """
+    blocks = extract_jsonld_blocks(html_body)
+    products = _walk_jsonld(blocks, ("Hotel", "VacationRental", "LodgingBusiness", "Product"))
+    primary = products[0] if products else {}
+
+    title = primary.get("name") or ""
+    description = primary.get("description") or ""
+    description = description[:600]
+
+    addr = primary.get("address") or {}
+    if isinstance(addr, list):
+        addr = addr[0] if addr else {}
+    address_displayed = ""
+    city = ""
+    country = ""
+    if isinstance(addr, dict):
+        city = addr.get("addressLocality") or ""
+        country = addr.get("addressCountry") or ""
+        # addressCountry may be {"@type": "Country", "name": "United States"}.
+        if isinstance(country, dict):
+            country = country.get("name") or ""
+        parts = [
+            addr.get("streetAddress") or "",
+            city,
+            addr.get("addressRegion") or "",
+            country,
+        ]
+        address_displayed = ", ".join(p for p in parts if p)
+
+    # GPS from JSON-LD geo block (TripAdvisor exposes the pin).
+    geo = primary.get("geo") or {}
+    if isinstance(geo, list):
+        geo = geo[0] if geo else {}
+    gps_lat: float | None = None
+    gps_lon: float | None = None
+    gps_source = "absent"
+    if isinstance(geo, dict):
+        try:
+            lat_raw = geo.get("latitude")
+            lon_raw = geo.get("longitude")
+            if lat_raw is not None and lon_raw is not None:
+                gps_lat = float(lat_raw)
+                gps_lon = float(lon_raw)
+                gps_source = "json-ld-geo"
+        except (TypeError, ValueError):
+            gps_lat = None
+            gps_lon = None
+            gps_source = "absent"
+
+    # Aggregate rating: 0-5 scale on TripAdvisor (unlike Booking's 0-10).
+    rating_obj = primary.get("aggregateRating") or {}
+    review_count = 0
+    review_rating: float | None = None
+    if isinstance(rating_obj, dict):
+        try:
+            review_count = int(rating_obj.get("reviewCount") or 0)
+        except (TypeError, ValueError):
+            review_count = 0
+        try:
+            rv = rating_obj.get("ratingValue")
+            if rv is not None:
+                review_rating = float(rv)
+        except (TypeError, ValueError):
+            review_rating = None
+
+    # Photos: JSON-LD `image` is a string or list.
+    img_field = primary.get("image")
+    photo_urls: list[str] = []
+    if isinstance(img_field, str):
+        photo_urls = [img_field]
+    elif isinstance(img_field, list):
+        photo_urls = [x for x in img_field if isinstance(x, str)]
+
+    # Price range as free text ("$100 - $250" or "$$$$").
+    price_range = primary.get("priceRange") or ""
+
+    # No host name + no review text -> owner_mention is INFO.
+    owner_mention = review_owner_mention_scan("", [])
+
+    # Determine TripAdvisor vs FlipKey for the platform field (they're
+    # routed to the same extractor but the dossier may want the distinction).
+    platform_label = "tripadvisor"
+    if "flipkey.com" in (urllib.parse.urlparse(listing_url).hostname or "").lower():
+        platform_label = "flipkey"
+
+    return {
+        "platform": platform_label,
+        "listing_url": listing_url,
+        "listing_id": _tripadvisor_extract_listing_id(listing_url),
+        "title": title,
+        "host_name": "",
+        "host_url": "",
+        "host_member_since": "",
+        "host_is_superhost": False,
+        "host_verifications": [],
+        "host_response_rate": "",
+        "host_response_time": "",
+        "cohost_names": [],
+        "cohost_urls": [],
+        "address_displayed": address_displayed,
+        "neighborhood": "",
+        "city": city,
+        "country": country,
+        "gps_lat": gps_lat,
+        "gps_lon": gps_lon,
+        "gps_source": gps_source,
+        "review_count": review_count,
+        "review_rating": review_rating,
+        "review_rating_scale": "0-5",
+        "review_sample": [],
+        "review_extracted_count": 0,
+        "owner_mention": owner_mention,
+        "photo_urls": photo_urls,
+        "amenities": [],
+        "bedrooms": None,
+        "bathrooms": None,
+        "max_guests": None,
+        "property_type": primary.get("@type") or "",
+        "currency": "",
+        "nightly_price": None,
+        "price_range_text": price_range,
+        "extraction_tier": "json-ld" if products else "dom",
+        "raw_jsonld_count": len(blocks),
+    }
+
+
+# ===========================================================================
+# Yanolja extractor (KR; vendor=none in PLATFORM_ANTIBOT_MAP)
+# ===========================================================================
+#
+# Yanolja is South Korea's biggest accommodation booking platform
+# (hotels + motels + 모텔 + pensions). They ship JSON-LD where available
+# but the structure is sparser than western OTAs. URL pattern:
+#
+#   https://www.yanolja.com/places/<numeric_id>
+#   https://www.yanolja.com/hotel/<numeric_id>
+#   https://www.yanolja.com/pension/<numeric_id>
+#
+# The listing_id is the trailing digit run in the path. Yanolja does NOT
+# expose a property-manager name in the logged-out HTML (similar to most
+# CN/KR platforms -- host identity is shown only after booking flow
+# starts). Review text + ratings are surfaced via JSON-LD when the
+# property has them.
+#
+# Korean-specific consideration: addressCountry is "South Korea" but
+# addressRegion may be in Korean script (서울특별시 = Seoul Special City).
+# We pass through whatever the markup ships and let the dossier UI
+# render with Korean fonts.
+
+
+def _yanolja_extract_listing_id(listing_url: str) -> str:
+    """Yanolja URLs: /(places|hotel|pension|motel)/<digits>."""
+    try:
+        path = urllib.parse.urlparse(listing_url).path
+    except Exception:
+        return ""
+    m = re.search(r"/(?:places|hotel|pension|motel|guest-?house)/(\d+)", path)
+    return m.group(1) if m else ""
+
+
+def extract_yanolja(html_body: str, listing_url: str) -> dict[str, Any]:
+    """Extract a normalized Yanolja listing.
+
+    Strategy: same schema.org pattern as TripAdvisor + Booking. The
+    Korean market uses 0-5 rating scale (matching schema.org default,
+    NOT Booking's 0-10). Yanolja's JSON-LD typically ships Hotel +
+    LodgingBusiness; older pages may use Place.
+    """
+    blocks = extract_jsonld_blocks(html_body)
+    products = _walk_jsonld(
+        blocks, ("Hotel", "LodgingBusiness", "Place", "VacationRental", "Product")
+    )
+    primary = products[0] if products else {}
+
+    title = primary.get("name") or ""
+
+    addr = primary.get("address") or {}
+    if isinstance(addr, list):
+        addr = addr[0] if addr else {}
+    city = ""
+    country = ""
+    address_displayed = ""
+    if isinstance(addr, dict):
+        city = addr.get("addressLocality") or ""
+        country = addr.get("addressCountry") or ""
+        if isinstance(country, dict):
+            country = country.get("name") or ""
+        parts = [
+            addr.get("streetAddress") or "",
+            city,
+            addr.get("addressRegion") or "",
+            country,
+        ]
+        address_displayed = ", ".join(p for p in parts if p)
+
+    geo = primary.get("geo") or {}
+    if isinstance(geo, list):
+        geo = geo[0] if geo else {}
+    gps_lat: float | None = None
+    gps_lon: float | None = None
+    gps_source = "absent"
+    if isinstance(geo, dict):
+        try:
+            lat_raw = geo.get("latitude")
+            lon_raw = geo.get("longitude")
+            if lat_raw is not None and lon_raw is not None:
+                gps_lat = float(lat_raw)
+                gps_lon = float(lon_raw)
+                gps_source = "json-ld-geo"
+        except (TypeError, ValueError):
+            pass
+
+    rating_obj = primary.get("aggregateRating") or {}
+    review_count = 0
+    review_rating: float | None = None
+    if isinstance(rating_obj, dict):
+        try:
+            review_count = int(rating_obj.get("reviewCount") or 0)
+        except (TypeError, ValueError):
+            review_count = 0
+        try:
+            rv = rating_obj.get("ratingValue")
+            if rv is not None:
+                review_rating = float(rv)
+        except (TypeError, ValueError):
+            review_rating = None
+
+    img_field = primary.get("image")
+    photo_urls: list[str] = []
+    if isinstance(img_field, str):
+        photo_urls = [img_field]
+    elif isinstance(img_field, list):
+        photo_urls = [x for x in img_field if isinstance(x, str)]
+
+    owner_mention = review_owner_mention_scan("", [])
+
+    return {
+        "platform": "yanolja",
+        "listing_url": listing_url,
+        "listing_id": _yanolja_extract_listing_id(listing_url),
+        "title": title,
+        "host_name": "",
+        "host_url": "",
+        "host_member_since": "",
+        "host_is_superhost": False,
+        "host_verifications": [],
+        "host_response_rate": "",
+        "host_response_time": "",
+        "cohost_names": [],
+        "cohost_urls": [],
+        "address_displayed": address_displayed,
+        "neighborhood": "",
+        "city": city,
+        "country": country,
+        "gps_lat": gps_lat,
+        "gps_lon": gps_lon,
+        "gps_source": gps_source,
+        "review_count": review_count,
+        "review_rating": review_rating,
+        "review_rating_scale": "0-5",
+        "review_sample": [],
+        "review_extracted_count": 0,
+        "owner_mention": owner_mention,
+        "photo_urls": photo_urls,
+        "amenities": [],
+        "bedrooms": None,
+        "bathrooms": None,
+        "max_guests": None,
+        "property_type": primary.get("@type") or "",
+        "currency": "KRW",  # Yanolja is KR-only
+        "nightly_price": None,
+        "extraction_tier": "json-ld" if products else "dom",
+        "raw_jsonld_count": len(blocks),
+    }
+
+
+# ===========================================================================
+# Leboncoin extractor (FR; vendor=didomi-only -- cookie banner only)
+# ===========================================================================
+#
+# Leboncoin is France's biggest classifieds platform. Vacation rentals
+# live under /locations/ and /ventes_immobilieres/. Unlike OTAs, the
+# listings are USER-POSTED -- the "host" is the individual seller/owner.
+# This is one of the few platforms where host name IS available in the
+# public markup (under "auteur" / pro account name).
+#
+# URL pattern:
+#   https://www.leboncoin.fr/locations/<id>.htm
+#   https://www.leboncoin.fr/ventes_immobilieres/<id>.htm
+#   https://www.leboncoin.fr/ad/locations/<id>
+#
+# Data surface:
+#   - Next.js __NEXT_DATA__ blob (most reliable; carries the full listing
+#     state for SSR).
+#   - schema.org JSON-LD (recently added; may not be present on older
+#     listings).
+#   - DOM-rendered seller name + city + price.
+#
+# Leboncoin's anti-bot posture is light (Didomi cookie banner only). Most
+# parses should succeed with patchright + no warmup.
+
+
+def _leboncoin_extract_listing_id(listing_url: str) -> str:
+    """Leboncoin URL forms: /(locations|ventes_immobilieres|ad/...)/<id>(.htm)?"""
+    try:
+        path = urllib.parse.urlparse(listing_url).path
+    except Exception:
+        return ""
+    m = re.search(r"/(?:locations|ventes_immobilieres|ad/[^/]+)/(\d+)", path)
+    return m.group(1) if m else ""
+
+
+_LEBONCOIN_NEXT_DATA_RE = re.compile(
+    r'<script[^>]+id="__NEXT_DATA__"[^>]*>(.*?)</script>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def extract_leboncoin(html_body: str, listing_url: str) -> dict[str, Any]:
+    """Extract a normalized Leboncoin listing.
+
+    Strategy: try Next.js __NEXT_DATA__ first (richest), fall back to
+    schema.org JSON-LD, fall back to DOM scraping last. Unlike OTAs,
+    leboncoin DOES expose the seller's display name (legitimate -- it's
+    a classifieds platform where users post their own listings).
+    """
+    title = ""
+    description = ""
+    host_name = ""
+    city = ""
+    country = "France"
+    address_displayed = ""
+    gps_lat: float | None = None
+    gps_lon: float | None = None
+    gps_source = "absent"
+    nightly_price: float | None = None
+    currency = "EUR"
+    photo_urls: list[str] = []
+    extraction_tier = "dom"
+
+    # 1. Try Next.js hydration blob.
+    nd = _LEBONCOIN_NEXT_DATA_RE.search(html_body)
+    if nd:
+        try:
+            data = _json.loads(nd.group(1).strip())
+            extraction_tier = "next-data"
+            # Walk page-props.pageProps.ad (the canonical listing object).
+            pp = data.get("props", {})
+            page_props = pp.get("pageProps", {})
+            ad = page_props.get("ad") or page_props.get("classified") or {}
+            if isinstance(ad, dict):
+                title = ad.get("subject") or ad.get("title") or ""
+                description = (ad.get("body") or ad.get("description") or "")[:600]
+                location = ad.get("location") or {}
+                if isinstance(location, dict):
+                    city = location.get("city") or ""
+                    try:
+                        if location.get("lat") and location.get("lng"):
+                            gps_lat = float(location["lat"])
+                            gps_lon = float(location["lng"])
+                            gps_source = "next-data-location"
+                    except (TypeError, ValueError):
+                        pass
+                    region_name = location.get("region_name") or ""
+                    zip_code = location.get("zipcode") or ""
+                    parts = [city, region_name, zip_code, country]
+                    address_displayed = ", ".join(p for p in parts if p)
+                # Seller / "auteur" object.
+                owner = ad.get("owner") or ad.get("user") or ad.get("publisher") or {}
+                if isinstance(owner, dict):
+                    host_name = owner.get("name") or owner.get("user_id") or ""
+                # Price (single number, EUR).
+                price = ad.get("price")
+                if isinstance(price, int | float):
+                    nightly_price = float(price)
+                elif isinstance(price, list) and price:
+                    with contextlib.suppress(TypeError, ValueError):
+                        nightly_price = float(price[0])
+                # Images (list of URL dicts or URL strings).
+                imgs = ad.get("images") or {}
+                if isinstance(imgs, dict):
+                    urls = imgs.get("urls") or imgs.get("thumb_urls") or []
+                    if isinstance(urls, list):
+                        photo_urls = [u for u in urls if isinstance(u, str)]
+                elif isinstance(imgs, list):
+                    for entry in imgs:
+                        if isinstance(entry, str):
+                            photo_urls.append(entry)
+                        elif isinstance(entry, dict):
+                            u = entry.get("url") or entry.get("large") or entry.get("thumb")
+                            if isinstance(u, str):
+                                photo_urls.append(u)
+        except (ValueError, _json.JSONDecodeError, AttributeError, KeyError):
+            pass
+
+    # 2. Fall back to schema.org JSON-LD if next-data didn't populate basics.
+    blocks = extract_jsonld_blocks(html_body)
+    if not title and blocks:
+        products = _walk_jsonld(blocks, ("Product", "Place", "Accommodation", "Apartment", "House"))
+        primary = products[0] if products else (blocks[0] if blocks else {})
+        if isinstance(primary, dict):
+            title = title or primary.get("name") or ""
+            description = description or (primary.get("description") or "")[:600]
+            img = primary.get("image")
+            if isinstance(img, str) and not photo_urls:
+                photo_urls = [img]
+            elif isinstance(img, list) and not photo_urls:
+                photo_urls = [x for x in img if isinstance(x, str)]
+            if extraction_tier == "dom":
+                extraction_tier = "json-ld"
+
+    owner_mention = review_owner_mention_scan(host_name, [])
+
+    return {
+        "platform": "leboncoin",
+        "listing_url": listing_url,
+        "listing_id": _leboncoin_extract_listing_id(listing_url),
+        "title": title,
+        "host_name": host_name,
+        "host_url": "",
+        "host_member_since": "",
+        "host_is_superhost": False,
+        "host_verifications": [],
+        "host_response_rate": "",
+        "host_response_time": "",
+        "cohost_names": [],
+        "cohost_urls": [],
+        "address_displayed": address_displayed,
+        "neighborhood": "",
+        "city": city,
+        "country": country,
+        "gps_lat": gps_lat,
+        "gps_lon": gps_lon,
+        "gps_source": gps_source,
+        "review_count": 0,  # leboncoin: classifieds, no review system
+        "review_rating": None,
+        "review_rating_scale": "n/a",
+        "review_sample": [],
+        "review_extracted_count": 0,
+        "owner_mention": owner_mention,
+        "photo_urls": photo_urls,
+        "amenities": [],
+        "bedrooms": None,
+        "bathrooms": None,
+        "max_guests": None,
+        "property_type": "Classified",
+        "currency": currency,
+        "nightly_price": nightly_price,
+        "extraction_tier": extraction_tier,
+        "raw_jsonld_count": len(blocks),
+    }
+
+
+# Per-platform extractor dispatch. Airbnb + Booking + VRBO + TripAdvisor
+# + Yanolja + Leboncoin have bespoke parsing for richer data than
+# schema.org JSON-LD alone provides; the others fall through to
+# extract_generic_jsonld until their bespoke parsers land. Per-platform
+# parsers can be added incrementally; each MUST preserve the
+# owner_mention field by calling review_owner_mention_scan on extracted
+# review text (user directive 2026-05-15).
 _PLATFORM_EXTRACTORS: dict[str, Any] = {
     "airbnb": extract_airbnb,
     "booking": extract_booking,
+    "vrbo": extract_vrbo,
+    "tripadvisor": extract_tripadvisor,
+    "flipkey": extract_tripadvisor,  # TripAdvisor subsidiary, same shape
+    "yanolja": extract_yanolja,
+    "leboncoin": extract_leboncoin,
 }
 
 
