@@ -10,6 +10,7 @@ from . import (
     adapters_identity,  # noqa: F401  (W12.id Phase 2, 2026-05-12)
     adapters_image,  # noqa: F401
     adapters_ip,  # noqa: F401
+    adapters_listing,  # noqa: F401  (W20.tr Ship 10, 2026-05-15)
     adapters_phone,  # noqa: F401
     adapters_property,  # noqa: F401
 )

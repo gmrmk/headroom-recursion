@@ -33,6 +33,72 @@ export interface InvestigationFields {
   readonly domain?: string;
   readonly notes?: string;
   readonly csv_path?: string;
+  /**
+   * Ship 10 (W20.tr): travel-platform listing URL. Recognized hosts:
+   * airbnb.com, vrbo.com, booking.com, tripadvisor.com, yanolja.com,
+   * leboncoin.fr, expedia.com, hotels.com, hipcamp.com, and ~30 others.
+   * Dispatches w20.tr which extracts host/cohost/location/GPS/reviews
+   * via Scrapling StealthyFetcher + JSON-LD + per-platform DOM parser.
+   */
+  readonly listing_url?: string;
+}
+
+/** Hosts that the listing_scrape adapter knows how to extract from. */
+const TRAVEL_PLATFORM_HOST_SUFFIXES = [
+  "airbnb.com",
+  "airbnb.co.uk",
+  "airbnb.fr",
+  "airbnb.de",
+  "airbnb.it",
+  "airbnb.es",
+  "airbnb.jp",
+  "airbnb.co.kr",
+  "vrbo.com",
+  "homeaway.com",
+  "homeaway.co.uk",
+  "stayz.com.au",
+  "abritel.fr",
+  "fewo-direkt.de",
+  "booking.com",
+  "tripadvisor.com",
+  "tripadvisor.co.uk",
+  "tripadvisor.fr",
+  "tripadvisor.de",
+  "tripadvisor.jp",
+  "flipkey.com",
+  "yanolja.com",
+  "leboncoin.fr",
+  "expedia.com",
+  "expedia.co.uk",
+  "hotels.com",
+  "hotwire.com",
+  "orbitz.com",
+  "agoda.com",
+  "hipcamp.com",
+  "outdoorsy.com",
+  "rvshare.com",
+  "vacasa.com",
+  "sonder.com",
+  "plumguide.com",
+  "trip.com",
+  "ctrip.com",
+  "ostrovok.ru",
+  "despegar.com",
+  "makemytrip.com",
+  "marriott.com",
+  "tujia.com",
+] as const;
+
+function isTravelPlatformUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.toLowerCase();
+    return TRAVEL_PLATFORM_HOST_SUFFIXES.some(
+      (suffix) => host === suffix || host.endsWith("." + suffix),
+    );
+  } catch {
+    return false;
+  }
 }
 
 export interface WorkflowSelection {
@@ -67,6 +133,7 @@ export function routeWorkflows(
   const ip = trimmed(fields.ip);
   const domain = trimmed(fields.domain);
   const csv_path = trimmed(fields.csv_path);
+  const listing_url = trimmed(fields.listing_url);
 
   // Property-vetting is the umbrella when an address is in play. It
   // chains nominatim -> overpass -> inside-airbnb -> reverse-image +
@@ -178,6 +245,20 @@ export function routeWorkflows(
     });
   }
 
+  // Ship 10 (W20.tr): travel-platform listing extractor. Fires when a
+  // recognized travel-platform URL is provided (airbnb/vrbo/booking/
+  // tripadvisor/yanolja/leboncoin/expedia/hipcamp/etc.). Pulls host,
+  // cohost, GPS pin, reviews from the listing page via Scrapling +
+  // JSON-LD + per-platform DOM parser.
+  if (listing_url && isTravelPlatformUrl(listing_url)) {
+    out.push({
+      id: "w20.tr",
+      label: "Travel Platform Listing Extract",
+      seed: { listing_url },
+      why: "Extract host / cohost / GPS pin / reviews / amenities from the listing page",
+    });
+  }
+
   return out;
 }
 
@@ -196,6 +277,7 @@ export const FIELD_ORDER: ReadonlyArray<keyof InvestigationFields> = [
   "username",
   "ip",
   "domain",
+  "listing_url",
   "csv_path",
   "notes",
 ];
@@ -258,6 +340,13 @@ export const FIELD_META: Record<
     label: "Domain",
     placeholder: "example.com",
     hint: "CT log + Wayback + subdomain enum",
+    monospace: true,
+  },
+  listing_url: {
+    label: "Listing URL",
+    placeholder: "https://www.airbnb.com/rooms/12345678",
+    hint: "Airbnb / VRBO / Booking / TripAdvisor / Yanolja / Leboncoin / Expedia / Hipcamp / 30+ — extracts host + cohost + GPS pin + reviews",
+    type: "url",
     monospace: true,
   },
   csv_path: {

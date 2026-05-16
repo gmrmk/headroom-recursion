@@ -741,7 +741,10 @@ function projectOpenWeb(events: ReadonlyArray<InvestigationEvent>): Finding[] {
       detail:
         "URLs surfaced by ≥2 search engines independently. Confidence: MEDIUM (corroborated). Investigator visit upgrades to FIRM (methodology §2.1).",
       samples,
-      severity: "medium",
+      // Severity union is the UI render tier (info/good/warn/bad), not the
+      // rubric tier. Corroborated hits surface at "warn" (yellow-tier) so
+      // they stand out vs the per-engine "info" sections below.
+      severity: "warn",
       source: "dork:corroborated",
       severity_basis: "matrix:DORK_HIT_CORROBORATED",
     });

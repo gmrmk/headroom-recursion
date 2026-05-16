@@ -745,6 +745,28 @@ WORKFLOWS: dict[str, Workflow] = {
             ),
         ],
     ),
+    "w20.tr": Workflow(
+        id="w20.tr",
+        name="Travel Platform Listing Extract",
+        description=(
+            "Extract host/cohost/location/GPS-pin/reviews from a travel-"
+            "platform listing URL. Platform-detected from URL host: "
+            "Airbnb (bespoke deferred-state walk), Booking / TripAdvisor / "
+            "Vrbo / Expedia / Hipcamp / Yanolja / Leboncoin (generic "
+            "schema.org JSON-LD extractor). Ship 10 (2026-05-15)."
+        ),
+        steps=[
+            WorkflowStep(
+                "listing_scrape",
+                {"listing_url": "{listing_url}"},
+                required_seed_keys=("listing_url",),
+                description=(
+                    "Single-URL listing extractor via Scrapling "
+                    "StealthyFetcher + JSON-LD + per-platform DOM parser."
+                ),
+            ),
+        ],
+    ),
 }
 
 

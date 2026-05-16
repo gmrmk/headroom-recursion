@@ -121,3 +121,64 @@ describe("routeWorkflows — regression checks (existing rules unchanged)", () =
     assert.ok(!list.includes("w4.im"));
   });
 });
+
+describe("routeWorkflows — Ship 10 w20.tr listing extractor", () => {
+  it("airbnb URL triggers w20.tr", () => {
+    const list = ids({ listing_url: "https://www.airbnb.com/rooms/12345678" });
+    assert.ok(list.includes("w20.tr"));
+  });
+
+  it("airbnb UK subdomain triggers w20.tr", () => {
+    const list = ids({ listing_url: "https://www.airbnb.co.uk/rooms/12345" });
+    assert.ok(list.includes("w20.tr"));
+  });
+
+  it("airbnb Korean subdomain triggers w20.tr", () => {
+    const list = ids({ listing_url: "https://ko.airbnb.com/rooms/12345" });
+    assert.ok(list.includes("w20.tr"));
+  });
+
+  it("vrbo triggers w20.tr", () => {
+    const list = ids({ listing_url: "https://www.vrbo.com/12345" });
+    assert.ok(list.includes("w20.tr"));
+  });
+
+  it("booking triggers w20.tr", () => {
+    const list = ids({ listing_url: "https://www.booking.com/hotel/x.html" });
+    assert.ok(list.includes("w20.tr"));
+  });
+
+  it("yanolja KR triggers w20.tr", () => {
+    const list = ids({ listing_url: "https://www.yanolja.com/hotels/12345" });
+    assert.ok(list.includes("w20.tr"));
+  });
+
+  it("leboncoin FR triggers w20.tr", () => {
+    const list = ids({
+      listing_url: "https://www.leboncoin.fr/locations_vacances/12345",
+    });
+    assert.ok(list.includes("w20.tr"));
+  });
+
+  it("unrecognized host (example.com) does NOT trigger w20.tr", () => {
+    const list = ids({ listing_url: "https://example.com/listing/1" });
+    assert.ok(!list.includes("w20.tr"));
+  });
+
+  it("invalid URL does NOT trigger w20.tr", () => {
+    const list = ids({ listing_url: "not a url" });
+    assert.ok(!list.includes("w20.tr"));
+  });
+
+  it("empty listing_url does NOT trigger w20.tr", () => {
+    const list = ids({ listing_url: "" });
+    assert.ok(!list.includes("w20.tr"));
+  });
+
+  it("w20.tr seed carries listing_url verbatim", () => {
+    const url = "https://www.airbnb.com/rooms/12345678";
+    const sel = routeWorkflows({ listing_url: url }).find((s) => s.id === "w20.tr");
+    assert.ok(sel);
+    assert.equal(sel.seed.listing_url, url);
+  });
+});
