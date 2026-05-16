@@ -12,6 +12,7 @@ from osint_goblin_workers.adapters_dork import (
     _parse_baidu_html,
     _parse_bing_html,
     _parse_ddg_html,
+    _parse_naver_html,
     _parse_yandex_html,
     _rewrite_query_for_bing,
     _strip_bing_redirect,
@@ -21,6 +22,7 @@ from osint_goblin_workers.adapters_dork import (
     dork_sweep_bing,
     dork_sweep_brave,
     dork_sweep_ddg,
+    dork_sweep_naver,
     dork_sweep_serper,
     dork_sweep_yandex,
 )
@@ -649,6 +651,118 @@ class TestParseBaiduHtml:
 class TestBaiduAdapter:
     def test_baidu_returns_skip_event_with_empty_seed(self):
         events = dork_sweep_baidu({})
+        assert len(events) == 1
+        assert events[0]["event_type"] == "tool-run-result"
+        assert events[0]["payload"]["skipped"] is True
+
+
+# ---------------------------------------------------------------------------
+# _parse_naver_html -- BS4 card-walk extraction
+# ---------------------------------------------------------------------------
+
+
+# Fixture mirrors Naver's 2026 component-tree structure with random class
+# hashes: title in <span class="sds-comps-text-type-headline1">, snippet
+# in <span class="sds-comps-text-ellipsis-3">, result link in
+# <a nocr="1" href="<external-url>">. All wrapped in a card div.
+_NAVER_FIXTURE = (
+    "<html><body>"
+    '<div class="card fender-ui_abc123">'
+    '<a nocr="1" href="https://www.linkedin.com/in/alice-smith" '
+    'class="fender-ui_def456" data-heatmap-target=".link">'
+    '<div class="sds-comps-profile-thumb"></div></a>'
+    '<div class="card-body fender-ui_ghi789">'
+    '<span class="sds-comps-text sds-comps-text-type-headline1 '
+    'sds-comps-text-weight-sm">Alice Smith - Senior Engineer | LinkedIn</span>'
+    '<span class="sds-comps-text sds-comps-text-ellipsis '
+    "sds-comps-text-ellipsis-3 sds-comps-text-type-body1 "
+    'sds-comps-text-weight-sm">Experience at Acme Corp · Boston, MA · '
+    "500+ connections on LinkedIn. View Alice's profile on LinkedIn.</span>"
+    "</div></div>"
+    '<div class="card fender-ui_xyz000">'
+    '<a nocr="1" href="https://github.com/alicesmith">'
+    "<div></div></a>"
+    '<div class="card-body">'
+    '<span class="sds-comps-text-type-headline1">alice <b>smith</b>&#39;s GitHub</span>'
+    '<span class="sds-comps-text-ellipsis-3">Public repos by alicesmith on GitHub.</span>'
+    "</div></div>"
+    "</body></html>"
+)
+
+
+class TestParseNaverHtml:
+    def test_extracts_two_hits_from_fixture(self):
+        hits = _parse_naver_html(_NAVER_FIXTURE)
+        assert len(hits) == 2
+
+    def test_first_hit_url_title_and_snippet(self):
+        hits = _parse_naver_html(_NAVER_FIXTURE)
+        assert hits[0]["url"] == "https://www.linkedin.com/in/alice-smith"
+        assert "Alice Smith" in hits[0]["title"]
+        assert "Senior Engineer" in hits[0]["title"]
+        assert "Experience at Acme Corp" in hits[0]["snippet"]
+        assert "500+ connections" in hits[0]["snippet"]
+
+    def test_strips_inline_html_from_title(self):
+        hits = _parse_naver_html(_NAVER_FIXTURE)
+        # Second hit has <b>smith</b> + &#39; entity; both stripped.
+        assert hits[1]["title"] == "alice smith's GitHub"
+
+    def test_empty_input_returns_empty_list(self):
+        assert _parse_naver_html("") == []
+        assert _parse_naver_html("<html><body>no results</body></html>") == []
+
+    def test_skips_naver_internal_anchors(self):
+        # Cards whose only nocr=1 anchor points at naver.com (login, dict,
+        # shopping refinements) should not produce a hit -- no external URL.
+        internal_only = (
+            '<div class="card">'
+            '<a nocr="1" href="https://nid.naver.com/nidlogin.login">x</a>'
+            '<span class="sds-comps-text-type-headline1">naver login</span>'
+            "</div>"
+            '<div class="card">'
+            '<a nocr="1" href="https://example.com/real">y</a>'
+            '<span class="sds-comps-text-type-headline1">real result</span>'
+            "</div>"
+        )
+        hits = _parse_naver_html(internal_only)
+        assert len(hits) == 1
+        assert hits[0]["url"] == "https://example.com/real"
+
+    def test_dedupes_repeated_urls(self):
+        dup = (
+            '<div class="card">'
+            '<a nocr="1" href="https://example.com/page">x</a>'
+            '<span class="sds-comps-text-type-headline1">First</span>'
+            "</div>"
+            '<div class="card">'
+            '<a nocr="1" href="https://example.com/page">y</a>'
+            '<span class="sds-comps-text-type-headline1">Duplicate</span>'
+            "</div>"
+        )
+        hits = _parse_naver_html(dup)
+        assert len(hits) == 1
+
+    def test_handles_korean_text_in_title_and_snippet(self):
+        # Naver's primary content is Korean; the parser must round-trip
+        # multi-byte characters through BS4 without corruption.
+        kr = (
+            '<div class="card">'
+            '<a nocr="1" href="https://kr.linkedin.com/in/이재용">x</a>'
+            '<span class="sds-comps-text-type-headline1">이재용 - LinkedIn</span>'
+            '<span class="sds-comps-text-ellipsis-3">삼성전자 회장. 서울 거주.</span>'
+            "</div>"
+        )
+        hits = _parse_naver_html(kr)
+        assert len(hits) == 1
+        assert "이재용" in hits[0]["title"]
+        assert "삼성전자" in hits[0]["snippet"]
+        assert "서울" in hits[0]["snippet"]
+
+
+class TestNaverAdapter:
+    def test_naver_returns_skip_event_with_empty_seed(self):
+        events = dork_sweep_naver({})
         assert len(events) == 1
         assert events[0]["event_type"] == "tool-run-result"
         assert events[0]["payload"]["skipped"] is True

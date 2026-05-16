@@ -18,6 +18,12 @@ dependencies = [
   "imagehash>=4.3",               # pHash dedupe across an investigation (Tomas gap)
   "pdqhash>=0.2.5",               # PDQ via Facebook ThreatExchange (W4-PDQ-PIPE; BSD-3, <10ms)
   "phonenumbers>=9.0",            # libphonenumber port for W3.ph (Sprint-4 phone-vet)
+  # International dork-sweep engines (Ship 4 of OSINT-WEAPON-2026-05-15):
+  "beautifulsoup4>=4.14",         # DOM parsing for React-rendered SERPs (Naver, future engines)
+  "scrapling>=0.4.8",              # 3-tier fetcher facade (curl_cffi + Patchright + Camoufox)
+  "curl_cffi>=0.15",                # tier-1 TLS-impersonation (Chrome JA3/JA4 replay)
+  "patchright>=1.59",               # tier-3 anti-detection Playwright fork
+  "playwright>=1.59",               # tier-3 browser driver (StealthyFetcher dep)
 ]
 
 [build-system]

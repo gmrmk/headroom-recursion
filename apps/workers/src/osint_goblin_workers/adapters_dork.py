@@ -2037,6 +2037,207 @@ def _dork_sweep_baidu_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]
 
 
 # ===========================================================================
+# Naver main-UI HTML scrape (keyless 7th engine; KR coverage)
+# ===========================================================================
+#
+# Endpoint: https://search.naver.com/search.naver?where=web&query=<query>
+# Coverage: #1 in South Korea (~70% market share, ahead of Google in KR).
+# Indexes kr.linkedin.com, naver.blog, cafe.naver.com, KR news sites that
+# Google de-prioritizes outside KR. Native `site:` operator support.
+#
+# Naver 2026 result structure: React/Vue-style component tree with random
+# content-hashed class names (`fender-ui_22887c0d` etc). Stable markers:
+#   - Title:  span.sds-comps-text-type-headline1
+#   - Snippet: span.sds-comps-text-ellipsis-3
+#   - Result link: <a nocr="1" href="<external>">
+#
+# Strategy: BeautifulSoup card-walk. For each title span, walk up the DOM
+# up to 12 levels to find a containing card with a nocr=1 anchor +
+# external URL; pair title + URL + snippet from sibling spans in the card.
+# Regex parsing is hopeless against the React markup; BS4 is required.
+
+_NAVER_URL = "https://search.naver.com/search.naver"
+
+
+def _parse_naver_html(html_body: str) -> list[dict[str, str]]:
+    """Parse Naver search results into hits with url + title + snippet."""
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+
+    soup = BeautifulSoup(html_body, "html.parser")
+    titles = soup.find_all("span", class_="sds-comps-text-type-headline1")
+
+    hits: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+    for t in titles:
+        title_text = _clean_html_fragment(str(t), max_len=200)
+        if not title_text:
+            continue
+
+        card = t
+        url: str | None = None
+        for _ in range(12):
+            card = getattr(card, "parent", None)
+            if card is None:
+                break
+            anchors = card.find_all("a", attrs={"nocr": "1"})
+            for a in anchors:
+                href = (a.get("href") or "").strip()
+                if not href.startswith(("http://", "https://")):
+                    continue
+                try:
+                    host = href.split("/", 3)[2]
+                except IndexError:
+                    continue
+                if "naver.com" in host or "pstatic.net" in host:
+                    continue
+                url = href
+                break
+            if url:
+                break
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+
+        snippet_text = ""
+        if card is not None:
+            snip = card.find("span", class_="sds-comps-text-ellipsis-3")
+            if snip is not None:
+                snippet_text = _clean_html_fragment(str(snip), max_len=300)
+
+        hits.append({"url": url, "title": title_text, "snippet": snippet_text})
+    return hits
+
+
+def _naver_fetch(url: str, timeout_s: float = 60.0) -> tuple[int, str]:
+    """Fetch a Naver search URL via Scrapling's StealthyFetcher."""
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        return (0, "")
+    try:
+        page = StealthyFetcher.fetch(
+            url,
+            headless=True,
+            network_idle=True,
+            timeout=int(timeout_s * 1000),
+        )
+        body = getattr(page, "html_content", None) or getattr(page, "text", "") or ""
+        if isinstance(body, bytes | bytearray):
+            body = bytes(body).decode("utf-8", errors="replace")
+        return (int(getattr(page, "status", 0) or 0), body)
+    except Exception:
+        return (0, "")
+
+
+def dork_sweep_naver(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Dork-sweep via Naver through Scrapling StealthyFetcher.
+
+    Coverage: #1 in South Korea (~70% market share). Highest-value
+    engine for hosts/targets with KR residence/identity.
+
+    Naomi gate: queries never logged.
+    """
+    seed = payload or {}
+    limit_per = min(
+        int(seed.get("limit_per_query", _HIT_LIMIT_PER_DORK) or _HIT_LIMIT_PER_DORK), 25
+    )
+    queries = _build_dork_queries(seed)
+    if not queries:
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "adapter_id": "dork_sweep_naver",
+                    "skipped": True,
+                    "reason": "no dork templates matched available seed keys",
+                    "templates_total": len(_PV_TEMPLATES),
+                },
+            }
+        ]
+
+    events: list[dict[str, Any]] = []
+    queries_run = 0
+    queries_failed = 0
+    total_hits = 0
+    for idx, q in enumerate(queries):
+        if idx > 0:
+            jitter = 0.5 * ((idx * 7) % 11) / 10
+            time.sleep(1.0 + jitter)
+        encoded_q = urllib.parse.quote_plus(q["query"])
+        url = f"{_NAVER_URL}?where=web&query={encoded_q}"
+        status, body = _naver_fetch(url)
+        if status != 200 or not body:
+            queries_failed += 1
+            continue
+        hits = _parse_naver_html(body)[:limit_per]
+        queries_run += 1
+        for h in hits:
+            total_hits += 1
+            events.append(
+                {
+                    "event_type": "dork-hit",
+                    "payload": {
+                        "source": "dork-sweep",
+                        "engine": "naver",
+                        "template_id": q["id"],
+                        "template_label": q["label"],
+                        "url": h["url"],
+                        "title": h["title"],
+                        "snippet": h.get("snippet", ""),
+                        "confidence": "tentative",
+                    },
+                }
+            )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_naver",
+                "queries_attempted": len(queries),
+                "queries_run": queries_run,
+                "queries_failed": queries_failed,
+                "total_hits": total_hits,
+                "fetch_method": "scrapling-stealthy-patchright",
+            },
+        }
+    )
+    return events
+
+
+def _dork_sweep_naver_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    name = payload.get("name") or "Test Host"
+    return [
+        {
+            "event_type": "dork-hit",
+            "payload": {
+                "source": "dork-sweep",
+                "engine": "naver",
+                "template_id": "name_linkedin",
+                "template_label": "Host name on LinkedIn profiles",
+                "url": "https://kr.linkedin.com/in/test-host",
+                "title": f"{name} — LinkedIn (synthetic via naver)",
+                "snippet": "Synthetic snippet preview for Naver engine smoke test.",
+                "confidence": "tentative",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_naver",
+                "queries_run": 1,
+                "total_hits": 1,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ===========================================================================
 # Registry installation
 # ===========================================================================
 
@@ -2093,5 +2294,16 @@ _REGISTRY.register(
     description=(
         "Dork-sweep via Baidu through Scrapling StealthyFetcher (W13.dk, "
         "keyless 6th engine, CN-language coverage)."
+    ),
+)
+_REGISTRY.register(
+    "dork_sweep_naver",
+    dork_sweep_naver,
+    synthetic_mode=_dork_sweep_naver_synthetic,
+    in_process=True,
+    description=(
+        "Dork-sweep via Naver through Scrapling StealthyFetcher + BS4 "
+        "card-walk (W13.dk, keyless 7th engine, KR-language coverage; "
+        "Naver is #1 search engine in South Korea ~70%% market share)."
     ),
 )

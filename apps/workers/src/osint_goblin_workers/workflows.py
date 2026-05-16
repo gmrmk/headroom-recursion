@@ -668,6 +668,26 @@ WORKFLOWS: dict[str, Workflow] = {
                     "unwrap); native site: operator support."
                 ),
             ),
+            WorkflowStep(
+                "dork_sweep_naver",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),
+                description=(
+                    "Naver through Scrapling + BS4 card-walk (keyless 7th "
+                    "engine, KR-language coverage; #1 search engine in "
+                    "South Korea ~70% market share). React-rendered DOM "
+                    "with random class hashes -- BS4 card-walk anchors on "
+                    "stable sds-comps-text-type-headline1 + nocr=1 "
+                    "selectors."
+                ),
+            ),
         ],
     ),
 }
