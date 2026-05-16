@@ -224,6 +224,40 @@ def _score_contract(platform: str, out: dict) -> ContractScore:
     return ContractScore(satisfied=sat, partial=par, missing=mis)
 
 
+def _load_cookies_for(platform: str) -> list[dict] | None:
+    """Read OSINT_TEST_<PLATFORM>_COOKIES from env (typically loaded
+    from .env.local which is gitignored). Returns a Playwright-format
+    cookie list, or None if the env var isn't set or fails to parse.
+
+    Investigator workflow:
+      1. Open the platform in your browser, solve any CAPTCHA.
+      2. Export cookies via Cookie-Editor / EditThisCookie / similar
+         extension as Playwright JSON.
+      3. Paste into .env.local as:
+         OSINT_TEST_LEBONCOIN_COOKIES='[{...}, {...}]'
+      4. Re-run this script -- the cookies inject into the fetcher's
+         BrowserContext before the first fetch.
+
+    Cookies live in memory only. Never written to disk or echoed in
+    logs. shred() drops them with the rest of context state.
+    """
+    import json
+
+    env_name = f"OSINT_TEST_{platform.upper()}_COOKIES"
+    raw = os.environ.get(env_name, "").strip()
+    if not raw:
+        return None
+    try:
+        cookies = json.loads(raw)
+    except json.JSONDecodeError:
+        print(f"  [{platform}] WARN: {env_name} present but not valid JSON; ignoring")
+        return None
+    if not isinstance(cookies, list):
+        print(f"  [{platform}] WARN: {env_name} must be a JSON array; ignoring")
+        return None
+    return cookies
+
+
 def _try_tier(tier: str, probe: PlatformProbe) -> tuple[float, int, str, str | None]:
     """Single tier attempt. Returns (elapsed, status, body, error_or_None)."""
     from osint_goblin_workers.humanize import HumanizedFetcher
@@ -233,6 +267,11 @@ def _try_tier(tier: str, probe: PlatformProbe) -> tuple[float, int, str, str | N
     t0 = time.monotonic()
     fetcher = HumanizedFetcher(investigation_id=f"step-d-{probe.name}")
     try:
+        # Investigator-supplied session cookies (post-CAPTCHA), if any.
+        cookies = _load_cookies_for(probe.name)
+        if cookies:
+            fetcher.inject_cookies(probe.name, cookies)
+            print(f"  [{probe.name}] injected {len(cookies)} cookies from env")
         status, body = fetcher.fetch(
             probe.url,
             platform=probe.name,
