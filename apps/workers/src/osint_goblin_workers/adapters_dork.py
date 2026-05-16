@@ -1144,6 +1144,426 @@ def _dork_sweep_serper_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]
 
 
 # ===========================================================================
+# Bing main-UI HTML scrape (keyless 4th engine)
+# ===========================================================================
+#
+# Endpoint: https://www.bing.com/search?q=<query>&cc=us&setlang=en-US
+# Auth: none. Anti-bot: per-IP rate limit ~10/min (returns 429 then captcha).
+# Result block (stable since 2021):
+#   <li class="b_algo">
+#     <h2><a href="<url>"...>title</a></h2>
+#     <div class="b_caption"><p class="b_lineclamp...">snippet</p></div>
+#   </li>
+#
+# Why we ship Bing despite DDG being "Bing-flavored": DDG's html.duckduckgo.com
+# endpoint returns a curated subset (privacy-pruned, no personalization). The
+# Bing main UI returns the full result set + sometimes surfaces sites that DDG
+# de-prioritizes. Cross-engine corroboration in dossier-shape.ts then
+# graduates URLs surfaced by ≥2 engines from TENTATIVE to MEDIUM. (Naomi:
+# the cost of redundancy is one extra TCP-to-Microsoft-edge per query.)
+
+_BING_URL = "https://www.bing.com/search"
+
+# Find each algorithmic result li: anchored on `<li class="b_algo">` opener
+# until the next `<li class="b_algo">` opener or end-of-document. Bing's
+# 2026 layout puts an inline `<style>` block, a top-citation `tpcn` div,
+# an `<h2>` containing the actual title anchor, and a `<p class="b_lineclamp...">`
+# snippet inside each result li. We slice the whole li and let per-field
+# regexes pick out the bits we want -- one pass through the page, no
+# selector library dependency.
+_BING_RESULT_LI_RE = re.compile(
+    r'(<li[^>]+class="[^"]*b_algo[^"]*"[^>]*>'
+    r".*?"
+    r")"
+    r'(?=<li[^>]+class="[^"]*b_algo[^"]*"|\Z)',
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Inline <style>...</style> blocks inside b_algo li elements; stripped
+# before per-field extraction so style-rules that mention "b_algo" don't
+# confuse downstream regexes.
+_BING_INLINE_STYLE_RE = re.compile(
+    r"<style[^>]*>.*?</style>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Title anchor: <h2 ...><a ... href="<bing-redirect-or-real-url>">TITLE</a></h2>
+_BING_TITLE_ANCHOR_RE = re.compile(
+    r"<h2[^>]*>\s*" r'<a[^>]+href="([^"]+)"[^>]*>' r"(.*?)" r"</a>\s*" r"</h2>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Snippet paragraph: <p class="b_lineclamp..." or "b_paractl" or "b_caption">...</p>
+# 2026 Bing prefers `b_lineclamp2`; older results use `b_caption b_rich`.
+# Skip the leading <span class="news_dt">date</span> prefix when present
+# (we keep dates structurally; the body text follows).
+_BING_SNIPPET_RE = re.compile(
+    r'<p[^>]+class="[^"]*(?:b_lineclamp|b_paractl)[^"]*"[^>]*>' r"(.*?)" r"</p>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _parse_bing_html(html_body: str) -> list[dict[str, str]]:
+    """Parse Bing main-UI HTML into hits with url + title + snippet.
+
+    Bing's 2026 layout wraps every result URL in a `bing.com/ck/a?...&u=a1<base64>`
+    redirect; `_strip_bing_redirect` unwraps it back to the real URL.
+
+    Naomi gate: only result text leaves this function -- the page bytes
+    never touch disk past the SSE bus.
+
+    Robustness: each li is sliced independently; failures on one li (e.g.
+    image-result li with no h2) don't break extraction of sibling lis.
+    """
+    hits: list[dict[str, str]] = []
+    for m in _BING_RESULT_LI_RE.finditer(html_body):
+        block_raw = m.group(1)
+        block = _BING_INLINE_STYLE_RE.sub("", block_raw)
+
+        title_match = _BING_TITLE_ANCHOR_RE.search(block)
+        if not title_match:
+            continue  # image-card or carousel li without a title anchor
+
+        raw_url = title_match.group(1).strip()
+        title_html = title_match.group(2)
+
+        url = _strip_bing_redirect(raw_url)
+        if not url or not url.startswith(("http://", "https://")):
+            continue
+        # Reject Bing-internal URLs that slipped through: image-search and
+        # video-search links go to /images/search?... which isn't a hit.
+        if "bing.com/images/" in url or "bing.com/videos/" in url:
+            continue
+
+        title_text = _clean_html_fragment(title_html, max_len=200)
+        snippet_text = ""
+        sn = _BING_SNIPPET_RE.search(block)
+        if sn:
+            snippet_text = _clean_html_fragment(sn.group(1), max_len=300)
+
+        hits.append({"url": url, "title": title_text, "snippet": snippet_text})
+    return hits
+
+
+# ===========================================================================
+# Bing query rewriter (site:-operator stub-avoidance)
+# ===========================================================================
+#
+# Empirically (pressure-tested 2026-05-15): Bing serves a stub error page
+# in response to `site:DOMAIN ...` queries scraped via Patchright/Camoufox,
+# but returns full results when the same intent is expressed as a free-text
+# domain mention (`"QUERY" DOMAIN`). The Bing anti-scrape ML clearly
+# fingerprints the `site:` operator + suspicious-looking PII context as a
+# scrape signature.
+#
+# `_rewrite_query_for_bing` performs the transform; `_url_matches_domain`
+# is the post-filter we apply to result URLs so the original intent of the
+# `site:` operator (restrict to that domain) is preserved. Templates that
+# don't use `site:` pass through unchanged.
+
+_BING_SITE_OPERATOR_RE = re.compile(r"\bsite:([A-Za-z0-9.\-]+)", re.IGNORECASE)
+
+
+def _rewrite_query_for_bing(query: str) -> tuple[str, list[str]]:
+    """Strip site:DOMAIN operators and return (rewritten_query, extracted_domains).
+
+    The extracted domain list feeds `_url_matches_domain` to filter results
+    post-hoc -- preserving the original dork's "this domain only" intent
+    without triggering Bing's anti-scrape stub. Domain mentions are
+    appended as free-text tokens so Bing still favors those domains in
+    ranking.
+
+    Cleanup: removing `site:DOMAIN` from a string like
+    `"alice@example.com" (site:pastebin.com OR site:ghostbin.com)` leaves
+    orphan punctuation `( OR )` that confuses Bing's parser. We
+    additionally:
+      - drop the `-` prefix when a `-site:` operator gets stripped
+      - drop empty `(...)` parens
+      - drop dangling `OR` / `AND` operators with no operand
+      - collapse multiple spaces
+    """
+    domains = [d.lower() for d in _BING_SITE_OPERATOR_RE.findall(query)]
+    # Match optional leading `-` (Bing-style negation) + `site:DOMAIN`.
+    rewritten = re.sub(r"-?\s*\bsite:[A-Za-z0-9.\-]+", "", query, flags=re.IGNORECASE)
+    # Drop now-empty parenthetical groups: "( OR )", "(   )", "( OR OR )".
+    for _ in range(3):
+        rewritten = re.sub(
+            r"\(\s*(?:OR\s+|AND\s+)*(?:OR|AND)?\s*\)",
+            "",
+            rewritten,
+            flags=re.IGNORECASE,
+        )
+    # Drop dangling boolean operators at start/end or doubled.
+    rewritten = re.sub(r"^\s*(?:OR|AND)\b", "", rewritten, flags=re.IGNORECASE)
+    rewritten = re.sub(r"\b(?:OR|AND)\s*$", "", rewritten, flags=re.IGNORECASE)
+    rewritten = re.sub(r"\b(?:OR|AND)\s+(?:OR|AND)\b", "OR", rewritten, flags=re.IGNORECASE)
+    # Collapse whitespace.
+    rewritten = re.sub(r"\s+", " ", rewritten).strip()
+    if domains:
+        unique_domains = list(dict.fromkeys(domains))
+        rewritten = f"{rewritten} {' '.join(unique_domains)}".strip()
+    return (rewritten, domains)
+
+
+def _url_matches_domain(url: str, allowed_domains: list[str]) -> bool:
+    """True if the URL's host matches one of the allowed domains.
+
+    Match is suffix-based: `linkedin.com` matches `www.linkedin.com` and
+    `subdomain.linkedin.com`. Empty allowed_domains list returns True
+    (no filter applied).
+    """
+    if not allowed_domains:
+        return True
+    try:
+        host = urllib.parse.urlparse(url).hostname or ""
+    except Exception:
+        return False
+    host = host.lower().removeprefix("www.")
+    for d in allowed_domains:
+        d_norm = d.lower().removeprefix("www.")
+        if host == d_norm or host.endswith("." + d_norm):
+            return True
+    return False
+
+
+def _strip_bing_redirect(url: str) -> str:
+    """Bing wraps result URLs in `bing.com/ck/a?...&u=a1<base64-url>`.
+    The `u` param's value is the real URL, base64url-encoded with an
+    `a1` prefix Bing prepends.
+
+    The href captured from a rendered HTML page is entity-encoded
+    (`&amp;` not `&`); we unescape first so `parse_qs` sees real `&`
+    separators. Without this step, `u` is part of the previous param's
+    value and the URL never unwraps.
+    """
+    # Unescape entities first; the href content from rendered DOM is
+    # often still entity-encoded (Patchright serializes the raw HTML).
+    url = html.unescape(url)
+    if "bing.com/ck/a" not in url:
+        return url
+    try:
+        parsed = urllib.parse.urlparse(url)
+        qs = urllib.parse.parse_qs(parsed.query)
+        u = qs.get("u", [""])[0]
+        if u.startswith("a1"):
+            u = u[2:]
+        import base64
+
+        padded = u + "=" * (-len(u) % 4)
+        decoded = base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8", errors="ignore")
+        if decoded.startswith(("http://", "https://")):
+            return decoded
+    except Exception:
+        return url
+    return url
+
+
+# Bing browser-UA pool. Real Chrome strings from major versions; rotated
+# per-query so the per-IP rate-limit governor sees varied client fingerprints.
+# (We don't ship the full 50-string offensive-osint §6.4 pool inline here --
+# that lives in `_ua.py` once Ship 8 lands. This is a tight Bing-only set.)
+_BING_UA_POOL: tuple[str, ...] = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+)
+
+
+def _bing_ua_for_query(idx: int) -> str:
+    """Pick a UA deterministically from the pool, indexed by query position
+    so multi-query sweeps cycle through Chrome/Edge/Safari variants. Avoids
+    importing `random` here (RNG state in workers complicates reproducibility
+    of synthetic tests)."""
+    return _BING_UA_POOL[idx % len(_BING_UA_POOL)]
+
+
+def _bing_fetch(url: str, ua: str, timeout_s: float = 60.0) -> tuple[int, str]:
+    """Fetch a Bing search URL via Scrapling's StealthyFetcher (Patchright + Camoufox).
+
+    Returns (status, body_text). status=0 on exception, body_text='' on failure.
+
+    Why StealthyFetcher and not plain httpx / curl_cffi: Bing's 2026 results
+    body is JavaScript-rendered after page load. curl_cffi gets the page
+    chrome only (no `b_algo` blocks). StealthyFetcher boots a real browser
+    (Patchright = patched Playwright with anti-detection), waits for
+    network-idle, then serializes the rendered DOM -- which contains the
+    actual result list.
+
+    Cost: 5-15s per query vs ~500ms for static fetchers. This is the
+    necessary cost of beating Bing's anti-scrape ML.
+    """
+    # Late-import: keeps Patchright/Playwright out of the module's import
+    # path until an adapter actually fires up the browser.
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        return (0, "")
+
+    try:
+        # network_idle=True lets the JS bundle finish rendering before we
+        # serialize the DOM. headless=True keeps the headless-fingerprint
+        # masking that Patchright applies; we want headless because we're
+        # running inside a worker, not interactively.
+        page = StealthyFetcher.fetch(
+            url,
+            headless=True,
+            network_idle=True,
+            timeout=int(timeout_s * 1000),
+        )
+        body = getattr(page, "html_content", None) or getattr(page, "text", "") or ""
+        if isinstance(body, bytes | bytearray):
+            body = bytes(body).decode("utf-8", errors="replace")
+        return (int(getattr(page, "status", 0) or 0), body)
+    except Exception:
+        return (0, "")
+
+
+def dork_sweep_bing(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Dork-sweep via Bing main-UI through Scrapling StealthyFetcher.
+
+    Routes through Patchright (patched Playwright) + Camoufox-class
+    headless Chrome with network_idle waiting so the JS-rendered results
+    DOM is fully populated before we serialize. Plain httpx / curl_cffi
+    only get the page chrome (zero `b_algo` blocks); StealthyFetcher
+    fires up a real browser and beats Bing's anti-scrape ML.
+
+    Per-query pre-processing rewrites `site:DOMAIN ...` templates into
+    `"..." DOMAIN` free-text form -- empirical pressure-test 2026-05-15
+    showed Bing's bot wall fingerprints the `site:` operator + scrape
+    signatures and returns a stub error page. The intent of the `site:`
+    operator is preserved post-hoc by `_url_matches_domain` filtering
+    on result URLs.
+
+    UA rotates per-query through 5 realistic browser strings. Cost:
+    5-15s per query (browser boot + render + serialize). This is the
+    real cost of beating Bing; cheaper engines (DDG, Brave API, Serper
+    API) run in parallel from the workflow definition.
+
+    Payload: same as dork_sweep_ddg.
+
+    Naomi gate: queries never logged; only result URLs + titles +
+    snippets surface back through the event stream.
+    """
+    seed = payload or {}
+    limit_per = min(
+        int(seed.get("limit_per_query", _HIT_LIMIT_PER_DORK) or _HIT_LIMIT_PER_DORK), 25
+    )
+    queries = _build_dork_queries(seed)
+    if not queries:
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "adapter_id": "dork_sweep_bing",
+                    "skipped": True,
+                    "reason": "no dork templates matched available seed keys",
+                    "templates_total": len(_PV_TEMPLATES),
+                },
+            }
+        ]
+
+    events: list[dict[str, Any]] = []
+    queries_run = 0
+    queries_failed = 0
+    total_hits = 0
+    for idx, q in enumerate(queries):
+        # Anti-detection jitter between queries; modest because the
+        # browser-render path is already 5-15s/query (rate-limit headroom
+        # is not the bottleneck, BBPC -- browser boot per call -- is).
+        if idx > 0:
+            jitter = 0.5 * ((idx * 7) % 11) / 10
+            time.sleep(1.0 + jitter)
+
+        # Rewrite site:-operator queries into free-text form to dodge
+        # Bing's anti-scrape stub. Preserve original intent via post-filter.
+        rewritten_query, allowed_domains = _rewrite_query_for_bing(q["query"])
+        encoded_q = urllib.parse.quote_plus(rewritten_query)
+        url = f"{_BING_URL}?q={encoded_q}&cc=us&setlang=en-US"
+
+        _ua = _bing_ua_for_query(idx)
+        status, body = _bing_fetch(url, _ua)
+        if status != 200 or not body:
+            queries_failed += 1
+            continue
+
+        parsed_hits = _parse_bing_html(body)
+        # Apply post-hoc domain filter only when the original template
+        # had a `site:` operator; otherwise pass-through.
+        if allowed_domains:
+            parsed_hits = [h for h in parsed_hits if _url_matches_domain(h["url"], allowed_domains)]
+        hits = parsed_hits[:limit_per]
+        queries_run += 1
+        for h in hits:
+            total_hits += 1
+            events.append(
+                {
+                    "event_type": "dork-hit",
+                    "payload": {
+                        "source": "dork-sweep",
+                        "engine": "bing",
+                        "template_id": q["id"],
+                        "template_label": q["label"],
+                        "url": h["url"],
+                        "title": h["title"],
+                        "snippet": h.get("snippet", ""),
+                        "confidence": "tentative",
+                    },
+                }
+            )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_bing",
+                "queries_attempted": len(queries),
+                "queries_run": queries_run,
+                "queries_failed": queries_failed,
+                "total_hits": total_hits,
+                "fetch_method": "scrapling-stealthy-patchright",
+            },
+        }
+    )
+    return events
+
+
+def _dork_sweep_bing_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    name = payload.get("name") or "Test Host"
+    return [
+        {
+            "event_type": "dork-hit",
+            "payload": {
+                "source": "dork-sweep",
+                "engine": "bing",
+                "template_id": "name_linkedin",
+                "template_label": "Host name on LinkedIn profiles",
+                "url": "https://www.linkedin.com/in/test-host",
+                "title": f"{name} — LinkedIn (synthetic via bing)",
+                "snippet": "Synthetic snippet preview for Bing engine smoke test.",
+                "confidence": "tentative",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_bing",
+                "queries_run": 1,
+                "total_hits": 1,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ===========================================================================
 # Registry installation
 # ===========================================================================
 
@@ -1170,5 +1590,15 @@ _REGISTRY.register(
     in_process=True,
     description=(
         "Dork-sweep via Serper.dev (Google results, W13.dk, requires OSINT_SERPER_API_KEY)."
+    ),
+)
+_REGISTRY.register(
+    "dork_sweep_bing",
+    dork_sweep_bing,
+    synthetic_mode=_dork_sweep_bing_synthetic,
+    in_process=True,
+    description=(
+        "Dork-sweep via Bing main-UI HTML scrape (W13.dk, keyless 4th engine, "
+        "UA-rotated for per-IP burst-protection softening)."
     ),
 )

@@ -612,6 +612,25 @@ WORKFLOWS: dict[str, Workflow] = {
                 required_seed_keys=(),
                 description="Serper.dev / Google results (env-gated OSINT_SERPER_API_KEY).",
             ),
+            WorkflowStep(
+                "dork_sweep_bing",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),
+                description=(
+                    "Bing main-UI HTML scrape (keyless 4th engine; "
+                    "UA-rotated for burst-protection softening). "
+                    "Sits in cost-tier between DDG and API engines; "
+                    "cross-engine corroboration with DDG graduates "
+                    "shared URLs TENTATIVE -> MEDIUM (methodology §2.1)."
+                ),
+            ),
         ],
     ),
 }

@@ -9,8 +9,13 @@ from __future__ import annotations
 from osint_goblin_workers.adapters_dork import (
     _PV_TEMPLATES,
     _build_dork_queries,
+    _parse_bing_html,
     _parse_ddg_html,
+    _rewrite_query_for_bing,
+    _strip_bing_redirect,
     _strip_ddg_redirect,
+    _url_matches_domain,
+    dork_sweep_bing,
     dork_sweep_brave,
     dork_sweep_ddg,
     dork_sweep_serper,
@@ -176,3 +181,256 @@ class TestAdapterSkipPath:
         assert len(events) == 1
         assert events[0]["payload"]["skipped"] is True
         assert "OSINT_SERPER_API_KEY" in events[0]["payload"]["reason"]
+
+    def test_bing_returns_skip_event_with_empty_seed(self):
+        events = dork_sweep_bing({})
+        assert len(events) == 1
+        assert events[0]["event_type"] == "tool-run-result"
+        assert events[0]["payload"]["skipped"] is True
+
+
+# ---------------------------------------------------------------------------
+# _strip_bing_redirect -- unwrap Bing's bing.com/ck/a tracking redirect
+# ---------------------------------------------------------------------------
+
+
+class TestStripBingRedirect:
+    def test_passes_through_plain_url(self):
+        assert (
+            _strip_bing_redirect("https://www.linkedin.com/in/alice-smith")
+            == "https://www.linkedin.com/in/alice-smith"
+        )
+
+    def test_unwraps_ck_redirect(self):
+        # Bing's `u` param is base64url-encoded with an `a1` prefix.
+        # Target: https://example.com/profile
+        # base64url("https://example.com/profile") = aHR0cHM6Ly9leGFtcGxlLmNvbS9wcm9maWxl
+        # Prefixed with "a1" -> "a1aHR0cHM6Ly9leGFtcGxlLmNvbS9wcm9maWxl"
+        wrapped = (
+            "https://www.bing.com/ck/a?!&&p=abc"
+            "&u=a1aHR0cHM6Ly9leGFtcGxlLmNvbS9wcm9maWxl"
+            "&ntb=1"
+        )
+        assert _strip_bing_redirect(wrapped) == "https://example.com/profile"
+
+    def test_returns_input_on_parse_error(self):
+        # Malformed `u` param -- adapter should pass through, not raise.
+        wrapped = "https://www.bing.com/ck/a?u=a1invalid-base64-***"
+        # Function returns either the unwrapped value OR the original URL
+        # on parse error; both are acceptable (no exception, no None).
+        result = _strip_bing_redirect(wrapped)
+        assert isinstance(result, str)
+        assert result == wrapped or result.startswith(("http://", "https://"))
+
+
+# ---------------------------------------------------------------------------
+# _parse_bing_html -- extract algorithmic result blocks
+# ---------------------------------------------------------------------------
+
+
+# Fixture mirrors Bing's 2026 b_algo result-block shape:
+# <li class="b_algo" data-id="" iid="SERP.5618">
+#   <style>...</style>             <!-- inline CSS to strip -->
+#   <div class="b_imgcap_main">
+#     <div class="b_tpcn">         <!-- top citation chrome -->
+#       <a class="tilk" href="<ck/a-redirect>">...LinkedIn...</a>
+#     </div>
+#     <h2><a href="<ck/a-redirect>">TITLE</a></h2>
+#     <p class="b_lineclamp2">SNIPPET</p>
+#   </div>
+# </li>
+# Real-world: each result href is wrapped in bing.com/ck/a redirect.
+_BING_LINKEDIN_HREF = "https://www.linkedin.com/in/alice-smith"
+_BING_GITHUB_HREF = "https://github.com/alicesmith"
+_BING_FIXTURE = (
+    "<html><body>"
+    '<ol id="b_results">'
+    '<li class="b_algo" data-id="" iid="SERP.5001">'
+    "<style>.b_algo { color: red; }</style>"  # inline style must be stripped
+    '<div class="b_tpcn"><a class="tilk" href="x">LinkedIn</a></div>'
+    "<h2>"
+    '<a target="_blank" href="' + _BING_LINKEDIN_HREF + '" h="ID=abc">'
+    "Alice Smith — LinkedIn</a>"
+    "</h2>"
+    '<p class="b_lineclamp2">'
+    '<span class="news_dt">Oct 21, 2025</span>'
+    " · Senior engineer. Boston, MA. Profile snippet for testing.</p>"
+    "</li>"
+    '<li class="b_algo" data-id="" iid="SERP.5002">'
+    "<h2>"
+    '<a target="_blank" href="' + _BING_GITHUB_HREF + '" h="ID=def">'
+    "alice <b>smith</b>&#39;s GitHub</a>"
+    "</h2>"
+    '<p class="b_lineclamp2">Public repos by alicesmith on GitHub.</p>'
+    "</li>"
+    "</ol>"
+    "</body></html>"
+)
+
+
+class TestParseBingHtml:
+    def test_extracts_two_hits_from_fixture(self):
+        hits = _parse_bing_html(_BING_FIXTURE)
+        assert len(hits) == 2
+
+    def test_first_hit_url_title_and_snippet(self):
+        hits = _parse_bing_html(_BING_FIXTURE)
+        assert hits[0]["url"] == _BING_LINKEDIN_HREF
+        assert "Alice Smith" in hits[0]["title"]
+        assert "LinkedIn" in hits[0]["title"]
+        assert "Senior engineer" in hits[0]["snippet"]
+
+    def test_strips_inline_html_from_title(self):
+        hits = _parse_bing_html(_BING_FIXTURE)
+        # Fixture has <b>smith</b> + &#39; entity in second title; both
+        # should be cleaned to plain text "alice smith's GitHub".
+        assert hits[1]["title"] == "alice smith's GitHub"
+
+    def test_empty_input_returns_empty_list(self):
+        assert _parse_bing_html("") == []
+        assert _parse_bing_html("<html><body>no results</body></html>") == []
+
+    def test_handles_missing_snippet_gracefully(self):
+        # Bing sometimes returns a b_algo block with no caption paragraph
+        # (image / video / news-card result types). The parser must not
+        # crash and must still extract the title + URL.
+        no_caption_fixture = (
+            '<li class="b_algo" iid="SERP.1">'
+            '<h2><a href="https://example.com/news">News Title</a></h2>'
+            "</li>"
+            '<li class="b_algo" iid="SERP.2">'
+            '<h2><a href="https://example.com/other">Other</a></h2>'
+            '<p class="b_lineclamp2">Has snippet.</p>'
+            "</li>"
+        )
+        hits = _parse_bing_html(no_caption_fixture)
+        assert len(hits) == 2
+        assert hits[0]["snippet"] == ""
+        assert "snippet" in hits[1]["snippet"].lower()
+
+    def test_strips_inline_style_from_block(self):
+        # b_algo blocks contain inline <style> tags whose CSS rules
+        # reference "b_algo" -- if not stripped, downstream code would
+        # mistakenly treat CSS as content.
+        fixture_with_style = (
+            '<li class="b_algo">'
+            "<style>.foo .b_algo { display: none; }</style>"
+            '<h2><a href="https://example.com">Title</a></h2>'
+            '<p class="b_lineclamp2">Snippet body.</p>'
+            "</li>"
+        )
+        hits = _parse_bing_html(fixture_with_style)
+        assert len(hits) == 1
+        assert hits[0]["url"] == "https://example.com"
+        assert hits[0]["title"] == "Title"
+        assert "Snippet body" in hits[0]["snippet"]
+
+    def test_unwraps_ck_a_redirect_with_entities(self):
+        # Real-world Bing wraps result URLs in bing.com/ck/a redirects
+        # AND the rendered DOM keeps `&amp;` entities. Both must be
+        # handled or the URL never unwraps.
+        b64 = "aHR0cHM6Ly9leGFtcGxlLmNvbS9wcm9maWxl"  # base64url for https://example.com/profile
+        wrapped = (
+            f'<li class="b_algo"><h2>'
+            f'<a href="https://www.bing.com/ck/a?!&amp;&amp;p=abc&amp;u=a1{b64}&amp;ntb=1">'
+            f"Title</a></h2>"
+            f'<p class="b_lineclamp2">Snippet</p>'
+            f"</li>"
+        )
+        hits = _parse_bing_html(wrapped)
+        assert len(hits) == 1
+        assert hits[0]["url"] == "https://example.com/profile"
+
+    def test_rejects_bing_internal_image_video_urls(self):
+        # Image-search and video-search hrefs sometimes get captured
+        # in a b_algo block; they should NOT count as hits.
+        internal = (
+            '<li class="b_algo"><h2>'
+            '<a href="https://www.bing.com/images/search?view=detailV2">img</a>'
+            "</h2></li>"
+            '<li class="b_algo"><h2>'
+            '<a href="https://www.bing.com/videos/search?q=foo">vid</a>'
+            "</h2></li>"
+            '<li class="b_algo"><h2>'
+            '<a href="https://example.com/real">real</a>'
+            "</h2></li>"
+        )
+        hits = _parse_bing_html(internal)
+        assert len(hits) == 1
+        assert hits[0]["url"] == "https://example.com/real"
+
+
+# ---------------------------------------------------------------------------
+# Bing query rewriter -- site:operator stub-avoidance pressure tests
+# ---------------------------------------------------------------------------
+
+
+class TestRewriteQueryForBing:
+    def test_passes_through_query_without_site_operator(self):
+        rew, doms = _rewrite_query_for_bing('"Alice Smith" filetype:pdf')
+        assert rew == '"Alice Smith" filetype:pdf'
+        assert doms == []
+
+    def test_strips_single_site_operator_and_appends_domain(self):
+        rew, doms = _rewrite_query_for_bing('site:linkedin.com "John Doe"')
+        assert "site:" not in rew
+        assert "linkedin.com" in rew
+        assert '"John Doe"' in rew
+        assert doms == ["linkedin.com"]
+
+    def test_strips_multiple_site_operators_in_or_group(self):
+        rew, doms = _rewrite_query_for_bing(
+            '"alice@example.com" (site:pastebin.com OR site:ghostbin.com OR site:rentry.co)'
+        )
+        assert "site:" not in rew
+        # Empty `( OR OR )` collapses; multiple-domain mention appended.
+        assert "(" not in rew or ")" not in rew or "OR" not in rew.split("(")[1].split(")")[0]
+        assert "pastebin.com" in rew
+        assert "ghostbin.com" in rew
+        assert "rentry.co" in rew
+        assert sorted(doms) == ["ghostbin.com", "pastebin.com", "rentry.co"]
+
+    def test_strips_negation_dash_with_site_operator(self):
+        # "-site:nope.com" should not leave a stray "-" in the output.
+        rew, doms = _rewrite_query_for_bing('"alice" -site:nope.com')
+        assert "site:" not in rew
+        # The "-" prefix should be consumed along with the operator.
+        assert " - " not in rew
+        assert doms == ["nope.com"]
+
+    def test_lowercases_extracted_domains(self):
+        _, doms = _rewrite_query_for_bing('site:LinkedIn.COM "X"')
+        assert doms == ["linkedin.com"]
+
+    def test_dedupes_extracted_domains_in_output(self):
+        rew, _ = _rewrite_query_for_bing("site:linkedin.com site:linkedin.com site:linkedin.com X")
+        # The domain mention should appear exactly once in the appended portion.
+        assert rew.count("linkedin.com") == 1
+
+    def test_preserves_other_operators(self):
+        rew, _ = _rewrite_query_for_bing('site:example.com "X" filetype:pdf inurl:profile')
+        assert "filetype:pdf" in rew
+        assert "inurl:profile" in rew
+
+
+# ---------------------------------------------------------------------------
+# URL domain filter -- preserves site:-operator intent post-hoc
+# ---------------------------------------------------------------------------
+
+
+class TestUrlMatchesDomain:
+    def test_empty_allowed_list_passes_everything(self):
+        assert _url_matches_domain("https://example.com/page", []) is True
+
+    def test_exact_host_match(self):
+        assert _url_matches_domain("https://linkedin.com/in/x", ["linkedin.com"]) is True
+
+    def test_subdomain_match(self):
+        assert _url_matches_domain("https://uk.linkedin.com/in/x", ["linkedin.com"]) is True
+        assert _url_matches_domain("https://www.linkedin.com/in/x", ["linkedin.com"]) is True
+
+    def test_non_match_rejected(self):
+        assert _url_matches_domain("https://github.com/x", ["linkedin.com"]) is False
+
+    def test_invalid_url_returns_false(self):
+        assert _url_matches_domain("not a url", ["linkedin.com"]) is False

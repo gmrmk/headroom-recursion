@@ -187,7 +187,7 @@ def workflow_runner(req: dict) -> None:
                     "event_type": "tool-run-error",
                     "payload": {
                         "reason": (
-                            f"adapter {step.adapter_id!r} raised " f"{type(exc).__name__}: {exc}"
+                            f"adapter {step.adapter_id!r} raised {type(exc).__name__}: {exc}"
                         ),
                         "workflow_id": workflow.id,
                         "step_index": step_idx,

@@ -35,8 +35,7 @@ class SubprocessAdapterError(Exception):
         self.exit_code = exit_code
         self.stderr = stderr
         super().__init__(
-            f"subprocess adapter {wrapper!r} exited {exit_code}; "
-            f"stderr (tail): {stderr[-400:]!r}"
+            f"subprocess adapter {wrapper!r} exited {exit_code}; stderr (tail): {stderr[-400:]!r}"
         )
 
 
