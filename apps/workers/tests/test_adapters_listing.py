@@ -9,10 +9,12 @@ from __future__ import annotations
 from osint_goblin_workers.adapters_listing import (
     _PLATFORM_HOST_MAP,
     _airbnb_extract_listing_id,
+    _booking_extract_listing_id,
     _normalize_host_name_tokens,
     _redact_pii,
     detect_platform,
     extract_airbnb,
+    extract_booking,
     extract_generic_jsonld,
     extract_jsonld_blocks,
     listing_scrape,
@@ -509,3 +511,125 @@ class TestGenericJsonldOwnerMention:
         assert out["owner_mention"]["reviews_scanned"] == 2
         # "Bob owns this place" -- explicit ownership phrasing fires.
         assert "Bob" in out["owner_mention"]["explicit_ownership"]
+
+
+# ---------------------------------------------------------------------------
+# extract_booking -- Booking.com bespoke parser
+# ---------------------------------------------------------------------------
+
+
+# Booking fixture; the embedded GraphQL-style BasicPropertyData line is
+# intentionally long (mirrors live response).
+# ruff: noqa: E501
+_BOOKING_FIXTURE = """
+<html><head>
+<script type="application/ld+json">
+{
+  "@type": "Hotel",
+  "name": "Ace Hotel New York",
+  "description": "This boutique hotel is located in the center of Manhattan.",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "20 West 29th Street",
+    "streetAddress": "20 West 29th Street, NoMad, New York, NY 10001, United States",
+    "addressRegion": "New York State",
+    "addressCountry": "US"
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": 7.6,
+    "bestRating": 10,
+    "reviewCount": 1864
+  },
+  "image": "https://cf.bstatic.com/xdata/images/hotel/test.jpg"
+}
+</script>
+</head><body>
+<a data-atlas-latlng="40.745783723685015,-73.9882005751133" data-atlas-bbox="x">map</a>
+<script>
+[..."BasicPropertyData","id":79515,"ufi":20088325,"location":{"__typename":"Location","city":"New York","latitude":40.745783723685015,"longitude":-73.9882005751133,"countryCode":"us","formattedAddress":"20 West 29th Street, NoMad, New York, NY 10001, United States"},"name":"Ace Hotel"..]
+</script>
+<div data-testid="review">
+  <span>"positiveText":"Great location and lobby vibe. Bob the manager was helpful."</span>
+  <span>"negativeText":"Rooms are not well isolated from noise."</span>
+</div>
+<div data-testid="review">
+  <span>"positiveText":"Comfortable beds, easy check-in."</span>
+  <span>"negativeText":"Street noise."</span>
+</div>
+</body></html>
+"""
+
+
+class TestExtractBooking:
+    def test_extracts_title_from_jsonld(self):
+        d = extract_booking(_BOOKING_FIXTURE, "https://www.booking.com/hotel/us/ace.html")
+        assert d["title"] == "Ace Hotel New York"
+
+    def test_extracts_gps_from_data_atlas_latlng(self):
+        d = extract_booking(_BOOKING_FIXTURE, "https://www.booking.com/hotel/us/ace.html")
+        assert d["gps_lat"] == 40.745783723685015
+        assert d["gps_lon"] == -73.9882005751133
+        assert d["gps_source"] == "data-atlas-latlng"
+
+    def test_extracts_canonical_city_from_basic_property_data(self):
+        # Booking's JSON-LD addressLocality is unreliable (puts street there);
+        # BasicPropertyData's location.city is canonical -- must win.
+        d = extract_booking(_BOOKING_FIXTURE, "https://www.booking.com/hotel/us/ace.html")
+        assert d["city"] == "New York"
+
+    def test_extracts_booking_property_id(self):
+        d = extract_booking(_BOOKING_FIXTURE, "https://www.booking.com/hotel/us/ace.html")
+        assert d["listing_id"] == "79515"
+
+    def test_extracts_rating_with_0_10_scale_tag(self):
+        d = extract_booking(_BOOKING_FIXTURE, "https://www.booking.com/hotel/us/ace.html")
+        assert d["review_rating"] == 7.6
+        assert d["review_rating_scale"] == "0-10"
+        assert d["review_count"] == 1864
+
+    def test_extracts_review_text_pairs(self):
+        d = extract_booking(_BOOKING_FIXTURE, "https://www.booking.com/hotel/us/ace.html")
+        assert d["review_extracted_count"] == 2
+        # First review pair combined.
+        first = d["review_sample"][0]
+        assert "Positive:" in first
+        assert "Negative:" in first
+        assert "Great location" in first
+        assert "noise" in first.lower()
+
+    def test_owner_mention_scan_runs_on_extracted_reviews(self):
+        d = extract_booking(_BOOKING_FIXTURE, "https://www.booking.com/hotel/us/ace.html")
+        om = d["owner_mention"]
+        # Booking doesn't surface host_name -> info tier even when
+        # "Bob" appears (no host to compare against).
+        # But the scan ran and recorded reviews_scanned > 0.
+        assert om["reviews_scanned"] == 2
+
+    def test_fallback_listing_id_from_url_slug(self):
+        # Fixture without BasicPropertyData block -> falls back to URL slug.
+        bare = '<script type="application/ld+json">{"@type":"Hotel","name":"x"}</script>'
+        d = extract_booking(bare, "https://www.booking.com/hotel/us/ace-new-york.html")
+        assert d["listing_id"] == "ace-new-york"
+
+    def test_address_displayed_uses_formatted_address_when_available(self):
+        d = extract_booking(_BOOKING_FIXTURE, "https://www.booking.com/hotel/us/ace.html")
+        # formattedAddress from BasicPropertyData is preferred over
+        # the concatenated JSON-LD parts.
+        assert "20 West 29th Street, NoMad, New York" in d["address_displayed"]
+        # Should NOT include the junky concatenation
+        assert "20 West 29th Street, 20 West 29th Street" not in d["address_displayed"]
+
+
+class TestBookingExtractListingId:
+    def test_extracts_slug_from_path(self):
+        assert (
+            _booking_extract_listing_id("https://www.booking.com/hotel/us/ace-new-york.html")
+            == "ace-new-york"
+        )
+
+    def test_returns_empty_for_non_hotel_url(self):
+        assert _booking_extract_listing_id("https://www.booking.com/search.html") == ""
+
+    def test_returns_empty_for_invalid_url(self):
+        assert _booking_extract_listing_id("not a url") == ""

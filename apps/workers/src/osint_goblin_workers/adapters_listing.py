@@ -1155,12 +1155,234 @@ def extract_generic_jsonld(html_body: str, listing_url: str, platform: str) -> d
     }
 
 
-# Per-platform extractor dispatch. Airbnb has bespoke parsing for the
-# deferred-state blob (richer than its JSON-LD); the others fall back
-# to schema.org JSON-LD which is usually sufficient. Per-platform
-# parsers can be added incrementally.
+# ===========================================================================
+# Booking.com bespoke extractor
+# ===========================================================================
+#
+# Booking.com 2026 page structure (verified live 2026-05-15):
+#   - JSON-LD <script type="application/ld+json"> with @type=Hotel:
+#       name, description, address (full street!), aggregateRating
+#       (ratingValue out of 10 NOT 5, reviewCount), image
+#     -- but NO geo block.
+#   - GPS lives in DOM attribute on the map-link anchor:
+#       <a data-atlas-latlng="40.7458,-73.9882" data-atlas-bbox="...">
+#   - Embedded GraphQL/Apollo response carries BasicPropertyData with:
+#       id, ufi, location.latitude, location.longitude, location.city,
+#       location.countryCode, location.formattedAddress, name
+#   - Reviews surface as "positiveText":"..." and "negativeText":"..."
+#     in embedded JSON (paired per-review).
+#
+# Booking's review rating scale is 0-10 (not the 0-5 schema.org typically
+# implies). We pass it through as-is and tag scale="0-10" in the output
+# so the dossier renderer can label appropriately.
+
+_BOOKING_DATA_ATLAS_LATLNG_RE = re.compile(r'data-atlas-latlng="(-?\d+\.\d+),(-?\d+\.\d+)"')
+_BOOKING_BASIC_PROPERTY_RE = re.compile(
+    r'"BasicPropertyData"\s*,\s*"id"\s*:\s*(\d+)\s*,\s*'
+    r'"ufi"\s*:\s*(\d+)\s*,\s*"location"\s*:\s*\{([^}]+)\}',
+    re.DOTALL,
+)
+_BOOKING_POSITIVE_TEXT_RE = re.compile(r'"positiveText"\s*:\s*"((?:[^"\\]|\\.){5,2000})"')
+_BOOKING_NEGATIVE_TEXT_RE = re.compile(r'"negativeText"\s*:\s*"((?:[^"\\]|\\.){5,2000})"')
+
+
+def _booking_extract_listing_id(listing_url: str) -> str:
+    """Booking URLs: /hotel/<country>/<slug>.html.
+    Returns the slug portion as a stable id token."""
+    try:
+        path = urllib.parse.urlparse(listing_url).path
+    except Exception:
+        return ""
+    m = re.search(r"/hotel/[a-z]{2}/([a-z0-9\-]+)\.html", path)
+    return m.group(1) if m else ""
+
+
+def extract_booking(html_body: str, listing_url: str) -> dict[str, Any]:
+    """Extract a normalized Booking.com listing record.
+
+    Strategy:
+      1. JSON-LD `@type=Hotel` for name/description/full-address/rating
+         (rating is 0-10 scale; passed through as-is + tagged scale=0-10).
+      2. data-atlas-latlng DOM attribute for GPS.
+      3. BasicPropertyData JSON regex for internal id + city + canonical
+         formatted-address.
+      4. positiveText + negativeText regex for review-text pairs.
+      5. Universal owner-mention scan on all review text (Booking
+         doesn't surface host names in standard markup, so the scan
+         primarily catches explicit-ownership phrasing in review text).
+    """
+    blocks = extract_jsonld_blocks(html_body)
+    products = _walk_jsonld(blocks, ("Hotel", "LodgingBusiness", "Product"))
+    primary = products[0] if products else {}
+
+    title = primary.get("name") or ""
+    description = primary.get("description") or ""
+    description = description[:600]
+
+    addr = primary.get("address") or {}
+    if isinstance(addr, list):
+        addr = addr[0] if addr else {}
+    address_displayed = ""
+    city = ""
+    country = ""
+    if isinstance(addr, dict):
+        city = addr.get("addressLocality") or ""
+        country = addr.get("addressCountry") or ""
+        parts = [
+            addr.get("streetAddress") or "",
+            city,
+            addr.get("addressRegion") or "",
+            country,
+        ]
+        address_displayed = ", ".join(p for p in parts if p)
+
+    rating_obj = primary.get("aggregateRating") or {}
+    review_count = 0
+    review_rating: float | None = None
+    if isinstance(rating_obj, dict):
+        try:
+            review_count = int(rating_obj.get("reviewCount") or 0)
+        except (TypeError, ValueError):
+            review_count = 0
+        try:
+            rv = rating_obj.get("ratingValue")
+            if rv is not None:
+                review_rating = float(rv)
+        except (TypeError, ValueError):
+            review_rating = None
+
+    img_field = primary.get("image")
+    photo_urls: list[str] = []
+    if isinstance(img_field, str):
+        photo_urls = [img_field]
+    elif isinstance(img_field, list):
+        photo_urls = [x for x in img_field if isinstance(x, str)]
+
+    # GPS from data-atlas-latlng DOM attribute (JSON-LD has none).
+    gps_lat: float | None = None
+    gps_lon: float | None = None
+    gps_source = "absent"
+    m_gps = _BOOKING_DATA_ATLAS_LATLNG_RE.search(html_body)
+    if m_gps:
+        try:
+            gps_lat = float(m_gps.group(1))
+            gps_lon = float(m_gps.group(2))
+            gps_source = "data-atlas-latlng"
+        except (TypeError, ValueError):
+            pass
+
+    # BasicPropertyData for internal id + canonical city + GPS fallback.
+    # Booking's JSON-LD `addressLocality` is unreliable (Booking puts the
+    # street address there); BasicPropertyData's `location.city` is the
+    # canonical city name. Always prefer it when present.
+    booking_property_id = ""
+    m_bp = _BOOKING_BASIC_PROPERTY_RE.search(html_body)
+    if m_bp:
+        booking_property_id = m_bp.group(1)
+        loc_chunk = m_bp.group(3)
+        mc = re.search(r'"city"\s*:\s*"([^"]+)"', loc_chunk)
+        if mc:
+            city = mc.group(1)  # override JSON-LD's mis-populated locality
+        if gps_lat is None or gps_lon is None:
+            ml = re.search(r'"latitude"\s*:\s*(-?\d+\.?\d*)', loc_chunk)
+            mlo = re.search(r'"longitude"\s*:\s*(-?\d+\.?\d*)', loc_chunk)
+            if ml and mlo:
+                try:
+                    gps_lat = float(ml.group(1))
+                    gps_lon = float(mlo.group(1))
+                    gps_source = "basic-property-data"
+                except (TypeError, ValueError):
+                    pass
+        # Also prefer the BasicPropertyData formattedAddress over the
+        # concatenated JSON-LD parts (cleaner string).
+        mfa = re.search(r'"formattedAddress"\s*:\s*"([^"]+)"', loc_chunk)
+        if mfa:
+            address_displayed = mfa.group(1)
+
+    # Review-text extraction. Booking pairs positiveText + negativeText
+    # per-review; we concatenate them as a single review body for the
+    # owner-mention scan input.
+    raw_reviews: list[str] = []
+    pos_iter = _BOOKING_POSITIVE_TEXT_RE.finditer(html_body)
+    neg_iter = _BOOKING_NEGATIVE_TEXT_RE.finditer(html_body)
+    pos_texts = []
+    neg_texts = []
+    for m in pos_iter:
+        try:
+            pos_texts.append(_json.loads(f'"{m.group(1)}"'))
+        except (ValueError, _json.JSONDecodeError):
+            pos_texts.append(m.group(1))
+    for m in neg_iter:
+        try:
+            neg_texts.append(_json.loads(f'"{m.group(1)}"'))
+        except (ValueError, _json.JSONDecodeError):
+            neg_texts.append(m.group(1))
+    # Pair positive + negative as a single review (Booking renders them
+    # side-by-side in the review card). If counts differ, fall back to
+    # whichever has the bigger sample size.
+    for i in range(max(len(pos_texts), len(neg_texts))):
+        parts = []
+        if i < len(pos_texts):
+            parts.append("Positive: " + pos_texts[i])
+        if i < len(neg_texts):
+            parts.append("Negative: " + neg_texts[i])
+        if parts:
+            raw_reviews.append(" | ".join(parts))
+        if len(raw_reviews) >= 50:
+            break
+
+    review_sample_clean = [_redact_pii(r) for r in raw_reviews]
+    owner_mention = review_owner_mention_scan("", review_sample_clean)
+
+    return {
+        "platform": "booking",
+        "listing_url": listing_url,
+        "listing_id": booking_property_id or _booking_extract_listing_id(listing_url),
+        "title": title,
+        "host_name": "",  # Booking doesn't surface host identity in standard markup
+        "host_url": "",
+        "host_member_since": "",
+        "host_is_superhost": False,
+        "host_verifications": [],
+        "host_response_rate": "",
+        "host_response_time": "",
+        "cohost_names": [],
+        "cohost_urls": [],
+        "address_displayed": address_displayed,
+        "neighborhood": "",
+        "city": city,
+        "country": country,
+        "gps_lat": gps_lat,
+        "gps_lon": gps_lon,
+        "gps_source": gps_source,
+        "review_count": review_count,
+        "review_rating": review_rating,
+        "review_rating_scale": "0-10",  # Booking-specific; differs from Airbnb's 0-5
+        "review_sample": review_sample_clean[:10],
+        "review_extracted_count": len(review_sample_clean),
+        "owner_mention": owner_mention,
+        "photo_urls": photo_urls,
+        "amenities": [],
+        "bedrooms": None,
+        "bathrooms": None,
+        "max_guests": None,
+        "property_type": primary.get("@type") or "",
+        "currency": "",
+        "nightly_price": None,
+        "extraction_tier": "mixed" if products and m_gps else "json-ld" if products else "dom",
+        "raw_jsonld_count": len(blocks),
+    }
+
+
+# Per-platform extractor dispatch. Airbnb + Booking have bespoke parsing
+# for richer data than schema.org JSON-LD alone provides; the others
+# fall through to extract_generic_jsonld until their bespoke parsers
+# land. Per-platform parsers can be added incrementally; each MUST
+# preserve the owner_mention field by calling review_owner_mention_scan
+# on extracted review text (user directive 2026-05-15).
 _PLATFORM_EXTRACTORS: dict[str, Any] = {
     "airbnb": extract_airbnb,
+    "booking": extract_booking,
 }
 
 
