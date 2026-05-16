@@ -649,6 +649,25 @@ WORKFLOWS: dict[str, Workflow] = {
                     "operator support (no query rewrite needed)."
                 ),
             ),
+            WorkflowStep(
+                "dork_sweep_baidu",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),
+                description=(
+                    "Baidu through Scrapling StealthyFetcher (keyless 6th "
+                    "engine, CN-language coverage of ~96% of CN-web that "
+                    "Google blocks and Bing/Yandex miss). Destination URL "
+                    "from result-container `mu=` attribute (no redirect "
+                    "unwrap); native site: operator support."
+                ),
+            ),
         ],
     ),
 }

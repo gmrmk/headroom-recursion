@@ -1822,6 +1822,221 @@ def _dork_sweep_yandex_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]
 
 
 # ===========================================================================
+# Baidu main-UI HTML scrape (keyless 6th engine; CN coverage)
+# ===========================================================================
+#
+# Endpoint: https://www.baidu.com/s?wd=<query>
+# Auth: none.
+#
+# Coverage rationale: Baidu indexes ~96% of the CN-language web that
+# Google blocks and Bing/Yandex de-prioritize. For PV-investigations
+# touching CN-residence/identity, Baidu is the canonical local-language
+# record. Distant second: Sogou (planned for a future ship).
+#
+# Baidu 2026 result structure:
+#   <div class="result c-container ..." mu="<DESTINATION_URL>" srcid="..." id="N">
+#     <h3 class="t ..."><a class="sc-link ..." href="<baidu-redirect>" data-module="title">
+#       ...nested spans with title text (with <em> match tags)
+#     </a></h3>
+#     ...
+#     <span class="summary-text_XXX">SNIPPET TEXT</span>
+#   </div>
+#
+# Key insight: the `mu=` attribute on the outer container holds the
+# canonical destination URL. No redirect unwrap needed -- just read it.
+
+_BAIDU_URL = "https://www.baidu.com/s"
+
+_BAIDU_RESULT_BLOCK_RE = re.compile(
+    r'<div[^>]+class="result c-container[^"]*"[^>]*\bmu="([^"]+)"[^>]*>'
+    r"(.*?)"
+    r'(?=<div[^>]+class="result c-container[^"]*"|\Z)',
+    re.IGNORECASE | re.DOTALL,
+)
+
+_BAIDU_TITLE_BLOCK_RE = re.compile(
+    r'<h3[^>]*\bclass="[^"]*\bt\b[^"]*"[^>]*>' r"(.*?)" r"</h3>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+_BAIDU_SNIPPET_SPAN_RE = re.compile(
+    r'<span[^>]*\bclass="[^"]*\bsummary-text_[A-Za-z0-9]+\b[^"]*"[^>]*>' r"(.*?)" r"</span>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _parse_baidu_html(html_body: str) -> list[dict[str, str]]:
+    """Parse Baidu search results into hits with url + title + snippet.
+
+    URL comes from the result container's `mu=` attribute (canonical
+    destination, no Baidu-redirect resolution required). Title from
+    the h3.t block. Snippet from the summary-text span.
+
+    Naomi gate: only result text leaves this function -- the page bytes
+    never touch disk past the SSE bus.
+    """
+    hits: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+    for m in _BAIDU_RESULT_BLOCK_RE.finditer(html_body):
+        raw_url = m.group(1).strip()
+        block = m.group(2)
+        if not raw_url.startswith(("http://", "https://")):
+            continue
+        try:
+            host = raw_url.split("/", 3)[2]
+        except IndexError:
+            continue
+        if host.endswith("baidu.com"):
+            continue
+        if raw_url in seen_urls:
+            continue
+        seen_urls.add(raw_url)
+
+        title_match = _BAIDU_TITLE_BLOCK_RE.search(block)
+        if not title_match:
+            continue
+        title_text = _clean_html_fragment(title_match.group(1), max_len=200)
+        if not title_text:
+            continue
+
+        snippet_text = ""
+        snip = _BAIDU_SNIPPET_SPAN_RE.search(block)
+        if snip:
+            snippet_text = _clean_html_fragment(snip.group(1), max_len=300)
+
+        hits.append({"url": raw_url, "title": title_text, "snippet": snippet_text})
+    return hits
+
+
+def _baidu_fetch(url: str, timeout_s: float = 60.0) -> tuple[int, str]:
+    """Fetch a Baidu search URL via Scrapling's StealthyFetcher."""
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        return (0, "")
+    try:
+        page = StealthyFetcher.fetch(
+            url,
+            headless=True,
+            network_idle=True,
+            timeout=int(timeout_s * 1000),
+        )
+        body = getattr(page, "html_content", None) or getattr(page, "text", "") or ""
+        if isinstance(body, bytes | bytearray):
+            body = bytes(body).decode("utf-8", errors="replace")
+        return (int(getattr(page, "status", 0) or 0), body)
+    except Exception:
+        return (0, "")
+
+
+def dork_sweep_baidu(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Dork-sweep via Baidu through Scrapling StealthyFetcher.
+
+    Coverage: ~96% of the CN-language web. Highest-value engine for
+    targets with CN residence/identity. Native `site:` operator support.
+
+    Payload: same as dork_sweep_ddg.
+
+    Naomi gate: queries never logged.
+    """
+    seed = payload or {}
+    limit_per = min(
+        int(seed.get("limit_per_query", _HIT_LIMIT_PER_DORK) or _HIT_LIMIT_PER_DORK), 25
+    )
+    queries = _build_dork_queries(seed)
+    if not queries:
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "adapter_id": "dork_sweep_baidu",
+                    "skipped": True,
+                    "reason": "no dork templates matched available seed keys",
+                    "templates_total": len(_PV_TEMPLATES),
+                },
+            }
+        ]
+
+    events: list[dict[str, Any]] = []
+    queries_run = 0
+    queries_failed = 0
+    total_hits = 0
+    for idx, q in enumerate(queries):
+        if idx > 0:
+            jitter = 0.5 * ((idx * 7) % 11) / 10
+            time.sleep(1.0 + jitter)
+        encoded_q = urllib.parse.quote_plus(q["query"])
+        url = f"{_BAIDU_URL}?wd={encoded_q}"
+        status, body = _baidu_fetch(url)
+        if status != 200 or not body:
+            queries_failed += 1
+            continue
+        hits = _parse_baidu_html(body)[:limit_per]
+        queries_run += 1
+        for h in hits:
+            total_hits += 1
+            events.append(
+                {
+                    "event_type": "dork-hit",
+                    "payload": {
+                        "source": "dork-sweep",
+                        "engine": "baidu",
+                        "template_id": q["id"],
+                        "template_label": q["label"],
+                        "url": h["url"],
+                        "title": h["title"],
+                        "snippet": h.get("snippet", ""),
+                        "confidence": "tentative",
+                    },
+                }
+            )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_baidu",
+                "queries_attempted": len(queries),
+                "queries_run": queries_run,
+                "queries_failed": queries_failed,
+                "total_hits": total_hits,
+                "fetch_method": "scrapling-stealthy-patchright",
+            },
+        }
+    )
+    return events
+
+
+def _dork_sweep_baidu_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    name = payload.get("name") or "Test Host"
+    return [
+        {
+            "event_type": "dork-hit",
+            "payload": {
+                "source": "dork-sweep",
+                "engine": "baidu",
+                "template_id": "name_linkedin",
+                "template_label": "Host name on LinkedIn profiles",
+                "url": "https://www.linkedin.com/in/test-host",
+                "title": f"{name} — LinkedIn (synthetic via baidu)",
+                "snippet": "Synthetic snippet preview for Baidu engine smoke test.",
+                "confidence": "tentative",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_baidu",
+                "queries_run": 1,
+                "total_hits": 1,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ===========================================================================
 # Registry installation
 # ===========================================================================
 
@@ -1868,5 +2083,15 @@ _REGISTRY.register(
     description=(
         "Dork-sweep via Yandex through Scrapling StealthyFetcher (W13.dk, "
         "keyless 5th engine, RU/EU/Eastern European coverage)."
+    ),
+)
+_REGISTRY.register(
+    "dork_sweep_baidu",
+    dork_sweep_baidu,
+    synthetic_mode=_dork_sweep_baidu_synthetic,
+    in_process=True,
+    description=(
+        "Dork-sweep via Baidu through Scrapling StealthyFetcher (W13.dk, "
+        "keyless 6th engine, CN-language coverage)."
     ),
 )

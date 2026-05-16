@@ -9,6 +9,7 @@ from __future__ import annotations
 from osint_goblin_workers.adapters_dork import (
     _PV_TEMPLATES,
     _build_dork_queries,
+    _parse_baidu_html,
     _parse_bing_html,
     _parse_ddg_html,
     _parse_yandex_html,
@@ -16,6 +17,7 @@ from osint_goblin_workers.adapters_dork import (
     _strip_bing_redirect,
     _strip_ddg_redirect,
     _url_matches_domain,
+    dork_sweep_baidu,
     dork_sweep_bing,
     dork_sweep_brave,
     dork_sweep_ddg,
@@ -552,6 +554,101 @@ class TestParseYandexHtml:
 class TestYandexAdapter:
     def test_yandex_returns_skip_event_with_empty_seed(self):
         events = dork_sweep_yandex({})
+        assert len(events) == 1
+        assert events[0]["event_type"] == "tool-run-result"
+        assert events[0]["payload"]["skipped"] is True
+
+
+# ---------------------------------------------------------------------------
+# _parse_baidu_html -- extract result c-container + mu= URL + summary-text
+# ---------------------------------------------------------------------------
+
+
+# Fixture mirrors Baidu's 2026 result-container shape: the `mu=` attribute on
+# the outer div is the destination URL; <h3 class="t"> contains the title;
+# <span class="summary-text_XXXX"> contains the snippet (random suffix).
+_BAIDU_FIXTURE = (
+    "<html><body>"
+    '<div class="result c-container xpath-log new-pmd" srcid="1599" id="1" '
+    'mu="https://www.linkedin.com/in/alice-smith" '
+    'data-op="{}" data-click="{}">'
+    '<h3 class="t _sc-title">'
+    '<a class="sc-link block" href="http://www.baidu.com/link?url=xxxxxx" '
+    'target="_blank" data-module="title">'
+    "<span><span>"
+    "<em>Alice</em> <em>Smith</em> - LinkedIn Profile</span></span>"
+    "</a></h3>"
+    '<div data-module="struct-info">chrome</div>'
+    '<div class="cos-row">'
+    '<div data-module="abstract">'
+    '<span class="summary-text_560AW">'
+    "<em>Alice</em> <em>Smith</em>, Senior Engineer at Acme Corp. "
+    "Based in Boston, MA. 500+ connections on LinkedIn."
+    "</span>"
+    "</div></div></div>"
+    '<div class="result c-container new-pmd" srcid="1600" id="2" '
+    'mu="https://github.com/alicesmith">'
+    '<h3 class="t">'
+    '<a href="x"><span>alice <b>smith</b>&#39;s GitHub</span></a></h3>'
+    '<span class="summary-text_99ZZZ">Public repos by alicesmith.</span>'
+    "</div>"
+    "</body></html>"
+)
+
+
+class TestParseBaiduHtml:
+    def test_extracts_two_hits_from_fixture(self):
+        hits = _parse_baidu_html(_BAIDU_FIXTURE)
+        assert len(hits) == 2
+
+    def test_first_hit_url_title_and_snippet(self):
+        hits = _parse_baidu_html(_BAIDU_FIXTURE)
+        # URL comes from mu= attribute, NOT from baidu.com/link?url=
+        assert hits[0]["url"] == "https://www.linkedin.com/in/alice-smith"
+        assert "Alice Smith" in hits[0]["title"]
+        assert "LinkedIn" in hits[0]["title"]
+        assert "Senior Engineer at Acme Corp" in hits[0]["snippet"]
+
+    def test_strips_inline_html_from_title(self):
+        hits = _parse_baidu_html(_BAIDU_FIXTURE)
+        assert hits[1]["title"] == "alice smith's GitHub"
+
+    def test_strips_em_match_tags_from_snippet(self):
+        # Baidu wraps query-matched terms in <em>; should be stripped.
+        hits = _parse_baidu_html(_BAIDU_FIXTURE)
+        assert "<em>" not in hits[0]["snippet"]
+
+    def test_empty_input_returns_empty_list(self):
+        assert _parse_baidu_html("") == []
+        assert _parse_baidu_html("<html><body>no results</body></html>") == []
+
+    def test_skips_baidu_internal_urls(self):
+        # Some result containers point at baidu.com itself (search refinements,
+        # related-queries blocks). The parser must drop those.
+        internal = (
+            '<div class="result c-container" mu="https://www.baidu.com/refine">'
+            '<h3 class="t"><a href="x">internal</a></h3></div>'
+            '<div class="result c-container" mu="https://example.com/real">'
+            '<h3 class="t"><a href="x">real</a></h3></div>'
+        )
+        hits = _parse_baidu_html(internal)
+        assert len(hits) == 1
+        assert hits[0]["url"] == "https://example.com/real"
+
+    def test_dedupes_repeated_urls(self):
+        dup = (
+            '<div class="result c-container" mu="https://example.com/page">'
+            '<h3 class="t"><a href="x">First</a></h3></div>'
+            '<div class="result c-container" mu="https://example.com/page">'
+            '<h3 class="t"><a href="x">Dup</a></h3></div>'
+        )
+        hits = _parse_baidu_html(dup)
+        assert len(hits) == 1
+
+
+class TestBaiduAdapter:
+    def test_baidu_returns_skip_event_with_empty_seed(self):
+        events = dork_sweep_baidu({})
         assert len(events) == 1
         assert events[0]["event_type"] == "tool-run-result"
         assert events[0]["payload"]["skipped"] is True
