@@ -24,11 +24,19 @@ refresh discipline.
 
 | Source | License | Format | Size | Reader lib | Refresh |
 |---|---|---|---|---|---|
-| MaxMind GeoLite2-City | CC-BY-SA-4.0 (attribution + free MaxMind account) | mmdb | ~70 MB | `geoip2` (Apache-2.0) | Tue + Fri upstream; we pull weekly |
-| MaxMind GeoLite2-ASN | CC-BY-SA-4.0 (attribution + free MaxMind account) | mmdb | ~10 MB | `geoip2` (Apache-2.0) | Tue + Fri upstream; we pull weekly |
-| IP2Proxy LITE PX11 BIN | Free w/ verbatim attribution line | BIN | ~50–700 MB | `IP2Proxy` (MIT) | 24h upstream; we pull weekly |
+| **DB-IP City Lite** | CC-BY-4.0 (attribution required) | mmdb | ~150 MB | `geoip2` (Apache-2.0) | Monthly upstream; we pull monthly |
+| **DB-IP ASN Lite** | CC-BY-4.0 (attribution required) | mmdb | ~40 MB | `geoip2` (Apache-2.0) | Monthly upstream; we pull monthly |
+| IP2Proxy LITE PX11 BIN | Free w/ verbatim attribution line + free download token | BIN | ~50-700 MB | `IP2Proxy` (MIT) | 24h upstream; we pull weekly |
 | Tor Project bulk-exit-list | Public domain | text, IPv4-per-line | ~50 KB | stdlib `set()` | 30 min upstream; we pull every 4 h |
 | X4BNet/lists_vpn | MIT | text, CIDR-per-line | ~5 MB | stdlib `ipaddress` | Automated CI rebuilds; we pull weekly |
+
+**DB-IP Lite was chosen over MaxMind GeoLite2** because MaxMind's free
+license-key issuance is gated on corporate-email approval (verified
+empirically 2026-05-16). DB-IP Lite publishes drop-in-replacement
+.mmdb files at `https://download.db-ip.com/free/dbip-{kind}-lite-YYYY-MM.mmdb.gz`
+with no account, no key, no corporate-email gate -- and the format is
+binary-identical to MaxMind's, so the same `geoip2` Python reader works
+unchanged. CC-BY-4.0 attribution lands in the dossier footer.
 
 ### Storage location
 
@@ -53,8 +61,8 @@ populates it idempotently. `make refdata` is the one-line invocation.
 The dossier export footer must include:
 
 ```
-Geolocation data provided by MaxMind GeoLite2 (CC-BY-SA-4.0).
-Proxy/VPN classification data provided by IP2Proxy LITE (https://lite.ip2location.com).
+Geolocation data: IP to City Lite by DB-IP (https://db-ip.com), CC-BY-4.0.
+Proxy/VPN classification data: IP2Proxy LITE (https://lite.ip2location.com).
 Tor exit-node list courtesy of the Tor Project.
 Community VPN/datacenter ranges courtesy of X4BNet/lists_vpn.
 ```

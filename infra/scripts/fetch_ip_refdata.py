@@ -1,41 +1,45 @@
 """Reference-database bootstrap for IP intel.
 
-Downloads (or refreshes) the four reference databases that feed the
+Downloads (or refreshes) the reference databases that feed the
 Identity Triangulation sprint's IP consensus verdict:
 
-  - MaxMind GeoLite2-City.mmdb       (city/country/lat-lon)
-  - MaxMind GeoLite2-ASN.mmdb        (AS number + org name)
+  - DB-IP City Lite (.mmdb)          (city/country/lat-lon)
+  - DB-IP ASN Lite (.mmdb)           (AS number + org name)
   - IP2Proxy LITE PX11 BIN           (VPN/Tor/datacenter/residential)
   - Tor Project bulk-exit-list       (definitive Tor flag)
   - X4BNet/lists_vpn ipv4.txt        (community VPN/datacenter CIDR ranges)
 
-These are reference databases, not target data. They describe IP
-*ranges* (like a phone book). Naomi-strict: safe to persist on disk
-under data/reference/.
+DB-IP Lite was chosen over MaxMind GeoLite2 because MaxMind gates
+GeoLite2 license keys on corporate email approval, which is impractical
+for individual investigators. DB-IP Lite is CC-BY-4.0, ships the
+identical MaxMind MMDB format (drop-in compatible with the `geoip2`
+Python library), refreshes monthly, and requires no account.
 
-Idempotent. Re-runs are cheap (HTTP HEAD + If-Modified-Since on the
-public sources; for MaxMind, requires a license key in
-MAXMIND_LICENSE_KEY).
+These are reference databases, not target data. They describe IP
+*ranges* (like a phone book), safe to persist on disk under
+`data/reference/` regardless of ephemeral-mode setting.
+
+Idempotent. Re-runs skip files that already exist; pass `--force` to
+re-download anyway.
 
 Usage:
     uv run python infra/scripts/fetch_ip_refdata.py [--force] [--source <name>]
 
 Environment:
-    MAXMIND_LICENSE_KEY  Required for MaxMind downloads. Free; sign up
-                         at https://www.maxmind.com/en/geolite2/signup.
-                         Without it, MaxMind downloads are skipped and
-                         the IP intel adapter falls back to ASN-heuristic
-                         + IP2Proxy-only verdicts.
+    IP2PROXY_DOWNLOAD_TOKEN  Free token from https://lite.ip2location.com.
+                             Without it, IP2Proxy LITE downloads are
+                             skipped and the IP intel adapter falls back
+                             to ASN-heuristic + DB-IP-only verdicts.
 """
 
 from __future__ import annotations
 
 import argparse
+import datetime
 import gzip
 import os
 import shutil
 import sys
-import tarfile
 from pathlib import Path
 
 import httpx
@@ -58,15 +62,10 @@ IP2PROXY_LITE_URL_TEMPLATE = (
     "https://download.ip2location.com/lite/?file=PX11LITEBINIPV6&token={token}"
 )
 
-# MaxMind downloads use a permalink with an account-scoped license key.
-MAXMIND_CITY_URL_TEMPLATE = (
-    "https://download.maxmind.com/app/geoip_download?"
-    "edition_id=GeoLite2-City&license_key={key}&suffix=tar.gz"
-)
-MAXMIND_ASN_URL_TEMPLATE = (
-    "https://download.maxmind.com/app/geoip_download?"
-    "edition_id=GeoLite2-ASN&license_key={key}&suffix=tar.gz"
-)
+# DB-IP Lite: monthly .mmdb.gz files at a predictable URL pattern.
+# Files at this URL pattern are CC-BY-4.0 and require no account.
+# Format: dbip-{kind}-lite-YYYY-MM.mmdb.gz where kind in {"city", "asn"}.
+DBIP_URL_TEMPLATE = "https://download.db-ip.com/free/dbip-{kind}-lite-{ym}.mmdb.gz"
 
 
 # ---------------------------------------------------------------------------
@@ -98,27 +97,27 @@ def _download(url: str, dest: Path, *, label: str) -> None:
     print(f"  [{label}] ok ({size_kb:,.0f} KB) -> {dest.name}")
 
 
-def _extract_mmdb_from_tarball(tarball: Path, dest_mmdb: Path) -> None:
-    """MaxMind ships GeoLite2 as a tar.gz with the .mmdb nested inside.
-    Extract just the .mmdb into dest, then delete the tarball.
-    """
-    with tarfile.open(tarball, "r:gz") as tf:
-        members = [m for m in tf.getmembers() if m.name.endswith(".mmdb")]
-        if not members:
-            raise RuntimeError(f"no .mmdb member found in {tarball.name}")
-        member = members[0]
-        # Strip the directory prefix; write to dest_mmdb directly.
-        with tf.extractfile(member) as src, dest_mmdb.open("wb") as dst:
-            if src is None:
-                raise RuntimeError(f"tarfile.extractfile returned None for {member.name}")
-            shutil.copyfileobj(src, dst)
-    tarball.unlink(missing_ok=True)
-
-
 def _gunzip(src_gz: Path, dest: Path) -> None:
+    """Gunzip src_gz to dest; remove the .gz on success."""
     with gzip.open(src_gz, "rb") as src, dest.open("wb") as dst:
         shutil.copyfileobj(src, dst)
     src_gz.unlink(missing_ok=True)
+
+
+def _current_yyyy_mm() -> str:
+    return datetime.date.today().strftime("%Y-%m")
+
+
+def _previous_yyyy_mm(offset: int = 1) -> str:
+    """Returns the YYYY-MM string `offset` months in the past."""
+    today = datetime.date.today()
+    year, month = today.year, today.month
+    for _ in range(offset):
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    return f"{year:04d}-{month:02d}"
 
 
 # ---------------------------------------------------------------------------
@@ -180,28 +179,46 @@ def fetch_ip2proxy_lite(*, force: bool = False) -> None:
     print(f"  [ip2proxy] extracted -> {dest.name}")
 
 
-def fetch_maxmind(*, force: bool = False) -> None:
-    key = os.environ.get("MAXMIND_LICENSE_KEY", "").strip()
-    if not key:
-        print(
-            "  [maxmind] SKIP: MAXMIND_LICENSE_KEY not set.\n"
-            "           Free MaxMind account required; sign up at\n"
-            "           https://www.maxmind.com/en/geolite2/signup\n"
-            "           and export MAXMIND_LICENSE_KEY=<key> before re-running."
-        )
-        return
-    for url_template, mmdb_name in (
-        (MAXMIND_CITY_URL_TEMPLATE, "GeoLite2-City.mmdb"),
-        (MAXMIND_ASN_URL_TEMPLATE, "GeoLite2-ASN.mmdb"),
+def _try_dbip_url(kind: str) -> tuple[str, str]:
+    """Returns (url, ym) for the current month's DB-IP Lite file.
+    Tries the current YYYY-MM first; if a HEAD check 404s, falls back
+    to the previous month (publish day is mid-month).
+    """
+    for offset in range(0, 3):
+        ym = _current_yyyy_mm() if offset == 0 else _previous_yyyy_mm(offset)
+        url = DBIP_URL_TEMPLATE.format(kind=kind, ym=ym)
+        try:
+            r = httpx.head(url, follow_redirects=True, timeout=20.0)
+            if r.status_code == 200:
+                return url, ym
+        except httpx.RequestError:
+            continue
+    raise RuntimeError(f"no dbip-{kind}-lite available within the last 3 months")
+
+
+def fetch_dbip(*, force: bool = False) -> None:
+    """Download DB-IP City Lite + DB-IP ASN Lite .mmdb files.
+    No key, no account; CC-BY-4.0 attribution required in dossier
+    output. Drop-in compatible with the `geoip2` Python reader
+    library (same MMDB format as MaxMind GeoLite2).
+    """
+    for kind, mmdb_name in (
+        ("city", "dbip-city-lite.mmdb"),
+        ("asn", "dbip-asn-lite.mmdb"),
     ):
         dest = REFDATA_DIR / mmdb_name
         if dest.exists() and not force:
             print(f"  [{mmdb_name}] skip (exists; use --force to refresh)")
             continue
-        tar_dest = REFDATA_DIR / (mmdb_name + ".tar.gz")
-        _download(url_template.format(key=key), tar_dest, label=mmdb_name.removesuffix(".mmdb"))
-        _extract_mmdb_from_tarball(tar_dest, dest)
-        print(f"  [{mmdb_name}] extracted -> {dest.name}")
+        try:
+            url, ym = _try_dbip_url(kind)
+        except RuntimeError as exc:
+            print(f"  [{mmdb_name}] ERROR: {exc}")
+            continue
+        gz_dest = REFDATA_DIR / f"{mmdb_name}.gz"
+        _download(url, gz_dest, label=mmdb_name.removesuffix(".mmdb"))
+        _gunzip(gz_dest, dest)
+        print(f"  [{mmdb_name}] extracted ({ym}) -> {dest.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +229,7 @@ _SOURCES = {
     "tor": fetch_tor_exit_list,
     "x4bnet": fetch_x4bnet,
     "ip2proxy": fetch_ip2proxy_lite,
-    "maxmind": fetch_maxmind,
+    "dbip": fetch_dbip,
 }
 
 
