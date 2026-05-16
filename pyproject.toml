@@ -45,6 +45,10 @@ select = ["E", "F", "I", "B", "UP", "RUF", "SIM"]
 # multi-host site:() OR-lists; reflowing them changes what the engine sees.
 # E501 silenced for this file by design (templates intentionally long).
 "apps/workers/src/osint_goblin_workers/adapters_dork.py" = ["E501"]
+# Dev probe scripts under tools/dev are exploratory + throwaway; relax the
+# stylistic lint set so they don't gate commits. Production code stays strict.
+"tools/dev/*.py" = ["E501", "SIM102", "SIM105", "SIM118", "UP038"]
+"tools/feynman_pty.py" = ["E501", "SIM105"]
 
 [tool.mypy]
 strict = true
