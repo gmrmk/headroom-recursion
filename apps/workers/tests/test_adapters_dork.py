@@ -12,7 +12,10 @@ from osint_goblin_workers.adapters_dork import (
     _parse_baidu_html,
     _parse_bing_html,
     _parse_ddg_html,
+    _parse_google_html,
     _parse_naver_html,
+    _parse_seznam_html,
+    _parse_yahoojp_html,
     _parse_yandex_html,
     _rewrite_query_for_bing,
     _strip_bing_redirect,
@@ -22,8 +25,11 @@ from osint_goblin_workers.adapters_dork import (
     dork_sweep_bing,
     dork_sweep_brave,
     dork_sweep_ddg,
+    dork_sweep_google,
     dork_sweep_naver,
     dork_sweep_serper,
+    dork_sweep_seznam,
+    dork_sweep_yahoojp,
     dork_sweep_yandex,
 )
 
@@ -766,3 +772,205 @@ class TestNaverAdapter:
         assert len(events) == 1
         assert events[0]["event_type"] == "tool-run-result"
         assert events[0]["payload"]["skipped"] is True
+
+
+# ---------------------------------------------------------------------------
+# _parse_yahoojp_html -- sw-Card Algo direct-URL extraction
+# ---------------------------------------------------------------------------
+
+
+_YAHOOJP_FIXTURE = (
+    "<html><body>"
+    '<div class="sw-Card Algo Algo-result"><section>'
+    '<div class="sw-Card__section sw-Card__section--header">'
+    '<div class="sw-Card__title">'
+    '<a href="https://www.linkedin.com/in/alice-smith" '
+    'class="sw-Card__titleInner" data-cl-params="x" ping="y">'
+    '<h3 class="sw-Card__titleMain sw-Card__titleMain--clamp">'
+    "<span>Alice Smith — <b>Senior</b> Engineer | LinkedIn</span>"
+    "</h3></a></div></div>"
+    '<div class="sw-Card__section">'
+    '<p class="sw-Card__summary">'
+    '<span class="util-Text--sub">2024/01/15</span>'
+    '<span class="util-Delimiter">-</span>Senior engineer at Acme Corp. '
+    "Boston, MA. 500+ connections."
+    "</p></div></section></div>"
+    '<div class="sw-Card Algo">'
+    '<div class="sw-Card__title">'
+    '<a href="https://github.com/alicesmith" class="sw-Card__titleInner">'
+    '<h3 class="sw-Card__titleMain">'
+    "<span>alice <b>smith</b>&#39;s GitHub</span></h3></a></div>"
+    '<p class="sw-Card__summary">Public repos.</p>'
+    "</div>"
+    "</body></html>"
+)
+
+
+class TestParseYahooJpHtml:
+    def test_extracts_two_hits_from_fixture(self):
+        hits = _parse_yahoojp_html(_YAHOOJP_FIXTURE)
+        assert len(hits) == 2
+
+    def test_first_hit_url_title_and_snippet(self):
+        hits = _parse_yahoojp_html(_YAHOOJP_FIXTURE)
+        assert hits[0]["url"] == "https://www.linkedin.com/in/alice-smith"
+        assert "Alice Smith" in hits[0]["title"]
+        assert "Senior" in hits[0]["title"]
+        assert "500+ connections" in hits[0]["snippet"]
+
+    def test_strips_inline_html_from_title(self):
+        hits = _parse_yahoojp_html(_YAHOOJP_FIXTURE)
+        assert hits[1]["title"] == "alice smith's GitHub"
+
+    def test_empty_input_returns_empty_list(self):
+        assert _parse_yahoojp_html("") == []
+
+    def test_skips_yahoo_internal_urls(self):
+        internal = (
+            '<div class="sw-Card Algo">'
+            '<a href="https://search.yahoo.co.jp/refine" class="sw-Card__titleInner">'
+            '<h3 class="sw-Card__titleMain"><span>refine</span></h3></a></div>'
+            '<div class="sw-Card Algo">'
+            '<a href="https://example.com/real" class="sw-Card__titleInner">'
+            '<h3 class="sw-Card__titleMain"><span>real</span></h3></a></div>'
+        )
+        hits = _parse_yahoojp_html(internal)
+        assert len(hits) == 1
+        assert hits[0]["url"] == "https://example.com/real"
+
+
+class TestYahooJpAdapter:
+    def test_yahoojp_returns_skip_event_with_empty_seed(self):
+        events = dork_sweep_yahoojp({})
+        assert len(events) == 1
+        assert events[0]["payload"]["skipped"] is True
+
+
+# ---------------------------------------------------------------------------
+# _parse_seznam_html -- BS4 Result__title-link extraction
+# ---------------------------------------------------------------------------
+
+
+_SEZNAM_FIXTURE = (
+    "<html><body>"
+    '<li class="Result">'
+    '<a class="Result__title-link" href="https://www.linkedin.com/in/alice-smith">'
+    "<h3>Alice Smith — LinkedIn</h3></a>"
+    '<p class="Result__perex">Senior engineer at Acme Corp.</p>'
+    "</li>"
+    '<li class="Result">'
+    '<a class="Result__title-link" href="https://github.com/alicesmith">'
+    "<h3>alice <b>smith</b>&#39;s GitHub</h3></a>"
+    '<p class="Result__perex">Public repos.</p>'
+    "</li>"
+    "</body></html>"
+)
+
+
+class TestParseSeznamHtml:
+    def test_extracts_two_hits_from_fixture(self):
+        hits = _parse_seznam_html(_SEZNAM_FIXTURE)
+        assert len(hits) == 2
+
+    def test_first_hit_url_title_and_snippet(self):
+        hits = _parse_seznam_html(_SEZNAM_FIXTURE)
+        assert hits[0]["url"] == "https://www.linkedin.com/in/alice-smith"
+        assert "Alice Smith" in hits[0]["title"]
+        assert "Senior engineer" in hits[0]["snippet"]
+
+    def test_strips_inline_html_from_title(self):
+        hits = _parse_seznam_html(_SEZNAM_FIXTURE)
+        assert hits[1]["title"] == "alice smith's GitHub"
+
+    def test_empty_input_returns_empty_list(self):
+        assert _parse_seznam_html("") == []
+
+    def test_skips_seznam_internal_urls(self):
+        internal = (
+            '<li class="Result">'
+            '<a class="Result__title-link" href="https://seznam.cz/refine">x</a>'
+            "</li>"
+            '<li class="Result">'
+            '<a class="Result__title-link" href="https://example.com/real">'
+            "<h3>real</h3></a></li>"
+        )
+        hits = _parse_seznam_html(internal)
+        assert len(hits) == 1
+        assert hits[0]["url"] == "https://example.com/real"
+
+
+class TestSeznamAdapter:
+    def test_seznam_returns_skip_event_with_empty_seed(self):
+        events = dork_sweep_seznam({})
+        assert len(events) == 1
+        assert events[0]["payload"]["skipped"] is True
+
+
+# ---------------------------------------------------------------------------
+# _parse_google_html -- BS4 MjjYud + h3 + VwiC3b extraction
+# ---------------------------------------------------------------------------
+
+
+_GOOGLE_FIXTURE = (
+    "<html><body>"
+    '<div class="MjjYud">'
+    '<a href="https://www.linkedin.com/in/alice-smith">'
+    "<h3>Alice Smith — Senior Engineer | LinkedIn</h3></a>"
+    '<div class="VwiC3b">Senior engineer at Acme Corp. Boston, MA. '
+    "500+ connections on LinkedIn.</div>"
+    "</div>"
+    '<div class="MjjYud">'
+    '<a href="https://github.com/alicesmith">'
+    "<h3>alice <b>smith</b>&#39;s GitHub</h3></a>"
+    '<div class="VwiC3b">Public repos by alicesmith.</div>'
+    "</div>"
+    "</body></html>"
+)
+
+
+class TestParseGoogleHtml:
+    def test_extracts_two_hits_from_fixture(self):
+        hits = _parse_google_html(_GOOGLE_FIXTURE)
+        assert len(hits) == 2
+
+    def test_first_hit_url_title_and_snippet(self):
+        hits = _parse_google_html(_GOOGLE_FIXTURE)
+        assert hits[0]["url"] == "https://www.linkedin.com/in/alice-smith"
+        assert "Alice Smith" in hits[0]["title"]
+        assert "500+ connections" in hits[0]["snippet"]
+
+    def test_strips_inline_html_from_title(self):
+        hits = _parse_google_html(_GOOGLE_FIXTURE)
+        assert hits[1]["title"] == "alice smith's GitHub"
+
+    def test_skips_google_self_references(self):
+        internal = (
+            '<div class="MjjYud">'
+            '<a href="https://www.google.com/imgres?...">'
+            "<h3>image</h3></a></div>"
+            '<div class="MjjYud">'
+            '<a href="https://example.com/real">'
+            "<h3>real</h3></a></div>"
+        )
+        hits = _parse_google_html(internal)
+        assert len(hits) == 1
+        assert hits[0]["url"] == "https://example.com/real"
+
+    def test_empty_input_returns_empty_list(self):
+        assert _parse_google_html("") == []
+
+
+class TestGoogleStealthAdapter:
+    def test_google_skips_when_env_gate_off(self, monkeypatch):
+        monkeypatch.delenv("OSINT_GOOGLE_STEALTH", raising=False)
+        events = dork_sweep_google({"name": "Alice"})
+        assert len(events) == 1
+        assert events[0]["payload"]["skipped"] is True
+        assert "OSINT_GOOGLE_STEALTH=1" in events[0]["payload"]["reason"]
+
+    def test_google_skips_with_empty_seed_when_env_gate_on(self, monkeypatch):
+        monkeypatch.setenv("OSINT_GOOGLE_STEALTH", "1")
+        events = dork_sweep_google({})
+        assert len(events) == 1
+        assert events[0]["payload"]["skipped"] is True
+        assert "no dork templates matched" in events[0]["payload"]["reason"]

@@ -688,6 +688,61 @@ WORKFLOWS: dict[str, Workflow] = {
                     "selectors."
                 ),
             ),
+            WorkflowStep(
+                "dork_sweep_yahoojp",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),
+                description=(
+                    "Yahoo Japan through Scrapling StealthyFetcher "
+                    "(keyless 8th engine, JP-language coverage; #1 in "
+                    "Japan ~50% market share, ahead of Google in JP). "
+                    "Direct URL anchors, stable sw-Card Algo class names."
+                ),
+            ),
+            WorkflowStep(
+                "dork_sweep_seznam",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),
+                description=(
+                    "Seznam through Scrapling + BS4 (keyless 9th engine, "
+                    "CZ-language coverage; #1 local engine in Czechia "
+                    "~25-30% market share; indexes seznam.cz partner "
+                    "blogs + idnes.cz + lidovky.cz + novinky.cz)."
+                ),
+            ),
+            WorkflowStep(
+                "dork_sweep_google",
+                {
+                    "name": "{name}",
+                    "email": "{email}",
+                    "phone": "{phone}",
+                    "domain": "{domain}",
+                    "username": "{username}",
+                    "address": "{address}",
+                },
+                required_seed_keys=(),
+                description=(
+                    "Google through StealthyFetcher (10th engine, env-"
+                    "gated OSINT_GOOGLE_STEALTH=1, OFF by default due "
+                    "to slow render + anti-bot escalation risk; "
+                    "Brave/Serper APIs cover Google's index when keys "
+                    "set). Last-resort coverage."
+                ),
+            ),
         ],
     ),
 }

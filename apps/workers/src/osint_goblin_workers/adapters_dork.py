@@ -2238,6 +2238,632 @@ def _dork_sweep_naver_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]
 
 
 # ===========================================================================
+# Yahoo Japan main-UI HTML scrape (keyless 8th engine; JP coverage)
+# ===========================================================================
+#
+# Endpoint: https://search.yahoo.co.jp/search?p=<query>
+# Coverage: #1 search engine in Japan (~50% market share, ahead of Google).
+# Powered by a Yahoo Inc. backend with JP-specific re-ranking; indexes
+# jp.linkedin.com, ameblo.jp, fc2.com, hatena.ne.jp blogs, Yahoo!知恵袋
+# (Q&A), Yahoo!ニュース that Google JP misses or de-prioritizes.
+#
+# 2026 result structure:
+#   <div class="sw-Card Algo">
+#     <a href="<DIRECT-URL>" class="sw-Card__titleInner">
+#       <h3 class="sw-Card__titleMain"><span>TITLE (with <b> match tags)</span></h3>
+#       ...favicon + breadcrumb chrome...
+#     </a>
+#     <p class="sw-Card__summary">SNIPPET TEXT</p>
+#   </div>
+#
+# Clean markup: direct URLs (no redirect unwrap), stable class names
+# (no random hashes like Naver). Regex parser works fine here.
+
+_YAHOOJP_URL = "https://search.yahoo.co.jp/search"
+
+_YAHOOJP_RESULT_BLOCK_RE = re.compile(
+    r'<div class="sw-Card Algo[^"]*"[^>]*>' r"(.*?)" r'(?=<div class="sw-Card Algo[^"]*"|\Z)',
+    re.IGNORECASE | re.DOTALL,
+)
+
+_YAHOOJP_TITLE_ANCHOR_RE = re.compile(
+    r'<a[^>]+href="([^"]+)"[^>]*class="sw-Card__titleInner"[^>]*>'
+    r".*?"
+    r'<h3[^>]*\bclass="[^"]*sw-Card__titleMain[^"]*"[^>]*>'
+    r"\s*<span[^>]*>(.*?)</span>\s*"
+    r"</h3>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+_YAHOOJP_SNIPPET_RE = re.compile(
+    r'<p[^>]+class="sw-Card__summary"[^>]*>(.*?)</p>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _parse_yahoojp_html(html_body: str) -> list[dict[str, str]]:
+    """Parse Yahoo Japan results into hits with url + title + snippet."""
+    hits: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+    for m in _YAHOOJP_RESULT_BLOCK_RE.finditer(html_body):
+        block = m.group(1)
+        ta = _YAHOOJP_TITLE_ANCHOR_RE.search(block)
+        if not ta:
+            continue
+        raw_url = ta.group(1).strip()
+        title_html = ta.group(2)
+        url = html.unescape(raw_url)
+        if not url.startswith(("http://", "https://")):
+            continue
+        try:
+            host = url.split("/", 3)[2]
+        except IndexError:
+            continue
+        if host.endswith("yahoo.co.jp"):
+            continue
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+
+        title_text = _clean_html_fragment(title_html, max_len=200)
+        if not title_text:
+            continue
+
+        snippet_text = ""
+        sn = _YAHOOJP_SNIPPET_RE.search(block)
+        if sn:
+            snippet_text = _clean_html_fragment(sn.group(1), max_len=300)
+
+        hits.append({"url": url, "title": title_text, "snippet": snippet_text})
+    return hits
+
+
+def _yahoojp_fetch(url: str, timeout_s: float = 60.0) -> tuple[int, str]:
+    """Fetch a Yahoo Japan search URL via Scrapling's StealthyFetcher."""
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        return (0, "")
+    try:
+        page = StealthyFetcher.fetch(
+            url,
+            headless=True,
+            network_idle=True,
+            timeout=int(timeout_s * 1000),
+        )
+        body = getattr(page, "html_content", None) or getattr(page, "text", "") or ""
+        if isinstance(body, bytes | bytearray):
+            body = bytes(body).decode("utf-8", errors="replace")
+        return (int(getattr(page, "status", 0) or 0), body)
+    except Exception:
+        return (0, "")
+
+
+def dork_sweep_yahoojp(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Dork-sweep via Yahoo Japan through Scrapling StealthyFetcher.
+
+    Coverage: #1 in Japan (~50% market share). Highest-value engine for
+    JP-residence/identity targets. Native `site:` operator support.
+
+    Naomi gate: queries never logged.
+    """
+    seed = payload or {}
+    limit_per = min(
+        int(seed.get("limit_per_query", _HIT_LIMIT_PER_DORK) or _HIT_LIMIT_PER_DORK), 25
+    )
+    queries = _build_dork_queries(seed)
+    if not queries:
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "adapter_id": "dork_sweep_yahoojp",
+                    "skipped": True,
+                    "reason": "no dork templates matched available seed keys",
+                    "templates_total": len(_PV_TEMPLATES),
+                },
+            }
+        ]
+
+    events: list[dict[str, Any]] = []
+    queries_run = 0
+    queries_failed = 0
+    total_hits = 0
+    for idx, q in enumerate(queries):
+        if idx > 0:
+            jitter = 0.5 * ((idx * 7) % 11) / 10
+            time.sleep(1.0 + jitter)
+        encoded_q = urllib.parse.quote_plus(q["query"])
+        url = f"{_YAHOOJP_URL}?p={encoded_q}"
+        status, body = _yahoojp_fetch(url)
+        if status != 200 or not body:
+            queries_failed += 1
+            continue
+        hits = _parse_yahoojp_html(body)[:limit_per]
+        queries_run += 1
+        for h in hits:
+            total_hits += 1
+            events.append(
+                {
+                    "event_type": "dork-hit",
+                    "payload": {
+                        "source": "dork-sweep",
+                        "engine": "yahoojp",
+                        "template_id": q["id"],
+                        "template_label": q["label"],
+                        "url": h["url"],
+                        "title": h["title"],
+                        "snippet": h.get("snippet", ""),
+                        "confidence": "tentative",
+                    },
+                }
+            )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_yahoojp",
+                "queries_attempted": len(queries),
+                "queries_run": queries_run,
+                "queries_failed": queries_failed,
+                "total_hits": total_hits,
+                "fetch_method": "scrapling-stealthy-patchright",
+            },
+        }
+    )
+    return events
+
+
+def _dork_sweep_yahoojp_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    name = payload.get("name") or "Test Host"
+    return [
+        {
+            "event_type": "dork-hit",
+            "payload": {
+                "source": "dork-sweep",
+                "engine": "yahoojp",
+                "template_id": "name_linkedin",
+                "template_label": "Host name on LinkedIn profiles",
+                "url": "https://jp.linkedin.com/in/test-host",
+                "title": f"{name} — LinkedIn (synthetic via yahoojp)",
+                "snippet": "Synthetic snippet preview for Yahoo Japan engine smoke test.",
+                "confidence": "tentative",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_yahoojp",
+                "queries_run": 1,
+                "total_hits": 1,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ===========================================================================
+# Seznam main-UI HTML scrape (keyless 9th engine; CZ coverage)
+# ===========================================================================
+#
+# Endpoint: https://search.seznam.cz/?q=<query>
+# Coverage: #1 search engine in Czechia (~25-30% market share locally).
+# Indexes seznam.cz partner blogs, novinky.cz, idnes.cz, lidovky.cz,
+# and CZ-specific commercial registries. Useful for CZ-residence targets.
+#
+# Seznam results are JS-rendered (Vue.js powered). Structure varies and
+# may change frequently. The parser uses BS4 because regex against
+# Vue-rendered DOM is fragile.
+
+_SEZNAM_URL = "https://search.seznam.cz/"
+
+
+def _parse_seznam_html(html_body: str) -> list[dict[str, str]]:
+    """Parse Seznam search results into hits with url + title + snippet.
+
+    Seznam's 2026 layout uses `<a class="Result__title-link">` for the
+    result anchor (stable selector) and `<p class="Result__perex">` for
+    the snippet body. BS4-based for robustness against Vue re-renders.
+
+    Naomi gate: only result text leaves this function.
+    """
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+
+    soup = BeautifulSoup(html_body, "html.parser")
+    # Seznam's stable selectors (verified 2026 layout):
+    #   - Result anchor: <a class="Result__title-link" href="<DIRECT-URL>">
+    #   - Title text:    inside the anchor (h3 child)
+    #   - Snippet:       <p class="Result__perex"> sibling of the anchor
+    hits: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+    # Find result-card containers; Seznam wraps each in <li class="Result">
+    cards = soup.find_all(
+        class_=lambda c: c and "Result" in (c if isinstance(c, str) else " ".join(c))
+    )
+    # Filter: only cards that have a Result__title-link inside.
+    for card in cards:
+        anchor = card.find("a", class_="Result__title-link") if hasattr(card, "find") else None
+        if not anchor:
+            continue
+        href = (anchor.get("href") or "").strip()
+        if not href.startswith(("http://", "https://")):
+            continue
+        try:
+            host = href.split("/", 3)[2]
+        except IndexError:
+            continue
+        if "seznam.cz" in host or "imedia.cz" in host:
+            continue
+        if href in seen_urls:
+            continue
+        seen_urls.add(href)
+
+        title_text = _clean_html_fragment(str(anchor), max_len=200)
+        if not title_text:
+            continue
+
+        snippet_text = ""
+        snip = card.find("p", class_="Result__perex") if hasattr(card, "find") else None
+        if snip is not None:
+            snippet_text = _clean_html_fragment(str(snip), max_len=300)
+
+        hits.append({"url": href, "title": title_text, "snippet": snippet_text})
+    return hits
+
+
+def _seznam_fetch(url: str, timeout_s: float = 60.0) -> tuple[int, str]:
+    """Fetch a Seznam search URL via Scrapling's StealthyFetcher."""
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        return (0, "")
+    try:
+        page = StealthyFetcher.fetch(
+            url,
+            headless=True,
+            network_idle=True,
+            timeout=int(timeout_s * 1000),
+        )
+        body = getattr(page, "html_content", None) or getattr(page, "text", "") or ""
+        if isinstance(body, bytes | bytearray):
+            body = bytes(body).decode("utf-8", errors="replace")
+        return (int(getattr(page, "status", 0) or 0), body)
+    except Exception:
+        return (0, "")
+
+
+def dork_sweep_seznam(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Dork-sweep via Seznam (Czech Republic's largest local engine).
+
+    Coverage: ~25-30% CZ market share. Indexes CZ-specific blogs, news,
+    forums. Useful for CZ-residence targets.
+
+    Naomi gate: queries never logged.
+    """
+    seed = payload or {}
+    limit_per = min(
+        int(seed.get("limit_per_query", _HIT_LIMIT_PER_DORK) or _HIT_LIMIT_PER_DORK), 25
+    )
+    queries = _build_dork_queries(seed)
+    if not queries:
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "adapter_id": "dork_sweep_seznam",
+                    "skipped": True,
+                    "reason": "no dork templates matched available seed keys",
+                    "templates_total": len(_PV_TEMPLATES),
+                },
+            }
+        ]
+
+    events: list[dict[str, Any]] = []
+    queries_run = 0
+    queries_failed = 0
+    total_hits = 0
+    for idx, q in enumerate(queries):
+        if idx > 0:
+            jitter = 0.5 * ((idx * 7) % 11) / 10
+            time.sleep(1.0 + jitter)
+        encoded_q = urllib.parse.quote_plus(q["query"])
+        url = f"{_SEZNAM_URL}?q={encoded_q}"
+        status, body = _seznam_fetch(url)
+        if status != 200 or not body:
+            queries_failed += 1
+            continue
+        hits = _parse_seznam_html(body)[:limit_per]
+        queries_run += 1
+        for h in hits:
+            total_hits += 1
+            events.append(
+                {
+                    "event_type": "dork-hit",
+                    "payload": {
+                        "source": "dork-sweep",
+                        "engine": "seznam",
+                        "template_id": q["id"],
+                        "template_label": q["label"],
+                        "url": h["url"],
+                        "title": h["title"],
+                        "snippet": h.get("snippet", ""),
+                        "confidence": "tentative",
+                    },
+                }
+            )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_seznam",
+                "queries_attempted": len(queries),
+                "queries_run": queries_run,
+                "queries_failed": queries_failed,
+                "total_hits": total_hits,
+                "fetch_method": "scrapling-stealthy-patchright",
+            },
+        }
+    )
+    return events
+
+
+def _dork_sweep_seznam_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    name = payload.get("name") or "Test Host"
+    return [
+        {
+            "event_type": "dork-hit",
+            "payload": {
+                "source": "dork-sweep",
+                "engine": "seznam",
+                "template_id": "name_linkedin",
+                "template_label": "Host name on LinkedIn profiles",
+                "url": "https://cz.linkedin.com/in/test-host",
+                "title": f"{name} — LinkedIn (synthetic via seznam)",
+                "snippet": "Synthetic snippet preview for Seznam engine smoke test.",
+                "confidence": "tentative",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_seznam",
+                "queries_run": 1,
+                "total_hits": 1,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ===========================================================================
+# Google-stealth (env-gated last-resort)
+# ===========================================================================
+#
+# Endpoint: https://www.google.com/search?q=<query>
+# Coverage: still the largest English-language index globally despite
+# losing JS-free SERP access in Jan 2025. Requires StealthyFetcher tier;
+# even then frequently triggers CF-Turnstile / reCAPTCHA challenges.
+#
+# Env gate: OSINT_GOOGLE_STEALTH=1 to opt in. Default OFF because:
+# 1. Slow (5-15s per query plus possible captcha solve).
+# 2. Higher anti-bot escalation risk than other engines.
+# 3. Brave + Serper APIs already cover Google's index when env keys set.
+#
+# 2026 result structure:
+#   <div class="MjjYud"> -- per-result wrapper
+#     <a href="<DIRECT-URL>" jsname="...">
+#       <h3>TITLE</h3>
+#     </a>
+#     <div class="VwiC3b">SNIPPET</div>
+#   </div>
+
+_GOOGLE_URL = "https://www.google.com/search"
+
+
+def _parse_google_html(html_body: str) -> list[dict[str, str]]:
+    """Parse Google search results into hits with url + title + snippet."""
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+
+    soup = BeautifulSoup(html_body, "html.parser")
+    hits: list[dict[str, str]] = []
+    seen_urls: set[str] = set()
+
+    # Google's per-result wrapper class is "MjjYud" (stable since ~2023).
+    # Each wrapper contains exactly one h3 (title) and one VwiC3b snippet
+    # paragraph. The result anchor is the parent of the h3.
+    for card in soup.find_all("div", class_="MjjYud"):
+        h3 = card.find("h3")
+        if not h3:
+            continue
+        anchor = h3.find_parent("a")
+        if not anchor:
+            continue
+        href = (anchor.get("href") or "").strip()
+        if not href.startswith(("http://", "https://")):
+            continue
+        try:
+            host = href.split("/", 3)[2]
+        except IndexError:
+            continue
+        # Skip google.com self-references (image-search, related-searches).
+        if "google.com" in host or "googleusercontent.com" in host:
+            continue
+        if href in seen_urls:
+            continue
+        seen_urls.add(href)
+
+        title_text = _clean_html_fragment(str(h3), max_len=200)
+        if not title_text:
+            continue
+
+        snippet_text = ""
+        snip = card.find("div", class_="VwiC3b")
+        if snip is None:
+            snip = card.find("span", class_="VwiC3b")
+        if snip is not None:
+            snippet_text = _clean_html_fragment(str(snip), max_len=300)
+
+        hits.append({"url": href, "title": title_text, "snippet": snippet_text})
+    return hits
+
+
+def _google_fetch(url: str, timeout_s: float = 60.0) -> tuple[int, str]:
+    """Fetch a Google search URL via Scrapling's StealthyFetcher."""
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        return (0, "")
+    try:
+        page = StealthyFetcher.fetch(
+            url,
+            headless=True,
+            network_idle=True,
+            timeout=int(timeout_s * 1000),
+        )
+        body = getattr(page, "html_content", None) or getattr(page, "text", "") or ""
+        if isinstance(body, bytes | bytearray):
+            body = bytes(body).decode("utf-8", errors="replace")
+        return (int(getattr(page, "status", 0) or 0), body)
+    except Exception:
+        return (0, "")
+
+
+def dork_sweep_google(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Dork-sweep via Google through StealthyFetcher (env-gated last-resort).
+
+    OSINT_GOOGLE_STEALTH=1 must be set to enable. Default OFF because of
+    slow render times + anti-bot escalation risk + Brave/Serper APIs
+    already proxy Google's index. Use when other engines miss and the
+    investigator explicitly wants Google's coverage.
+
+    Naomi gate: queries never logged.
+    """
+    if os.environ.get("OSINT_GOOGLE_STEALTH", "0").strip() != "1":
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "adapter_id": "dork_sweep_google",
+                    "skipped": True,
+                    "reason": (
+                        "OSINT_GOOGLE_STEALTH=1 not set -- Google-stealth is "
+                        "off by default (slow, anti-bot escalation risk; "
+                        "Brave/Serper APIs proxy Google's index when keys set)"
+                    ),
+                },
+            }
+        ]
+
+    seed = payload or {}
+    limit_per = min(
+        int(seed.get("limit_per_query", _HIT_LIMIT_PER_DORK) or _HIT_LIMIT_PER_DORK), 25
+    )
+    queries = _build_dork_queries(seed)
+    if not queries:
+        return [
+            {
+                "event_type": "tool-run-result",
+                "payload": {
+                    "adapter_id": "dork_sweep_google",
+                    "skipped": True,
+                    "reason": "no dork templates matched available seed keys",
+                    "templates_total": len(_PV_TEMPLATES),
+                },
+            }
+        ]
+
+    events: list[dict[str, Any]] = []
+    queries_run = 0
+    queries_failed = 0
+    total_hits = 0
+    for idx, q in enumerate(queries):
+        if idx > 0:
+            # Google: longer jitter (3-5s) -- Google's anti-bot ML is
+            # the most aggressive of any engine in this stack.
+            jitter = 1.0 * ((idx * 7) % 11) / 10
+            time.sleep(3.0 + jitter)
+        encoded_q = urllib.parse.quote_plus(q["query"])
+        url = f"{_GOOGLE_URL}?q={encoded_q}&hl=en&gl=us&num=20"
+        status, body = _google_fetch(url)
+        if status != 200 or not body:
+            queries_failed += 1
+            continue
+        hits = _parse_google_html(body)[:limit_per]
+        queries_run += 1
+        for h in hits:
+            total_hits += 1
+            events.append(
+                {
+                    "event_type": "dork-hit",
+                    "payload": {
+                        "source": "dork-sweep",
+                        "engine": "google",
+                        "template_id": q["id"],
+                        "template_label": q["label"],
+                        "url": h["url"],
+                        "title": h["title"],
+                        "snippet": h.get("snippet", ""),
+                        "confidence": "tentative",
+                    },
+                }
+            )
+
+    events.append(
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_google",
+                "queries_attempted": len(queries),
+                "queries_run": queries_run,
+                "queries_failed": queries_failed,
+                "total_hits": total_hits,
+                "fetch_method": "scrapling-stealthy-patchright",
+            },
+        }
+    )
+    return events
+
+
+def _dork_sweep_google_synthetic(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    name = payload.get("name") or "Test Host"
+    return [
+        {
+            "event_type": "dork-hit",
+            "payload": {
+                "source": "dork-sweep",
+                "engine": "google",
+                "template_id": "name_linkedin",
+                "template_label": "Host name on LinkedIn profiles",
+                "url": "https://www.linkedin.com/in/test-host",
+                "title": f"{name} — LinkedIn (synthetic via google)",
+                "snippet": "Synthetic snippet preview for Google-stealth engine smoke test.",
+                "confidence": "tentative",
+                "synthetic": True,
+            },
+        },
+        {
+            "event_type": "tool-run-result",
+            "payload": {
+                "adapter_id": "dork_sweep_google",
+                "queries_run": 1,
+                "total_hits": 1,
+                "synthetic": True,
+            },
+        },
+    ]
+
+
+# ===========================================================================
 # Registry installation
 # ===========================================================================
 
@@ -2305,5 +2931,38 @@ _REGISTRY.register(
         "Dork-sweep via Naver through Scrapling StealthyFetcher + BS4 "
         "card-walk (W13.dk, keyless 7th engine, KR-language coverage; "
         "Naver is #1 search engine in South Korea ~70%% market share)."
+    ),
+)
+_REGISTRY.register(
+    "dork_sweep_yahoojp",
+    dork_sweep_yahoojp,
+    synthetic_mode=_dork_sweep_yahoojp_synthetic,
+    in_process=True,
+    description=(
+        "Dork-sweep via Yahoo Japan through Scrapling StealthyFetcher "
+        "(W13.dk, keyless 8th engine, JP-language coverage; Yahoo JP is "
+        "#1 in Japan ~50%% market share, ahead of Google in JP)."
+    ),
+)
+_REGISTRY.register(
+    "dork_sweep_seznam",
+    dork_sweep_seznam,
+    synthetic_mode=_dork_sweep_seznam_synthetic,
+    in_process=True,
+    description=(
+        "Dork-sweep via Seznam through Scrapling + BS4 (W13.dk, keyless "
+        "9th engine, CZ-language coverage; #1 local engine in Czechia)."
+    ),
+)
+_REGISTRY.register(
+    "dork_sweep_google",
+    dork_sweep_google,
+    synthetic_mode=_dork_sweep_google_synthetic,
+    in_process=True,
+    description=(
+        "Dork-sweep via Google through StealthyFetcher (W13.dk, 10th "
+        "engine, env-gated OSINT_GOOGLE_STEALTH=1; OFF by default due to "
+        "slow render + anti-bot escalation risk; Brave/Serper APIs cover "
+        "Google's index when keys set)."
     ),
 )
