@@ -24,6 +24,7 @@ dependencies = [
   "curl_cffi>=0.15",                # tier-1 TLS-impersonation (Chrome JA3/JA4 replay)
   "patchright>=1.59",               # tier-3 anti-detection Playwright fork
   "playwright>=1.59",               # tier-3 browser driver (StealthyFetcher dep)
+  "zendriver>=0.15",                # tier-5 CDP-direct (defeats Imperva PWA + DataDome)
 ]
 
 [build-system]
