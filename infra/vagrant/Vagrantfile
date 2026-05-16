@@ -1,0 +1,73 @@
+# OSINT Goblin -- isolated investigation VM (Hyper-V on Windows 11 host).
+#
+# Purpose: investigator's real IP, real disk, real browser cookies never
+# touch any scraped site. The VM is a dedicated persona: every fetch,
+# every parser, every browser launch happens INSIDE the VM. Host stays
+# clean.
+#
+# Usage from the repo root:
+#   cd infra/vagrant
+#   vagrant up                # builds + provisions the VM (~5-15 min first run)
+#   vagrant ssh               # drops you into a shell inside the VM
+#   vagrant snapshot save baseline   # snapshot after first successful boot
+#   vagrant snapshot restore baseline # reset everything to clean state
+#   vagrant halt              # stop the VM
+#   vagrant destroy           # remove everything
+#
+# Provider: Hyper-V (Windows 11 native, no VirtualBox needed).
+# Requires: Hyper-V Windows feature enabled + Vagrant installed. The
+# host-bootstrap script `bootstrap-host.ps1` handles both.
+
+Vagrant.configure("2") do |config|
+  # Debian 12 (Bookworm) -- stable, long-support, minimal attack surface.
+  config.vm.box = "generic/debian12"
+  config.vm.hostname = "osint-goblin-vm"
+
+  # Network: Hyper-V default switch (NAT). Egress goes through the host's
+  # default route initially. The VM's WireGuard client (installed by
+  # provision.sh) routes ALL VM traffic through the investigator's VPN
+  # once configured.
+  config.vm.network "private_network", type: "dhcp"
+
+  # Repo mount: the host's working copy lives at /vagrant inside the VM.
+  # This is convenient for dev (code changes propagate instantly) but
+  # MEANS the VM CAN write to the host's repo dir. For maximum
+  # isolation, switch to a one-way rsync mount in v2.
+  config.vm.synced_folder "../../", "/vagrant", type: "rsync",
+    rsync__exclude: [".git/", ".venv/", "node_modules/", "data/",
+                     "graphify-out/", ".dev-logs/", "tools/dev/*-bodies/",
+                     "tools/dev/*.html", ".claude/"]
+
+  # Hyper-V provider config.
+  config.vm.provider "hyperv" do |hv|
+    hv.vmname = "osint-goblin-vm"
+    hv.memory = 4096          # 4 GB RAM -- Playwright + Chromium + Node + Python
+    hv.cpus = 2               # tweak up if you have headroom
+    hv.maxmemory = 8192       # dynamic memory cap
+    hv.enable_virtualization_extensions = false
+    hv.linked_clone = true    # faster + smaller disk footprint
+  end
+
+  # Provisioning: install everything osint-goblin needs.
+  config.vm.provision "shell", path: "provision.sh", privileged: false
+
+  # Post-provision banner so the investigator knows what to do next.
+  config.vm.post_up_message = <<~MSG
+
+    ============================================================
+     OSINT Goblin VM is up.
+
+     Next steps:
+       1. vagrant ssh
+       2. cd /vagrant
+       3. just install
+       4. just smoke
+       5. (optional) configure VPN: see /vagrant/infra/vagrant/README.md
+          section "VPN setup"
+       6. From the host: `vagrant snapshot save baseline` so you
+          can `vagrant snapshot restore baseline` after every
+          investigation -- drops every trace.
+    ============================================================
+
+  MSG
+end
