@@ -1,0 +1,85 @@
+{
+  "schema_version": "2026-05-12",
+  "last_updated": "2026-05-12",
+  "owner": "Tomás (per Margaret wave-4 §10 owner matrix)",
+  "maintenance_cadence": "quarterly review; ad-hoc on new vetting-vendor entry",
+  "sub_brands": [
+    {
+      "id": "aircover",
+      "label": "AirCover for Hosts",
+      "platform": "airbnb",
+      "verification_tier": "platform-baseline",
+      "patterns": [
+        "AirCover",
+        "Air Cover for Hosts",
+        "AirCover-protected"
+      ],
+      "inferred_floor": "Airbnb identity-baseline ran on this host",
+      "source": "https://www.airbnb.com/aircover-for-hosts"
+    },
+    {
+      "id": "autohost",
+      "label": "Autohost AI guest screening",
+      "platform": "cross-platform",
+      "verification_tier": "third-party-screen",
+      "patterns": [
+        "Autohost",
+        "Auto Host AI",
+        "screened by Autohost"
+      ],
+      "inferred_floor": "Operator paid for Autohost guest screening",
+      "source": "https://www.autohost.ai/"
+    },
+    {
+      "id": "truvi",
+      "label": "Truvi identity verification",
+      "platform": "cross-platform",
+      "verification_tier": "third-party-screen",
+      "patterns": [
+        "Truvi",
+        "Truvi-verified",
+        "Truvi ID check"
+      ],
+      "inferred_floor": "Operator subscribed to Truvi identity verification",
+      "source": "https://truvi.com/"
+    },
+    {
+      "id": "guestverify",
+      "label": "GuestVerify",
+      "platform": "cross-platform",
+      "verification_tier": "third-party-screen",
+      "patterns": [
+        "GuestVerify",
+        "Guest Verify",
+        "GuestVerified"
+      ],
+      "inferred_floor": "Operator uses GuestVerify screening",
+      "source": "https://guestverify.com/"
+    },
+    {
+      "id": "shield_suite",
+      "label": "Shield Suite by Safely",
+      "platform": "cross-platform",
+      "verification_tier": "third-party-screen",
+      "patterns": [
+        "Shield Suite",
+        "Safely Shield"
+      ],
+      "inferred_floor": "Operator subscribed to Safely's Shield Suite",
+      "source": "https://safely.com/"
+    },
+    {
+      "id": "screen_and_protect",
+      "label": "Screen & Protect by Superhog",
+      "platform": "cross-platform",
+      "verification_tier": "third-party-screen",
+      "patterns": [
+        "Screen & Protect",
+        "Screen and Protect",
+        "Superhog screen"
+      ],
+      "inferred_floor": "Operator subscribed to Superhog Screen & Protect",
+      "source": "https://superhog.com/"
+    }
+  ]
+}
