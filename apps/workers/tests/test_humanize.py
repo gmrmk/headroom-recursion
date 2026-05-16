@@ -190,6 +190,37 @@ class TestHumanizedFetcherLifecycle:
         fetcher.shred()
 
 
+class TestProcessCleanupRegistry:
+    """Browser cleanup hygiene: every HumanizedFetcher registers in
+    _ACTIVE_FETCHERS so an atexit hook can shred orphans at process
+    termination. Prevents Chromium-process leaks when callers forget
+    to call shred() explicitly."""
+
+    def test_init_registers_in_active_set(self):
+        from osint_goblin_workers.humanize import _ACTIVE_FETCHERS
+
+        fetcher = HumanizedFetcher(investigation_id="test-registry-add")
+        assert fetcher in _ACTIVE_FETCHERS
+        fetcher.shred()
+
+    def test_shred_unregisters_from_active_set(self):
+        from osint_goblin_workers.humanize import _ACTIVE_FETCHERS
+
+        fetcher = HumanizedFetcher(investigation_id="test-registry-remove")
+        assert fetcher in _ACTIVE_FETCHERS
+        fetcher.shred()
+        assert fetcher not in _ACTIVE_FETCHERS
+
+    def test_atexit_hook_registered(self):
+        # The module's atexit hook fires at process exit; we can't
+        # directly invoke it without exiting, but we can verify the
+        # callback is callable and idempotent against an empty set.
+        from osint_goblin_workers.humanize import _shred_all_fetchers
+
+        _shred_all_fetchers()  # must not raise even when set is empty
+        _shred_all_fetchers()  # idempotent
+
+
 # ---------------------------------------------------------------------------
 # Default-fetcher singleton
 # ---------------------------------------------------------------------------

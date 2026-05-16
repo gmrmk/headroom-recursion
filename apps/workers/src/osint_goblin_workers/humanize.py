@@ -49,12 +49,14 @@ USAGE
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import os
 import random
 import threading
 import time
 import urllib.parse
+import weakref
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -617,6 +619,39 @@ class _CtxState:
     cookies_applied: dict[str, bool] = field(default_factory=dict)
 
 
+# ---------------------------------------------------------------------------
+# Process-level cleanup registry
+# ---------------------------------------------------------------------------
+#
+# Browser instances are expensive (multi-hundred-MB chromium processes +
+# Node.js Playwright driver subprocess + tempdirs). If the worker process
+# exits without an explicit shred() call -- crash, uncaught exception,
+# sys.exit(), normal termination -- those browsers orphan and leak.
+#
+# A WeakSet of live HumanizedFetcher instances lets a single atexit hook
+# shred everyone at process termination. Weakset so GC isn't blocked when
+# the caller drops their reference; atexit catches the "I forgot to call
+# shred()" case.
+#
+# Limitations: atexit does NOT fire on SIGKILL, segfault, or an os._exit().
+# For those, the OS reaps the chromium child processes a few seconds after
+# their parent dies (driver-subprocess relationship). True hard-kill leaks
+# require a separate process-tree reaper, which is OPSEC-sprint scope.
+
+_ACTIVE_FETCHERS: weakref.WeakSet[HumanizedFetcher] = weakref.WeakSet()
+
+
+def _shred_all_fetchers() -> None:
+    """atexit hook: shred every live HumanizedFetcher."""
+    # Copy to a list because shred() removes from the weakset during iteration.
+    for fetcher in list(_ACTIVE_FETCHERS):
+        with contextlib.suppress(Exception):
+            fetcher.shred()
+
+
+atexit.register(_shred_all_fetchers)
+
+
 class HumanizedFetcher:
     """Investigation-scoped humanized fetcher.
 
@@ -628,6 +663,10 @@ class HumanizedFetcher:
     Thread-safe: a single fetcher instance can be shared across multiple
     worker threads (Dramatiq actors); the Playwright sync API holds an
     internal lock per browser.
+
+    Process-cleanup: every instance auto-registers in _ACTIVE_FETCHERS so
+    the module-level atexit hook can shred orphaned instances on normal
+    process termination. shred() removes self from the set.
     """
 
     _instances_lock = threading.Lock()
@@ -637,6 +676,7 @@ class HumanizedFetcher:
         self._state = _CtxState()
         self._state.user_agent = pick_ua()
         self._closed = False
+        _ACTIVE_FETCHERS.add(self)
 
     # -- public surface --
 
@@ -765,6 +805,11 @@ class HumanizedFetcher:
 
             with contextlib.suppress(Exception):
                 shutil.rmtree(self._camoufox_data_dir, ignore_errors=True)
+        # Drop from the process-level cleanup registry. Done last so a
+        # crash in any earlier teardown step doesn't strand the
+        # registration -- the atexit hook can still reach a half-shredded
+        # instance and try the remaining steps.
+        _ACTIVE_FETCHERS.discard(self)
 
     # -- internals --
 
