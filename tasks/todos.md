@@ -82,29 +82,49 @@ bodies. Then move on with a clean tree.
 
 ---
 
-## QUEUED NEXT: Sprint — IP Intel + Triangulation Widget
+## QUEUED NEXT: Sprint — Identity Triangulation
 
 **Status:** plan only; kicks off after the Stabilize + Verify sprint closes.
-**Trigger:** user 2026-05-16: "I want to find out if theyre hiding behind a VPN
-and get a map pin of their IP data, for free" + clarification "I wanna borrow it
-for observation, triangulation, typical you-are-who-you-say-you-are OSINT stuff"
-+ "once I close the dossier, poof its gone, I dont even want to see it, its
-temporary" + "interlacing Max Mind, IP2Proxy, TOR, and X4Bnet into their own
-interactive widget on the dossier" + "I want to treat the dossier like its a
-beautifully arranged HTML popout artifact".
+**Trigger sequence (2026-05-16):**
+- "I want to find out if theyre hiding behind a VPN and get a map pin of their
+  IP data, for free"
+- "I wanna borrow it for observation, triangulation, typical
+  you-are-who-you-say-you-are OSINT stuff"
+- "once I close the dossier, poof its gone, I dont even want to see it, its
+  temporary"
+- "interlacing Max Mind, IP2Proxy, TOR, and X4Bnet into their own interactive
+  widget on the dossier"
+- "I want to treat the dossier like its a beautifully arranged HTML popout
+  artifact"
+- "Id also like to triangulate the Google Reviews data if they posted photos,
+  or if they posted reviews, and scrub those for names, and search their
+  photos as well with flips, in the background, headless until the dossier
+  is generated. Everything is a little clue, it should be regarded as valued
+  data used to make high stakes decisions"
+- "I want to triangulate the pinned locations of the reviews into their own
+  popout google maps link"
+
+**Doctrine:** every little clue is valued data feeding high-stakes decisions.
+The dossier interlaces 5+ identity-claim sources into one consistency verdict.
+Shred on dossier close.
 
 ### Vision
 
-The investigator pastes target IPs (or pastes raw email headers and the system
-extracts `Received: from <IP>`). The dossier renders a beautifully arranged
-HTML popout artifact: one `IPIntelCard` per IP with a Leaflet map pin, plus a
-sibling `TriangulationCard` that plots every IP in the investigation on one
-map with distance rulers and a self-consistency score. Closes the
-"you-are-who-you-say-you-are" loop.
+The investigator opens an investigation, pastes whatever they have (target
+name, email, listing URL, raw email headers, social handles). Background
+Dramatiq actors fan out: IP intel, Google Reviews scrape, photo PV cross-
+search with flip detection, NER on review text, temporal-pattern analysis.
+The dossier renders progressively as actors finish. One coherent
+`IdentityTriangulationCard` interlaces every signal into a single
+self-consistency verdict with provenance. A separate Google Maps popout
+link surfaces the geographic cluster natively. Closes the "you-are-who-
+you-say-you-are" loop.
 
-Shred on dossier close. IPs never persist to disk in any form. Reference
-databases (knowledge bases, not target data) live under `data/reference/` and
-are gitignored; downloaded on first run via `make ip-refdata`.
+Shred on dossier close. No target data persists to disk in any form.
+Reference databases (knowledge bases, not target data: GeoLite2, IP2Proxy
+LITE, Tor exit list, X4BNet ranges, spaCy NER model) live under
+`data/reference/` and are gitignored; downloaded on first run via
+`make refdata`.
 
 ### Signal stack (5 sources, all free)
 
@@ -154,43 +174,112 @@ split (investigator review prompt).
     and never echoes the raw text back to the dossier)
 - Routing in `workflow-routing.ts`: IP field OR email-headers field → `w7.ip`
 
-#### Phase 4 — IPIntelCard component
-- `apps/web/src/components/ip-intel-card.tsx`:
-  - Header: IP + provenance badge ("from Received: header" / "DNS lookup")
-  - Leaflet map (react-leaflet + OSM tiles, free with attribution)
-  - ASN row + reverse-DNS
-  - 4 verdict pills (Tor / VPN / Datacenter / Residential confidence)
-  - Consensus-strength bar with "Show attestations" disclosure
-- Pure functions only; consumes `IPVerdict` from the event stream
+#### Phase 4 — Google Reviews + identity-claim adapters
+- `adapter_google_maps_review_scrape(payload={target_name|target_handle|profile_url})`:
+  - Resolves a Google Maps profile URL given the seed; routes through the
+    humanize fetcher (patchright default; zendriver fallback if Google
+    presents a challenge).
+  - Emits one `review-found` event per review carrying: reviewed-business
+    name, business lat/lon, review text, review photos (URLs), timestamp,
+    star rating.
+- `adapter_trustpilot_review_scrape`, `adapter_yelp_review_scrape` --
+  parallel signals for the same seed.
+- `adapter_entity_extract(payload={text})`:
+  - spaCy `en_core_web_sm` (~12MB, MIT) NER over review text.
+  - Emits `name-mention` / `location-mention` / `phone-mention` /
+    `email-mention` events feeding the existing identity workflow.
+- `adapter_temporal_pattern_detect(payload={timestamps[]})`:
+  - Computes posting-hour histogram + dominant timezone.
+  - Emits `tz-pattern` event with confidence band.
+- Per-review photos fan out into the EXISTING image PV pipeline
+  (`reverse_image_aggregator` + `image_flip_check` + `phash_dedupe`) -- no
+  new adapter, just wiring. Same Naomi-strict ephemeral mode applies.
 
-#### Phase 5 — TriangulationCard component
-- `apps/web/src/components/triangulation-card.tsx`:
-  - Activates when 2+ IPs are in the dossier
-  - One Leaflet map with all pins + distance rulers between them
-  - Self-consistency score (claimed vs captured locations)
-  - Provenance row: which IP came from what source
-  - Investigator-annotated "claimed location" input (in-memory only)
+#### Phase 5 — IdentityTriangulationCard component (merged surface)
+- `apps/web/src/components/identity-triangulation-card.tsx` -- single
+  dossier card interlacing every identity-claim signal:
+  - Map (Leaflet + OSM tiles, free with attribution) plotting:
+    - Claimed location (listing address)
+    - IP-derived pins per source (email-header IP, DNS IP, WhoIs IP)
+    - Reviewed-business pins from Google Reviews + Trustpilot + Yelp
+    - Centroid of review cluster
+  - 4 IP-verdict pills (Tor / VPN / Datacenter / Residential confidence)
+  - Behavioral-signal panel:
+    - Review-cluster geo + match % vs claimed
+    - Posting-hour histogram + inferred timezone vs claimed
+    - NER name-mention list (claimed name vs extracted names)
+    - Review-photo cross-search hits (flip-detection + cross-platform)
+  - Self-consistency score (0-100%) with weighted contributions
+  - Inconsistency reasons (bulleted) when score < 70%
+  - Consensus-strength bar + "Show source attestations" disclosure
+- Pure functions only; consumes the unified event stream.
 
-#### Phase 6 — Static export for HTML popout artifact
-- Extend `lib/dossier-shape.ts` to project `ip-intel` + `triangulation` events
-  into Sections.
+#### Phase 6 — Google Maps multi-pin popout link
+- Separate dossier functionality (per user direction): standalone button
+  in the IdentityTriangulationCard footer labeled "Open in Google Maps".
+- `lib/maps-popout.ts` -- pure function builds a multi-waypoint Google
+  Maps URL from all pinned locations:
+  - For <=10 pins: directions URL
+    (`https://www.google.com/maps/dir/<p1>/<p2>/.../<p10>`).
+    Route-line artifact noted in tooltip; not a route claim.
+  - For >10 pins: centroid-focused URL
+    (`https://www.google.com/maps/@<cLat>,<cLng>,<zoom>z`) plus
+    copy-to-clipboard of all coordinates.
+  - Optional richer path: generate a KMZ blob the investigator can open
+    in Google Earth Web for proper multi-pin display.
+- Naomi-strict: the URL contains only coordinates, never names or IDs.
+  Optional warning ("clicking opens Google Maps in your browser; coords
+  will be in your browser history") before the click.
+
+#### Phase 7 — Static export for HTML popout artifact
+- Extend `lib/dossier-shape.ts` to project all new event types
+  (`ip-intel`, `review-found`, `name-mention`, `location-mention`,
+  `tz-pattern`, `cross-platform-duplicate`) into Sections.
 - Extend `serializeDossierHtml`:
-  - Render `IPIntelCard` and `TriangulationCard` as static HTML with embedded
-    SVG maps (via `staticmaps` or pre-rendered Leaflet snapshots inline-base64).
+  - Render `IdentityTriangulationCard` as static HTML with embedded SVG
+    map (via `staticmaps` or pre-rendered Leaflet snapshot inline-base64).
+  - Include the Google Maps popout URL inline (clickable but not
+    auto-followed).
   - Offline-viewable; no external requests on open.
-- Investigator gets a single .html file with the full triangulation analysis.
+- Investigator gets a single .html file with the full triangulation
+  analysis, openable on an air-gapped machine.
 
-#### Phase 7 — Naomi-strict CI guards + shred-on-close hardening
-- Static-grep CI test: assert no IP-like patterns leak into any
-  persisted location (data/*, tasks/*, logs).
-- `_CtxState.shred()` extended to drop `ip_lookups` dict.
-- `IPVerdict` excluded from anything that hits disk; only the rendered
-  Section makes it to the dossier export.
+#### Phase 8 — Naomi-strict CI guards + shred-on-close hardening
+- Static-grep CI test: assert no IP-like, email-like, or name-like
+  patterns leak into any persisted location (data/*, tasks/*, logs).
+- `_CtxState.shred()` extended to drop:
+  - `ip_lookups` dict
+  - `review_cache` dict
+  - `ner_cache` dict
+  - any per-investigation visited-URL sets
+- All adapter event payloads scrubbed before they reach `tasks/` or
+  `data/` or stdout/stderr in production mode.
+- Production-mode env (default) suppresses any debug logs that could
+  carry target data; dev-mode env (explicit `OSINT_DEV=1`) re-enables.
 
-#### Phase 8 — Live verification
-- Test against 3 known patterns: known-Tor exit, known-AWS-IP, known-residential.
-- Verify consensus_strength behaves correctly when sources disagree.
-- Mock email-header paste with synthetic `Received:` chain.
+#### Phase 9 — Headless background dispatch
+- Investigation kickoff dispatches all signal-gathering actors in
+  parallel via Dramatiq:
+  - `w_ip_intel` (IP lookups)
+  - `w_google_reviews_scrape` (Google Reviews)
+  - `w_trustpilot_review_scrape`, `w_yelp_review_scrape`
+  - `w_entity_extract` (NER, runs as reviews stream in)
+  - `w_temporal_pattern` (timezone analysis)
+  - `w_photo_pv_fanout` (every review photo into image PV pipeline)
+- Dossier UI shows a "gathering signals" indicator until all terminal
+  events arrive.
+- Each actor independently emits its results; the dossier compose
+  function aggregates progressively.
+
+#### Phase 10 — Live verification
+- IP intel: 3 known patterns (Tor exit, AWS IP, residential).
+- Reviews: scrape a public Local Guide profile with diverse reviews.
+- NER: fixture review text with known names + addresses.
+- Photo PV: fixture review photo that matches a listing photo
+  cross-platform.
+- End-to-end: synthetic identity with deliberate inconsistencies;
+  verify self-consistency score drops below 30% with the right
+  inconsistency-reason bullets.
 
 ### Definition of done
 
@@ -216,6 +305,52 @@ split (investigator review prompt).
 | Source disagreement (e.g. one says VPN, others say residential) | `consensus_strength` surfaces the split rather than forcing one answer |
 | Investigator pastes email headers from a victim, not target | Document the consent model; never assume the paster is the source |
 | Reference databases become stale | Refresh cadence in `make ip-refdata`; staleness warning in card if last refresh > 30 days |
+
+---
+
+## DEFERRED (do NOT execute without explicit user trigger): Pre-release scrub
+
+**Status:** WAITING. Touch only when the user explicitly says the product is
+"a working product" / "ready to ship" / "let's upload to GitHub".
+**Trigger sequence (2026-05-16):**
+- "When we have a working product can we scrub all these headers out of there,
+  leaving nothing but functional code, I dont want to upload this and have
+  people on Github roll their eyes haha"
+- "Thats only after I say its a working product and we can commit"
+- "Only then"
+
+### Scope (when triggered)
+
+Strip every non-functional ornament from the codebase before public release:
+- Persona names in comments / docstrings / variable names / ADR text:
+  Naomi, Tomas, Margaret, Iris, Hideo, Sora, Camille, Priya, Adekunle,
+  any other named-persona references.
+- Multi-paragraph philosophical comment blocks that read like RP fanfic.
+- Repeated "LOGLESS LOGLESS LOGLESS"-style emphasis.
+- Verbose pre-amble docstrings explaining the *why* in three paragraphs
+  when one terse line would do.
+- ADR header blocks with deliberation metaphors (replace with standard
+  ADR template: Status / Context / Decision / Consequences).
+
+### Constraints (when triggered)
+
+- Test suite must stay 100% green throughout. The scrub is stylistic; no
+  behavior changes.
+- Functional persona-named identifiers (function names, variable names
+  that are referenced from other modules) rename in lock-step across
+  the codebase.
+- Commit messages of pre-scrub commits stay as they are in git history;
+  only the *current* code surface needs to look clean to a GitHub viewer
+  browsing main.
+- Output target: code that reads "professional senior-dev terse," not
+  "AI-generated verbose fanfic."
+
+### What this is NOT
+
+Not a doctrinal change to ongoing development. Through the working-product
+milestone, persona-named development continues unchanged because it serves
+the user's thinking + decision-making process. The scrub is a final-mile
+polish, nothing more.
 
 ---
 
