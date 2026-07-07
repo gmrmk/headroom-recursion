@@ -93,17 +93,36 @@ def compress(
     try:
         from headroom import compress as hr_compress  # type: ignore
 
-        result = _run_maybe_async(hr_compress(messages, model=model))
+        # The harness sends a single fat user message per call, but Headroom's
+        # default profile is tuned for coding agents: user messages are skipped and
+        # the most recent messages are protected — under it, NOTHING we send would
+        # ever be compressed. Opt user messages in and unprotect our only message.
+        kwargs = {}
+        try:
+            from headroom import CompressConfig  # type: ignore
+
+            kwargs["config"] = CompressConfig(compress_user_messages=True, protect_recent=0)
+        except Exception:
+            pass
+        try:
+            result = _run_maybe_async(hr_compress(messages, model=model, **kwargs))
+        except TypeError:
+            # Older/other builds without the config kwarg.
+            result = _run_maybe_async(hr_compress(messages, model=model))
     except Exception:
         # Never let a compression hiccup break reasoning — fall back to raw messages.
         return messages, before, before
 
-    # Headroom returns the compressed message list (some builds return a wrapper
-    # object with a ``.messages`` attribute); accept both. An empty result is a
-    # failure, not a 100% compression — never send Claude nothing.
+    # Headroom returns the compressed message list (some builds return a
+    # CompressResult with ``.messages`` plus its own token accounting); accept both.
+    # An empty result is a failure, not a 100% compression — never send Claude nothing.
     out = getattr(result, "messages", result)
     if not isinstance(out, list) or not out:
         return messages, before, before
 
-    after = estimate_tokens(out)
-    return out, before, after
+    # Prefer Headroom's real token counts over our 4-chars/token estimate.
+    hb = getattr(result, "tokens_before", None)
+    ha = getattr(result, "tokens_after", None)
+    if isinstance(hb, int) and isinstance(ha, int) and hb > 0:
+        return out, hb, ha
+    return out, before, estimate_tokens(out)
