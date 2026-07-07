@@ -88,6 +88,32 @@ print(trace.summary())          # answer + tier path + Headroom savings
 Structured tasks can pass a `validator` — an oracle that returns `True` when the answer
 is provably correct (e.g. a solved grid). It halts the loop immediately, no judge call.
 
+## Safety rails
+
+A self-refining loop has sharp edges; these are built in:
+
+- **No false halts.** A judge reply is only trusted as a probability if it actually is
+  one — "I found 3 errors" is not `halt_prob = 1.0`. Garbage replies get one re-ask,
+  then count as "don't halt". `--judge-votes 3` takes the median of independent votes
+  (robust to one sycophantic self-grade); `--judge-model` pins the verifier to a
+  different model. The judge's input is never Headroom-compressed by default
+  (`compress_judge`) — it verifies the exact answer text, not a paraphrase.
+- **State can't be destroyed.** Empty/whitespace completions never replace the
+  scratchpad or answer (counted as `rejected_updates` in the trace), and calls cut off
+  at `max_tokens` are flagged `truncated`.
+- **The best answer wins.** Refinement isn't monotone; on any non-confident exit the
+  run returns the highest-scoring answer seen (`best_*` in the trace), not the latest.
+- **Oscillation is convergence.** An A→B→A answer cycle escalates instead of burning
+  the tier's whole step budget.
+- **Hard budgets.** `--max-calls` / `--max-seconds` stop the run at a step boundary
+  with the best answer so far — and never escalate to a pricier tier after the budget
+  is gone. (LightRAG's internal LLM calls are not counted; see
+  `references/lightrag-setup.md`.)
+- **Work is never lost.** Ctrl-C returns the partial trace (exit 130); an API error
+  raises `RunError` whose `.trace` holds everything completed (CLI prints it, exit 1).
+  `RecurseConfig.validate()` rejects silently-broken configs (`n=0`, `threshold=1.5`)
+  before the first call.
+
 Knowledge-heavy tasks can pass a `retriever`. LightRAG (Claude-backed) grounds each
 step in a knowledge base:
 

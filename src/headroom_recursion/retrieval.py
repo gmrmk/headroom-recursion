@@ -28,6 +28,8 @@ import hashlib
 import inspect
 import math
 import re
+import threading
+import warnings
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Optional, Protocol, runtime_checkable
 
@@ -47,7 +49,12 @@ class NullRetriever:
 
 
 def _run_coro(coro: Awaitable):
-    """Run a coroutine to completion whether or not a loop is already running."""
+    """Run a self-contained coroutine to completion, loop or no loop.
+
+    Each call gets a FRESH event loop, so this must never be used for objects that
+    hold loop-bound state across calls (locks, sessions, pipelines) — LightRAG does;
+    it goes through ``_LoopRunner`` instead.
+    """
 
     if not inspect.isawaitable(coro):
         return coro
@@ -57,7 +64,31 @@ def _run_coro(coro: Awaitable):
         return asyncio.run(coro)
     # Inside a running loop: execute on a fresh loop in a worker thread.
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-        return ex.submit(asyncio.run, coro).result()
+        return ex.submit(asyncio.run, coro).result(timeout=300)
+
+
+class _LoopRunner:
+    """One persistent background event loop for all of an object's coroutines.
+
+    LightRAG initializes asyncio locks, pipeline status, and storage sessions bound
+    to the loop they were created on. Running each call on a throwaway loop (the old
+    behavior) either raises "attached to a different event loop" or deadlocks on a
+    lock whose loop is dead. This runner keeps a single daemon loop alive so every
+    coroutine sees the same loop from ``initialize_storages`` to the last ``aquery``.
+    """
+
+    def __init__(self):
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
+        self._thread.start()
+
+    def run(self, coro: Awaitable, timeout: float = 300):
+        return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout)
+
+    def close(self) -> None:
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self._thread.join(timeout=5)
+        self._loop.close()
 
 
 # --------------------------------------------------------------------------------------
@@ -153,10 +184,19 @@ class LightRAGRetriever:
 
             client = ClaudeClient()
 
+        if embedding is None:
+            warnings.warn(
+                "LightRAGRetriever: no embedding supplied — falling back to "
+                "simple_local_embedding (hashing bag-of-words, LOW retrieval quality). "
+                "Supply a real Embedding (OpenAI, sentence-transformers, ...) for "
+                "production retrieval.",
+                stacklevel=2,
+            )
         emb = embedding or simple_local_embedding()
 
         self._QueryParam = QueryParam
         self._mode = mode
+        self._runner = _LoopRunner()
         self._rag = LightRAG(
             working_dir=working_dir,
             llm_model_func=build_claude_llm_func(client, llm_model),
@@ -169,8 +209,10 @@ class LightRAGRetriever:
     def _ensure_init(self) -> None:
         if self._initialized:
             return
-        _run_coro(self._rag.initialize_storages())
-        _run_coro(self._rag.initialize_pipeline_status())
+        # Everything runs on the retriever's single persistent loop — LightRAG's
+        # loop-bound state (locks, sessions) must live and die on one loop.
+        self._runner.run(self._rag.initialize_storages())
+        self._runner.run(self._rag.initialize_pipeline_status())
         self._initialized = True
 
     def index(self, docs) -> None:
@@ -180,12 +222,20 @@ class LightRAGRetriever:
         if isinstance(docs, str):
             docs = [docs]
         for doc in docs:
-            _run_coro(self._rag.ainsert(doc))
+            self._runner.run(self._rag.ainsert(doc))
 
     def retrieve(self, query: str, *, k: int) -> list[str]:
         self._ensure_init()
         param = self._QueryParam(mode=self._mode, top_k=k, only_need_context=True)
-        context = _run_coro(self._rag.aquery(query, param=param))
+        context = self._runner.run(self._rag.aquery(query, param=param))
         if not context or not str(context).strip():
             return []
         return [str(context).strip()]
+
+    def close(self) -> None:
+        """Stop the background event loop (idempotent enough for atexit use)."""
+
+        try:
+            self._runner.close()
+        except Exception:
+            pass

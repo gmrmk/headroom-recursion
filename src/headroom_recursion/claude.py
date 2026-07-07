@@ -24,12 +24,23 @@ class CallResult:
     text: str
     tokens_before: int
     tokens_after: int
+    # The API's stop reason (e.g. "end_turn", "max_tokens"). "max_tokens" means the
+    # output was cut off mid-thought — the loop flags such steps as truncated.
+    stop_reason: str = ""
 
 
 class ClaudeClient:
     """Wraps the Anthropic SDK. Construct once; reuse across the whole run."""
 
-    def __init__(self, *, base_url: Optional[str] = None, api_key: Optional[str] = None):
+    def __init__(
+        self,
+        *,
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        timeout: Optional[float] = None,
+        max_retries: Optional[int] = None,
+        headroom_min_tokens: int = 0,
+    ):
         # Import lazily so the package imports (and unit tests) work without the SDK.
         from anthropic import Anthropic
 
@@ -40,7 +51,16 @@ class ClaudeClient:
         # library-mode compression.
         if base_url:
             kwargs["base_url"] = base_url
+        # Only forward when set, so the SDK's own defaults (retries with backoff,
+        # request timeout) apply otherwise.
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        if max_retries is not None:
+            kwargs["max_retries"] = max_retries
         self._client = Anthropic(**kwargs)
+        # Skip compression for prompts below this size — negligible savings, and a
+        # lossy pass over a small prompt (mostly the problem statement) is all risk.
+        self._headroom_min_tokens = headroom_min_tokens
 
     def complete(
         self,
@@ -53,7 +73,9 @@ class ClaudeClient:
         use_headroom: bool = True,
     ) -> CallResult:
         messages = [{"role": "user", "content": user}]
-        sent, before, after = headroom.compress(messages, model=model, use_headroom=use_headroom)
+        sent, before, after = headroom.compress(
+            messages, model=model, use_headroom=use_headroom, min_tokens=self._headroom_min_tokens
+        )
 
         resp = self._client.messages.create(
             model=model,
@@ -62,7 +84,12 @@ class ClaudeClient:
             system=system,
             messages=sent,
         )
-        return CallResult(text=_text_of(resp), tokens_before=before, tokens_after=after)
+        return CallResult(
+            text=_text_of(resp),
+            tokens_before=before,
+            tokens_after=after,
+            stop_reason=str(getattr(resp, "stop_reason", "") or ""),
+        )
 
 
 def _text_of(resp) -> str:

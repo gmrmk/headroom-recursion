@@ -65,6 +65,36 @@ def test_compression_failure_falls_back(monkeypatch):
     assert before == after == 100
 
 
+def test_min_tokens_floor_skips_compression(monkeypatch):
+    called = {}
+
+    def fake_compress(messages, model=None):
+        called["yes"] = True
+        return [{"role": "user", "content": "tiny"}]
+
+    fake_mod = types.ModuleType("headroom")
+    fake_mod.compress = fake_compress
+    monkeypatch.setitem(sys.modules, "headroom", fake_mod)
+    monkeypatch.setattr(headroom, "headroom_available", lambda: True)
+
+    # MSGS is ~100 tokens; below the 500-token floor the compressor is never touched.
+    out, before, after = headroom.compress(MSGS, model="m", use_headroom=True, min_tokens=500)
+    assert out is MSGS
+    assert before == after == 100
+    assert not called
+
+
+def test_empty_compression_result_is_a_failure_not_a_saving(monkeypatch):
+    fake_mod = types.ModuleType("headroom")
+    fake_mod.compress = lambda messages, model=None: []  # "100% compression"
+    monkeypatch.setitem(sys.modules, "headroom", fake_mod)
+    monkeypatch.setattr(headroom, "headroom_available", lambda: True)
+
+    out, before, after = headroom.compress(MSGS, model="m", use_headroom=True)
+    assert out is MSGS  # never send Claude an empty message list
+    assert before == after == 100
+
+
 def test_async_compress_is_awaited(monkeypatch):
     async def acompress(messages, model=None):
         return [{"role": "user", "content": "x" * 20}]  # 5 tokens
