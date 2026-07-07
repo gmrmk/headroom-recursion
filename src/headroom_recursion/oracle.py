@@ -434,3 +434,55 @@ def lean_verify(
             return False, "rejected: compiled with sorry warnings (holes are not proofs)"
         return True, "compiled clean (rung 1)"
     return False, (out.stderr or out.stdout or f"lean exited {out.returncode}").strip()[:500]
+
+
+# --------------------------------------------------------------------------------------
+# Rung-2 answer-extraction presets (competition math, closed-form answers)
+# --------------------------------------------------------------------------------------
+
+def extract_final_integer(text: str) -> Optional[int]:
+    """Pull the answer integer from a solution, most-explicit signal first.
+
+    Order: \\boxed{...}, then "answer is/= N" / "FINAL: N", then the last integer
+    in the text. Returns None if nothing integer-like is present. Tolerates commas
+    and surrounding non-digits; competition answers are integers (often mod 1000).
+    """
+
+    import re as _re
+
+    def _int(s: str) -> Optional[int]:
+        s = s.replace(",", "").strip()
+        m = _re.search(r"-?\d+", s)
+        return int(m.group()) if m else None
+
+    boxed = _re.findall(r"\\boxed\{([^}]*)\}", text)
+    if boxed:
+        v = _int(boxed[-1])
+        if v is not None:
+            return v
+    labelled = _re.findall(r"(?:final answer|answer)\s*(?:is|:|=)?\s*(-?[\d,]+)", text, _re.IGNORECASE)
+    if labelled:
+        v = _int(labelled[-1])
+        if v is not None:
+            return v
+    ints = _re.findall(r"-?\d[\d,]*", text)
+    return _int(ints[-1]) if ints else None
+
+
+def integer_answer_validator(expected: int, *, modulus: Optional[int] = None) -> Callable[[str], bool]:
+    """A SUFFICIENT rung-2 validator: the extracted answer equals ``expected``.
+
+    ``modulus`` (e.g. 1000 for AIMO/AIME) compares residues. Use for benchmarking
+    against known answers, or as an oracle when the answer is independently
+    checkable. Extraction failure = not validated (never a false pass).
+    """
+
+    def validate(answer: str) -> bool:
+        got = extract_final_integer(answer)
+        if got is None:
+            return False
+        if modulus:
+            return got % modulus == expected % modulus
+        return got == expected
+
+    return validate

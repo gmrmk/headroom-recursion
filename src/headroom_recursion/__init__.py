@@ -14,6 +14,9 @@ from headroom_recursion.ladder import RunError, recurse
 from headroom_recursion.clients import CompletionClient, OpenAIClient, CLITransportClient
 from headroom_recursion.oracle import CompiledOracle, compile_oracle
 from headroom_recursion.prompts import research_prompt
+from headroom_recursion.batch import BatchItem, BatchResult, BatchReport, run_batch
+from headroom_recursion.competition import solve, benchmark, SolveResult
+from headroom_recursion.oracle import extract_final_integer, integer_answer_validator
 from headroom_recursion.retrieval import (
     Retriever,
     NullRetriever,
@@ -39,6 +42,7 @@ __all__ = [
     "CompiledOracle",
     "compile_oracle",
     "research_prompt",
+    "run_batch",
     "CorpusRetriever",
     "Retriever",
     "NullRetriever",
@@ -46,6 +50,14 @@ __all__ = [
     "Embedding",
     "simple_local_embedding",
     "build_claude_llm_func",
+    "BatchItem",
+    "BatchResult",
+    "BatchReport",
+    "solve",
+    "benchmark",
+    "SolveResult",
+    "extract_final_integer",
+    "integer_answer_validator",
 ]
 
 __version__ = "0.1.0"
