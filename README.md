@@ -1,14 +1,14 @@
 # headroom-recursion
 
-**Recursive reasoning for Claude — a tiny idea that punches far above its weight.**
+Solve hard reasoning problems by refining in a loop instead of answering once. A cheap
+Claude model drafts, critiques, and rewrites its answer; larger models take over only
+when it stops making progress.
 
-This is a Claude Agent Skill plus a runnable harness that ports the principle of
+This is a Claude Agent Skill plus a runnable harness based on
 [*"Less is More: Recursive Reasoning with Tiny Networks"*](https://arxiv.org/abs/2510.04871)
-(arXiv:2510.04871) to the Claude model family.
-
-The paper shows a **2-layer, 7M-parameter** network that **recursively refines** a draft
-answer, beating models tens of thousands of times larger on hard reasoning (ARC-AGI,
-Sudoku, Maze). The transferable lesson has two halves, and this harness applies both:
+(arXiv:2510.04871), which shows a 2-layer, 7M-parameter network that recursively
+refines a draft answer outperforming much larger models on hard reasoning benchmarks
+(ARC-AGI, Sudoku, Maze). Two ideas from the paper carry over to LLMs:
 
 1. **Recursive refinement** — don't answer once. Draft, then loop: refine a reasoning
    *scratchpad*, rewrite the answer from it, and repeat.
@@ -45,10 +45,30 @@ def deep_recursion(x, y, z, n=6, T=3):   # y = answer, z = latent reasoning
 | "tiny net beats big net" | **tier ladder**: recurse on Haiku first; escalate only on non-halt |
 | — | **Headroom** compresses context each call so long recursion stays cheap |
 
-The model ladder, cheapest → most capable:
+The default model ladder, cheapest → most capable:
 `claude-haiku-4-5-20251001` → `claude-sonnet-5` → `claude-opus-4-8` → `claude-fable-5`.
 State carries *up* the ladder — a bigger model continues from the best draft rather than
 restarting.
+
+## Other model providers
+
+The loop is model-agnostic: it talks to a backend through one method
+(`clients.CompletionClient` — `complete(model, system, user, ...) -> CallResult`), and
+model names in the ladder are opaque strings. Two backends ship:
+
+- `ClaudeClient` (default) — the Anthropic SDK.
+- `OpenAIClient` — the OpenAI SDK, which also covers any OpenAI-compatible server
+  (Ollama, vLLM, LM Studio, OpenRouter, ...) via `base_url`.
+
+```bash
+pip install -e '.[openai]'
+recurse --client openai --ladder "gpt-4o-mini,gpt-4o" "…"
+recurse --client openai --base-url http://localhost:11434/v1 \
+        --ladder "llama3.2:3b,llama3.3:70b" "…"        # local Ollama
+```
+
+Anything else (a raw HTTP endpoint, a CLI, a test stub) just needs an object with that
+one `complete` method — pass it as `recurse(..., client=your_client)`.
 
 ## Install
 
@@ -58,7 +78,8 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 `headroom-ai` is optional: without it the loop still runs (uncompressed) and reports
-zero token savings.
+zero token savings. When a run needs something that isn't installed, the CLI offers to
+install it (interactive sessions only — scripts get an error with the pip command).
 
 ## Use
 
@@ -142,6 +163,7 @@ src/headroom_recursion/
   config.py    trm.py          # config + the core recursion loop
   ladder.py    halting.py      # tier escalation + the halt predictor
   headroom.py  claude.py       # Headroom compression + the Claude wrapper
+  clients.py                   # CompletionClient protocol + OpenAI-compatible backend
   retrieval.py                 # optional LightRAG retrieval layer (Claude-backed)
   prompts.py   trace.py  cli.py
 references/  examples/  tests/
