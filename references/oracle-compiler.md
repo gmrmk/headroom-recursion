@@ -21,6 +21,27 @@ goods and bads (including one plausible-but-wrong), and only a validator that
 discriminates every case is INSTALLED. Anything less is demoted to rung 5 and
 the judge keeps full authority.
 
+**Verdict dimensions.** A rung names the *source* of trust; three orthogonal
+dimensions state the verdict's *strength* within it — the taxonomy needs no
+extra rungs, it needs these:
+
+- **Sufficiency** — does a pass DECIDE correctness, or merely GATE it? The
+  compiler must claim `"sufficient": true` explicitly (only when the checked
+  object *is* the answer, e.g. an equation whose arithmetic is verified).
+  Anything less runs in **gate mode**: rejections are final for the step (the
+  judge is skipped — mechanical, and cheaper), but passes defer to the judge
+  and can never halt as "validated". *The gate doctrine: halt authority extends
+  exactly as far as declared coverage; residuals demote authority from decider
+  to gate.* This closes the hole found in the live research run, where a
+  structural (rung-3) validator for a proof document could otherwise have
+  "validated" a well-formatted but mathematically wrong answer.
+- **Settlement** — `Verdict.settles_at`: the check passed today, but the claim
+  is about the future; the halt is provisional until reality grades it.
+- **Confidence** — `Verdict.confidence`: 1.0 for exhaustive/deterministic
+  checks; < 1.0 for statistical ones (a 10⁶-trial Monte Carlo pass is evidence,
+  not enumeration). A statistical validation flags `needs_human_review` and
+  prints its confidence — it never masquerades as exhaustive.
+
 ## The doctrine (each rule earned by a live-run failure)
 
 - **Calibration is the gate.** An uncalibrated validator is opinion with a
@@ -52,10 +73,14 @@ the judge keeps full authority.
 | SATOR square | hand oracle (rung 3) | halted `validated`, novel-square construction |
 | P vs NP ×3, ironclad | judge-only (rung 5) | 36/36 votes ≤ 0.02 — no fabrication credited |
 | P vs NP, graded | judge-only (rung 5) | cheapest tier fabricated citations 4/4 steps (caught); verified ground scored 0.15; inflated [NEW] revoked |
+| P vs NP, fully instrumented | ladder+audit+ledger+oracle | ledger ratchet 0.02→0.15→0.30; floor lifted 0.02→0.22; models *self-flagged* "[not in provided corpus]" and withdrew a [NEW] label — the audit changed behavior at the source; 15% Headroom on 302k tokens; zero transport deaths |
 
 The graded run is why rungs 4 and 1 exist in this design: the judge caught
 fabricated citations as *pattern recognition* — the firewall makes it a lookup;
 and only a formal backend can verify novel mathematics rather than vibe it.
+The instrumented run is why gate mode exists: its compiled rung-3 validator
+declared residuals amounting to "the entire score is unchecked" while holding
+full halt authority — a hole, now closed by the sufficiency dimension.
 
 ## Usage
 

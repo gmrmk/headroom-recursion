@@ -73,6 +73,10 @@ class Verdict:
     passed: bool
     settles_at: Optional[str] = None
     note: str = ""
+    # Verdict strength within a rung: 1.0 = exhaustive/deterministic check;
+    # < 1.0 = statistical (e.g. Monte Carlo) — a validated halt below 1.0 is
+    # flagged for human review and never masquerades as exhaustive.
+    confidence: float = 1.0
 
 
 # An optional oracle: given a candidate answer string, return True (or a Verdict)
@@ -124,6 +128,11 @@ class RecurseConfig:
     # Internal: set by the compile step — one line telling the judge what the
     # oracle verifies and what residuals remain for the judge to score.
     oracle_note: str = ""
+    # Internal: halt authority of the installed validator. True (default, and
+    # always true for hand-supplied validators) = a pass halts as "validated".
+    # False (compiled oracle that declared itself insufficient) = GATE mode:
+    # fails are final for the step, passes defer to the judge.
+    oracle_sufficient: bool = True
 
     # Claim auditing (claims.py): parse [KNOWN]/[NEW] claims from each answer,
     # resolve [KNOWN] citations against the retriever (unresolvable -> UNSOURCED)

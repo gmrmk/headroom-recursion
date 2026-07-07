@@ -112,6 +112,31 @@ def test_retrieval_error_is_recorded_in_the_trace():
     assert trace.steps[0].retrieved_snippets == 0
 
 
+def test_corpus_retriever_ranks_by_overlap():
+    from headroom_recursion.retrieval import CorpusRetriever
+
+    ret = CorpusRetriever([
+        "Karp, Richard and Lipton, Richard (1980). Nonuniform and uniform complexity classes.",
+        "Kannan, Ravi (1982). Circuit-size lower bounds.",
+        "# a comment line that must be ignored",
+        "Baker, Gill, Solovay (1975). Relativizations of the P=?NP question.",
+    ])
+    hits = ret.retrieve("Karp, R., Lipton, R. (1980)", k=2)
+    assert hits and "Karp" in hits[0]
+    assert ret.retrieve("zzz qqq", k=3) == []          # below overlap threshold
+    assert all("comment" not in h for h in ret.retrieve("comment line ignored", k=5))
+    assert len(ret.retrieve("complexity circuit lower bounds 1980 1982", k=1)) == 1  # k-cap
+
+
+def test_corpus_retriever_from_file(tmp_path):
+    from headroom_recursion.retrieval import CorpusRetriever
+
+    f = tmp_path / "bib.txt"
+    f.write_text("# header\nWilliams, Ryan (2010). ACC lower bounds.\n")
+    ret = CorpusRetriever.from_file(str(f))
+    assert ret.retrieve("Williams (2010)", k=1)
+
+
 def test_simple_local_embedding_shape_and_determinism():
     emb = simple_local_embedding(dim=64)
     assert emb.dim == 64

@@ -103,6 +103,13 @@ def build_config(args) -> RecurseConfig:
         cfg.oracle_model = args.oracle_model
     if getattr(args, "claim_audit", False):
         cfg.claim_audit = True
+    if getattr(args, "research", False):
+        if not getattr(args, "ladder", None):
+            from headroom_recursion.config import RESEARCH_LADDER
+
+            cfg.ladder = RESEARCH_LADDER
+        if getattr(args, "lightrag", None) or getattr(args, "corpus", None):
+            cfg.claim_audit = True
     cfg.use_headroom = not args.no_headroom
     return cfg
 
@@ -132,8 +139,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--retrieval-max-chars", dest="retrieval_max_chars", type=int, help="cap on injected knowledge per step (default 8000 chars)")
     p.add_argument("--auto-oracle", dest="auto_oracle", action="store_true", help="compile + calibrate a mechanical verifier for the problem before solving (oracle compiler)")
     p.add_argument("--oracle-model", dest="oracle_model", help="model that compiles the oracle (default: strongest ladder model)")
-    p.add_argument("--claim-audit", dest="claim_audit", action="store_true", help="audit [KNOWN]/[NEW] claims against the retrieval corpus (needs --lightrag)")
+    p.add_argument("--claim-audit", dest="claim_audit", action="store_true", help="audit [KNOWN]/[NEW] claims against the retrieval corpus (needs --lightrag or --corpus)")
     p.add_argument("--ledger", metavar="PATH", help="run ledger: seed from prior verified results, record this run's outcome")
+    p.add_argument("--corpus", metavar="FILE", help="curated corpus (one entry per line) for CorpusRetriever — rung-4 lookups without LightRAG")
+    p.add_argument("--research", action="store_true", help="research mode: wrap the problem in the proven graded-rubric template, default the ladder to Sonnet+, auto-enable --claim-audit when a corpus/retriever is configured")
     p.add_argument("--client", choices=("claude", "openai"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url")
     p.add_argument("--ladder", help="comma-separated model ladder, cheapest first (default: the Claude tiers)")
     p.add_argument("--dry-run", action="store_true", help="print the call schedule and exit")
@@ -154,6 +163,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     problem = args.problem or (sys.stdin.read().strip() if not sys.stdin.isatty() else "")
     if not problem:
         p.error("no problem given (pass as an argument or via stdin)")
+    if args.research:
+        from headroom_recursion.prompts import research_prompt
+
+        problem = research_prompt(problem)
 
     # Check the run's dependencies up front, offering to install missing ones
     # (interactive sessions only; scripts get a copy-pasteable error instead).
@@ -186,6 +199,15 @@ def main(argv: Optional[list[str]] = None) -> int:
         from headroom_recursion.claude import ClaudeClient
 
         client = ClaudeClient(**client_kwargs)
+
+    # Optional curated-corpus retrieval (rung 4 without LightRAG).
+    if args.corpus:
+        from headroom_recursion.retrieval import CorpusRetriever
+
+        try:
+            cfg.retriever = CorpusRetriever.from_file(args.corpus)
+        except OSError as exc:
+            p.error(f"--corpus {args.corpus}: {exc}")
 
     # Optional LightRAG retrieval layer.
     if args.lightrag:

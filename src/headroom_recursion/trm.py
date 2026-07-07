@@ -143,20 +143,44 @@ def run_tier(
             unsourced = sum(1 for c in audited if c.label == "UNSOURCED")
             flagged_new = sum(1 for c in audited if c.label == "NEW" and c.prior_art)
 
-        # --- oracle short-circuit ---
-        validated, validator_error, verdict_obj = _safe_validate(cfg.validator, answer)
-        if validated and verdict_obj is not None and verdict_obj.settles_at:
-            trace.settles_at = verdict_obj.settles_at
+        # --- oracle: decider or gate, per its declared sufficiency ---
+        # A validator whose declared coverage excludes correctness (gate mode)
+        # must never produce a "validated" halt: its passes defer to the judge,
+        # and only its REJECTIONS are mechanical (final for the step, judge
+        # skipped). Sufficient validators keep full halt authority.
+        gate_rejected = False
+        gate_passed = False
+        if cfg.validator is not None and not cfg.oracle_sufficient:
+            passed, validator_error, _ = _safe_validate(cfg.validator, answer)
+            validated, verdict_obj = False, None
+            if passed:
+                gate_passed = True
+            else:
+                gate_rejected = True
+        else:
+            validated, validator_error, verdict_obj = _safe_validate(cfg.validator, answer)
+            if validated and verdict_obj is not None:
+                if verdict_obj.settles_at:
+                    trace.settles_at = verdict_obj.settles_at
+                trace.validated_confidence = verdict_obj.confidence
 
         # --- halt predictor (Q-head) ---
         judge_calls = 0
         if validated:
             halt_prob, reason = 1.0, "validator confirmed"
+        elif gate_rejected:
+            halt_prob, reason = 0.0, "oracle gate rejected (mechanical; judge skipped)"
         else:
+            gate_note = (
+                "\n\n[ORACLE GATE] the mechanical gate PASSED (format/constraints only — "
+                "correctness is entirely yours to score)"
+                if gate_passed
+                else ""
+            )
             verdict = halting.judge(
                 client,
                 model=judge_model,
-                problem=judge_problem + (f"\n\n{claim_note}" if claim_note else ""),
+                problem=judge_problem + (f"\n\n{claim_note}" if claim_note else "") + gate_note,
                 answer=answer,
                 scratchpad=scratchpad,
                 max_tokens=min(256, tier.max_tokens),
@@ -187,6 +211,7 @@ def run_tier(
                 retrieval_error=retrieval_error,
                 unsourced_claims=unsourced,
                 flagged_new_claims=flagged_new,
+                gate_rejected=gate_rejected,
                 rejected_updates=rejected,
                 truncated=truncated,
                 validator_error=validator_error,

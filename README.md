@@ -123,6 +123,15 @@ a settlement date for claims only the future can grade. Any outcome resting on
 judged opinion at ≥ 0.40 is flagged `NEEDS HUMAN REVIEW`. Full doctrine and the
 live-run evidence behind it: `references/oracle-compiler.md`.
 
+Halt authority matches declared coverage: a compiled validator must claim
+`sufficient` explicitly, or it runs as a **gate** — its rejections are final
+(and skip the judge, saving the run's dominant cost), but its passes defer to
+the judge and never halt as "validated". For research work, `--research` wraps
+the problem in the graded-rubric template proven across the live P-vs-NP runs
+and defaults the ladder to Sonnet+; `--corpus bibliography.txt` powers the
+citation firewall with a curated file (see `examples/complexity-bibliography.txt`)
+via `CorpusRetriever` — no LightRAG required.
+
 ## Safety rails
 
 A self-refining loop has sharp edges; these are built in:

@@ -155,3 +155,44 @@ def test_lean_verify_with_injected_runner():
     bad = lambda argv, **kw: SimpleNamespace(returncode=1, stdout="", stderr="type mismatch")
     ok, why = oracle.lean_verify("theorem t : 1 = 2 := rfl", runner=bad)
     assert ok is False and "type mismatch" in why
+
+
+# ---------------------------------------------------------------------------
+# Research mode + trajectory
+# ---------------------------------------------------------------------------
+
+def test_research_prompt_carries_the_proven_contract():
+    from headroom_recursion.prompts import research_prompt
+
+    p = research_prompt("resolve the Goldbach conjecture.")
+    assert "GRAND TARGET: resolve the Goldbach conjecture." in p
+    assert "FABRICATION DOMINATES" in p
+    assert "0.10-0.39" in p and "0.80-0.97" in p  # the gradient bands
+    assert "ATTACK LINE" in p and "FAILED" in p
+
+
+def test_research_flag_defaults_to_sonnet_ladder():
+    from types import SimpleNamespace
+    from headroom_recursion.cli import build_config
+
+    args = SimpleNamespace(
+        ladder=None, n=None, steps=None, threshold=None, temperature=None,
+        judge_model=None, judge_votes=None, retrieval_k=None, retrieval_max_chars=None,
+        max_calls=None, max_seconds=None, no_headroom=False, research=True,
+        corpus="bib.txt",
+    )
+    cfg = build_config(args)
+    assert all(not t.model.startswith("claude-haiku") for t in cfg.ladder)
+    assert cfg.claim_audit is True  # corpus configured -> audit auto-enabled
+
+
+def test_trajectory_groups_by_tier():
+    from headroom_recursion.config import RecurseConfig, Tier
+    from headroom_recursion.ladder import recurse
+
+    stub = StubClient(halt_prob=lambda step: [0.25, 0.28, 0.30, 0.22][min(step, 3)])
+    cfg = RecurseConfig(ladder=(Tier("x-sonnet-5"), Tier("x-opus-4")), n=1, T=2)
+    trace = recurse("p", client=stub, config=cfg)
+
+    assert trace.trajectory() == "sonnet 0.25 0.28 | opus 0.30 0.22"
+    assert "trajectory  : sonnet 0.25 0.28 | opus 0.30 0.22" in trace.summary()

@@ -31,11 +31,15 @@ CASES = [
 ]
 
 
-def envelope(source=GOOD_SOURCE, rung=3, cases=CASES, residuals=("whether 42 is justified",)):
+def envelope(
+    source=GOOD_SOURCE, rung=3, cases=CASES,
+    residuals=("whether 42 is justified",), sufficient=True,
+):
     return json.dumps(
         {
             "rung": rung,
             "rationale": "final line must be 42",
+            "sufficient": sufficient,
             "validator_source": source,
             "residuals": list(residuals),
             "calibration_cases": cases,
@@ -199,6 +203,57 @@ def test_callers_config_is_not_mutated():
     cfg = one_tier(n=1, T=1, oracle_auto=True)
     recurse("emit 42", client=client, config=cfg)
     assert cfg.validator is None and cfg.oracle_note == ""  # pre-registration on a copy
+
+
+def test_gate_mode_pass_defers_to_judge_not_validated():
+    # Insufficient oracle: a well-FORMED answer must not halt as "validated".
+    client = CompilerClient(
+        reply=envelope(sufficient=False), inner=StubClient(answers=["42"], halt_prob=0.2)
+    )
+    cfg = one_tier(n=1, T=1, oracle_auto=True)
+    trace = recurse("emit 42", client=client, config=cfg)
+
+    assert trace.stop_reason != "validated"
+    assert trace.halted is False  # judge said 0.2; the gate pass gave no authority
+    judge_prompts = [u for k, u in client.inner.prompts_seen if k == "judge"]
+    assert judge_prompts and "[ORACLE GATE]" in judge_prompts[0]
+    assert trace.oracle_gate_only is True
+    assert "GATE only" in trace.summary()
+
+
+def test_gate_mode_rejection_is_final_and_skips_judge():
+    client = CompilerClient(
+        reply=envelope(sufficient=False), inner=StubClient(answers=["wrong"], halt_prob=0.99)
+    )
+    cfg = one_tier(n=1, T=1, oracle_auto=True)
+    trace = recurse("emit 42", client=client, config=cfg)
+
+    assert trace.halted is False
+    assert client.inner.count("judge") == 0  # mechanical rejection, judge never paid
+    assert trace.steps[0].gate_rejected is True
+    assert trace.steps[0].halt_prob == 0.0
+    assert "mechanically rejected" in trace.summary()
+
+
+def test_unclaimed_sufficiency_is_treated_as_gate():
+    raw = json.loads(envelope())
+    del raw["sufficient"]  # compiler forgot to claim it
+    client = CompilerClient(reply=json.dumps(raw), inner=StubClient(answers=["42"]))
+    trace = recurse("emit 42", client=client, config=one_tier(n=1, T=1, oracle_auto=True))
+    assert trace.stop_reason != "validated"  # authority must be claimed, never assumed
+
+
+def test_statistical_validation_flags_human_review():
+    from headroom_recursion.config import Verdict
+
+    validator = lambda a: Verdict(passed=True, confidence=0.999)
+    cfg = one_tier(n=1, T=1, validator=validator)
+    trace = recurse("x", client=StubClient(), config=cfg)
+
+    assert trace.stop_reason == "validated" and trace.halted is True
+    assert trace.validated_confidence == 0.999
+    assert trace.needs_human_review is True  # statistical, not exhaustive
+    assert "STATISTICAL" in trace.summary()
 
 
 def test_high_judged_score_flags_human_review_without_halt():

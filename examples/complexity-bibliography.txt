@@ -1,0 +1,31 @@
+# Curated complexity-theory bibliography — a rung-4 corpus for the citation
+# firewall and novelty triage. One entry per line; lines starting with # are
+# ignored. Load with:
+#   from headroom_recursion.retrieval import CorpusRetriever
+#   retriever = CorpusRetriever.from_file("examples/complexity-bibliography.txt")
+# This corpus powered the live research runs; extend it for your own domain.
+Cook, Stephen (1971). The complexity of theorem-proving procedures. STOC. Defines NP-completeness; SAT is NP-complete.
+Levin, Leonid (1973). Universal sequential search problems. Independent discovery of NP-completeness.
+Karp, Richard (1972). Reducibility among combinatorial problems. 21 NP-complete problems.
+Karp, Richard and Lipton, Richard (1980). Some connections between nonuniform and uniform complexity classes. STOC 302-309. NP in P/poly implies PH collapses to Sigma2 (with Sipser; strengthened by Yap).
+Yap, Chee K. (1983). Some consequences of non-uniform conditions on uniform classes. Theoretical Computer Science / Information and Control. Sharpens the Karp-Lipton collapse to Sigma2.
+Kannan, Ravi (1982). Circuit-size lower bounds and non-reducibility to sparse sets. Information and Control 55. For every k, Sigma2 ∩ Pi2 (and Sigma2) contains a language not in SIZE(n^k) — the fixed-polynomial lower bound.
+Baker, Theodore, Gill, John, Solovay, Robert (1975). Relativizations of the P=?NP question. SIAM J. Computing 4. Oracles A, B with P^A = NP^A and P^B != NP^B; relativizing techniques cannot resolve P vs NP.
+Razborov, Alexander and Rudich, Steven (1994/1997). Natural proofs. STOC 1994 / JCSS 55. Constructive large properties useful against P/poly break pseudorandom generators — the natural proofs barrier.
+Aaronson, Scott and Wigderson, Avi (2008). Algebrization: a new barrier in complexity theory. STOC. Arithmetization-based techniques also cannot resolve P vs NP.
+Williams, Ryan (2010/2011). Non-uniform ACC circuit lower bounds. CCC/JACM. NEXP not in ACC0 via satisfiability algorithms implying lower bounds — evades all three barriers.
+Williams, Ryan (2013). Improving exhaustive search implies superpolynomial lower bounds. SIAM J. Computing. The algorithmic method: faster circuit-SAT gives circuit lower bounds.
+Murray, Cody and Williams, Ryan (2018). Circuit lower bounds for nondeterministic quasi-polytime. STOC. NQP not in ACC0 — tightens the algorithmic method.
+Hastad, Johan (1986). Almost optimal lower bounds for small depth circuits. STOC. Parity requires exponential-size AC0 circuits (switching lemma).
+Razborov, Alexander (1985). Lower bounds on the monotone complexity of some Boolean functions. Clique requires superpolynomial monotone circuits.
+Smolensky, Roman (1987). Algebraic methods in the theory of lower bounds for Boolean circuit complexity. AC0[p] lower bounds via polynomial approximation.
+Toda, Seinosuke (1991). PP is as hard as the polynomial-time hierarchy. SIAM J. Computing. PH is in P^PP.
+Impagliazzo, Russell and Wigderson, Avi (1997). P = BPP if E requires exponential circuits. Derandomization from hardness.
+Kabanets, Valentine and Impagliazzo, Russell (2004). Derandomizing polynomial identity testing means proving circuit lower bounds. Computational Complexity 13.
+Oliveira, Igor and Pich, Jan and Santhanam, Rahul (2019+). Hardness magnification near state-of-the-art lower bounds. Weak lower bounds for compression problems magnify to major separations.
+Chen, Lijie and Jin, Ce and Williams, Ryan (2020). Hardness magnification for all sparse NP languages. FOCS.
+Buhrman, Harry and Homer, Steven (1992). Superpolynomial circuits, almost sparse oracles and the exponential hierarchy. Fixed-polynomial lower bounds for larger classes.
+Santhanam, Rahul (2009). Circuit lower bounds for Merlin-Arthur classes. SIAM J. Computing. MA/1 not in SIZE(n^k) for every k.
+Vinodchandran, N. V. (2005). A note on the circuit complexity of PP. PP not in SIZE(n^k) for every fixed k.
+Arora, Sanjeev and Barak, Boaz (2009). Computational Complexity: A Modern Approach. Cambridge University Press. Standard reference text.
+Deolalikar, Vinay (2010). Claimed proof of P != NP via descriptive complexity / statistical physics; withdrawn after the finite-model-theory and solution-space arguments were shown flawed.

@@ -13,10 +13,12 @@ from headroom_recursion.trace import RunTrace, StepTrace
 from headroom_recursion.ladder import RunError, recurse
 from headroom_recursion.clients import CompletionClient, OpenAIClient, CLITransportClient
 from headroom_recursion.oracle import CompiledOracle, compile_oracle
+from headroom_recursion.prompts import research_prompt
 from headroom_recursion.retrieval import (
     Retriever,
     NullRetriever,
     LightRAGRetriever,
+    CorpusRetriever,
     Embedding,
     simple_local_embedding,
     build_claude_llm_func,
@@ -36,6 +38,8 @@ __all__ = [
     "RESEARCH_LADDER",
     "CompiledOracle",
     "compile_oracle",
+    "research_prompt",
+    "CorpusRetriever",
     "Retriever",
     "NullRetriever",
     "LightRAGRetriever",
