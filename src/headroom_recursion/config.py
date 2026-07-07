@@ -10,7 +10,10 @@ tier escalation instead).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
+
+if TYPE_CHECKING:  # avoid a runtime import cycle (retrieval imports claude/config helpers)
+    from headroom_recursion.retrieval import Retriever
 
 
 # Accurate model IDs for the Claude family, cheapest -> most capable. This ordering
@@ -71,6 +74,16 @@ class RecurseConfig:
 
     # Optional oracle for structured tasks (see ``Validator``).
     validator: Optional[Validator] = None
+
+    # Optional retrieval layer (e.g. a LightRAG-backed knowledge base). When set, each
+    # improvement step retrieves relevant snippets and injects them into the prompts so
+    # the recursion is grounded in external knowledge. Any object with a
+    # ``retrieve(query, k) -> list[str]`` method works (see ``retrieval.Retriever``).
+    retriever: Optional["Retriever"] = None
+    # How many snippets to request per retrieval.
+    retrieval_k: int = 4
+    # Max characters of (problem + scratchpad) used to form the retrieval query.
+    retrieval_query_chars: int = 1200
 
     # Sampling temperature for the working-model calls.
     temperature: float = 0.7

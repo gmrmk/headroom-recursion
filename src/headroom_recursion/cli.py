@@ -31,6 +31,8 @@ def build_config(args) -> RecurseConfig:
         cfg.temperature = args.temperature
     if args.judge_model is not None:
         cfg.judge_model = args.judge_model
+    if args.retrieval_k is not None:
+        cfg.retrieval_k = args.retrieval_k
     cfg.use_headroom = not args.no_headroom
     return cfg
 
@@ -47,6 +49,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--temperature", type=float, help="sampling temperature (default 0.7)")
     p.add_argument("--judge-model", dest="judge_model", help="pin the halt judge to this model")
     p.add_argument("--no-headroom", action="store_true", help="disable Headroom compression")
+    p.add_argument("--lightrag", metavar="DIR", help="enable LightRAG retrieval from this working dir")
+    p.add_argument("--lightrag-mode", default="mix", help="LightRAG query mode (default: mix)")
+    p.add_argument("--index", action="append", metavar="FILE", help="index a text file into LightRAG before running (repeatable)")
+    p.add_argument("--retrieval-k", type=int, help="snippets to retrieve per step (default 4)")
     p.add_argument("--dry-run", action="store_true", help="print the call schedule and exit")
     p.add_argument("--json", action="store_true", help="emit the full trace as JSON")
     p.add_argument("--base-url", dest="base_url", help="Anthropic base_url (e.g. a headroom proxy)")
@@ -66,6 +72,18 @@ def main(argv: Optional[list[str]] = None) -> int:
     from headroom_recursion.claude import ClaudeClient
 
     client = ClaudeClient(base_url=args.base_url)
+
+    # Optional LightRAG retrieval layer.
+    if args.lightrag:
+        from headroom_recursion.retrieval import LightRAGRetriever
+
+        retriever = LightRAGRetriever(args.lightrag, client=client, mode=args.lightrag_mode)
+        if args.index:
+            for path in args.index:
+                with open(path, "r", encoding="utf-8") as fh:
+                    retriever.index(fh.read())
+        cfg.retriever = retriever
+
     trace = recurse(problem, client=client, config=cfg)
 
     if args.json:

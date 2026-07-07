@@ -50,13 +50,20 @@ def run_tier(
         tb = ta = 0
         latent_calls = 0
 
+        # --- optional retrieval: ground this step in a knowledge base ---
+        snippets = _retrieve(cfg, problem, scratchpad)
+        context = prompts.format_context(snippets)
+
         # --- n latent updates:  z = net(x, y, z) ---
         for _ in range(cfg.n):
             res = client.complete(
                 model=tier.model,
                 system=prompts.LATENT_SYSTEM,
                 user=prompts.LATENT_UPDATE.format(
-                    problem=problem, answer=answer or "(none yet)", scratchpad=scratchpad or "(empty)"
+                    problem=problem,
+                    context=context,
+                    answer=answer or "(none yet)",
+                    scratchpad=scratchpad or "(empty)",
                 ),
                 max_tokens=tier.max_tokens,
                 temperature=cfg.temperature,
@@ -71,7 +78,9 @@ def run_tier(
         res = client.complete(
             model=tier.model,
             system=prompts.ANSWER_SYSTEM,
-            user=prompts.ANSWER_UPDATE.format(problem=problem, scratchpad=scratchpad, answer=answer or "(none yet)"),
+            user=prompts.ANSWER_UPDATE.format(
+                problem=problem, context=context, scratchpad=scratchpad, answer=answer or "(none yet)"
+            ),
             max_tokens=tier.max_tokens,
             temperature=cfg.temperature,
             use_headroom=cfg.use_headroom,
@@ -115,6 +124,7 @@ def run_tier(
                 halted=halted,
                 converged=converged,
                 reason=reason,
+                retrieved_snippets=len(snippets),
                 tokens_before=tb,
                 tokens_after=ta,
             )
@@ -127,6 +137,19 @@ def run_tier(
             return TierResult(answer, scratchpad, False, "converged")
 
     return TierResult(answer, scratchpad, False, stop_reason)
+
+
+def _retrieve(cfg: RecurseConfig, problem: str, scratchpad: str) -> list[str]:
+    """Pull knowledge snippets for this step; never let retrieval break reasoning."""
+
+    if cfg.retriever is None:
+        return []
+    query = (problem + ("\n\n" + scratchpad if scratchpad else ""))[: cfg.retrieval_query_chars]
+    try:
+        snippets = cfg.retriever.retrieve(query, k=cfg.retrieval_k)
+    except Exception:
+        return []
+    return [s for s in (snippets or []) if s and s.strip()]
 
 
 def _same(a: str, b: str) -> bool:
