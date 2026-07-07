@@ -69,10 +69,12 @@ def recurse(
             trace.final_answer = trace.best_answer if trace.best_step_index >= 0 else answer
         # Anything scored high on judged opinion alone is flagged for a human:
         # "validated" means a mechanical validator fired; everything else is a
-        # judge's view, and >= 0.40 is high enough to matter.
-        trace.needs_human_review = reason != "validated" and (
-            trace.best_halt_prob >= 0.40 or (halted and reason == "halt")
-        )
+        # judge's view, and >= 0.40 is high enough to matter. A STATISTICAL
+        # validation (confidence < 1.0) is also flagged — it is evidence, not proof.
+        trace.needs_human_review = (
+            reason != "validated"
+            and (trace.best_halt_prob >= 0.40 or (halted and reason == "halt"))
+        ) or (reason == "validated" and trace.validated_confidence < 1.0)
         return trace
 
     # --- step zero: compile an oracle if asked and none was hand-supplied ---
@@ -92,9 +94,15 @@ def recurse(
         trace.oracle_rung = compiled.rung
         trace.oracle_residuals = list(compiled.residuals)
         trace.oracle_calls = 1
+        trace.oracle_gate_only = compiled.validator is not None and not compiled.sufficient
         # Pre-registration: frozen now, before any solution attempt; the working
         # config is a copy so the caller's config object is never mutated.
-        cfg = replace(cfg, validator=compiled.validator, oracle_note=compiled.note)
+        cfg = replace(
+            cfg,
+            validator=compiled.validator,
+            oracle_note=compiled.note,
+            oracle_sufficient=compiled.sufficient,
+        )
 
     try:
         for tier in cfg.ladder:

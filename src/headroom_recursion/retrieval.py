@@ -48,6 +48,39 @@ class NullRetriever:
         return []
 
 
+class CorpusRetriever:
+    """Keyword-overlap retrieval over a small curated corpus — a rung-4 source
+    without LightRAG.
+
+    This is the retriever that powered the citation firewall in the live
+    research runs: `entries` is a list of strings (e.g. one bibliography entry
+    per line: author names, year, venue, one-line result). A query matches an
+    entry when they share at least ``min_overlap`` alphanumeric tokens; entries
+    are returned best-overlap-first. Deliberately dumb and auditable — for a
+    real knowledge base use ``LightRAGRetriever``.
+    """
+
+    def __init__(self, entries: list[str], *, min_overlap: int = 2):
+        self._entries = [e.strip() for e in entries if e and e.strip() and not e.lstrip().startswith("#")]
+        self._min_overlap = min_overlap
+        self._tokens = [set(re.findall(r"[a-z0-9]+", e.lower())) for e in self._entries]
+
+    @classmethod
+    def from_file(cls, path: str, **kw) -> "CorpusRetriever":
+        with open(path, "r", encoding="utf-8") as fh:
+            return cls(fh.readlines(), **kw)
+
+    def retrieve(self, query: str, *, k: int) -> list[str]:
+        qtok = set(re.findall(r"[a-z0-9]+", query.lower()))
+        scored = [
+            (len(qtok & etok), entry)
+            for entry, etok in zip(self._entries, self._tokens)
+            if len(qtok & etok) >= self._min_overlap
+        ]
+        scored.sort(key=lambda t: -t[0])
+        return [e for _, e in scored[:k]]
+
+
 def _run_coro(coro: Awaitable):
     """Run a self-contained coroutine to completion, loop or no loop.
 

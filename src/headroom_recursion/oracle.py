@@ -73,6 +73,10 @@ class CompiledOracle:
     calibration: Optional[CalibrationReport]
     source: str = ""  # recorded for audit; NEVER shown to the generator
     note: str = ""    # one line for the judge/trace ("oracle checks X; you score Y")
+    # Halt authority: True = a pass DECIDES correctness (validated halt); False =
+    # the validator is a GATE — fails are final, passes defer to the judge. The
+    # compiler must claim sufficiency explicitly; absence is insufficiency.
+    sufficient: bool = False
 
 
 # --------------------------------------------------------------------------------------
@@ -95,6 +99,7 @@ Design a verifier for candidate answers to this problem. Reply with ONLY this JS
 {{
   "rung": 2 | 3 | 5,
   "rationale": "<one sentence>",
+  "sufficient": true | false,
   "validator_source": "<python source or null>",
   "residuals": ["<claim the validator CANNOT check>", ...],
   "calibration_cases": [
@@ -102,6 +107,13 @@ Design a verifier for candidate answers to this problem. Reply with ONLY this JS
     ...
   ]
 }}
+
+"sufficient" means: does a validator PASS fully establish the answer is CORRECT —
+not merely well-formed? true only when the checked object IS the answer (e.g. an
+equation whose arithmetic is verified). If the validator checks structure/format
+while correctness lives in unchecked prose, say false: the validator will then act
+as a GATE (rejections are final; passes defer to the judge) instead of a decider.
+Be conservative — when in doubt, false.
 
 Rules for validator_source:
 - Define exactly `def validate(answer: str) -> bool`. Pure function of its input.
@@ -291,9 +303,11 @@ def compile_oracle(
         verdict, _err = run_validator(source, answer, timeout_s=timeout_s, runner=runner)
         return verdict is True  # crash/timeout at runtime = "don't halt", never "pass"
 
+    sufficient = envelope.get("sufficient") is True  # unclaimed = insufficient
     checkable = envelope.get("rationale", "").strip() or "mechanical answer check"
+    authority = "DECIDES correctness" if sufficient else "GATE only (format/constraints; correctness is yours to score)"
     note = (
-        f"a calibrated rung-{rung} oracle verifies: {checkable} | "
+        f"a calibrated rung-{rung} oracle ({authority}) verifies: {checkable} | "
         f"NOT verified (score these yourself): {'; '.join(residuals) or 'nothing — oracle is total'}"
     )
     return CompiledOracle(
@@ -303,6 +317,7 @@ def compile_oracle(
         calibration=report,
         source=source,
         note=note,
+        sufficient=sufficient,
     )
 
 

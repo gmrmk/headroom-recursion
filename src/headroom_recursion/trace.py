@@ -26,6 +26,9 @@ class StepTrace:
     # [NEW] claims with candidate prior art in the corpus.
     unsourced_claims: int = 0
     flagged_new_claims: int = 0
+    # True when a gate-mode oracle mechanically rejected this step's answer
+    # (the judge was skipped; halt_prob is 0.0 by rejection, not by opinion).
+    gate_rejected: bool = False
     # Model outputs rejected this step (empty/whitespace completions that would have
     # destroyed the scratchpad or answer; the previous value was kept instead).
     rejected_updates: int = 0
@@ -75,6 +78,12 @@ class RunTrace:
     oracle_rung: int = 0
     oracle_residuals: list[str] = field(default_factory=list)
     oracle_calls: int = 0
+    # True when the installed validator is a GATE (insufficient): its passes
+    # defer to the judge; only its rejections are mechanical.
+    oracle_gate_only: bool = False
+    # Confidence of the verdict behind a "validated" stop (1.0 = exhaustive;
+    # < 1.0 = statistical, which flags human review).
+    validated_confidence: float = 1.0
     # True when the outcome rests on judged opinion at a score high enough to
     # matter (>= 0.40) — i.e. NOT mechanically validated. Read it before believing.
     needs_human_review: bool = False
@@ -85,6 +94,22 @@ class RunTrace:
 
     def add(self, step: StepTrace) -> None:
         self.steps.append(step)
+
+    def trajectory(self) -> str:
+        """Per-step halt_probs grouped by tier: 'sonnet 0.25 0.28 | opus 0.30'."""
+
+        parts: list[str] = []
+        tier, scores = None, []
+        for s in self.steps:
+            short = s.tier_model.split("-")[1] if "-" in s.tier_model else s.tier_model
+            if short != tier and scores:
+                parts.append(f"{tier} {' '.join(scores)}")
+                scores = []
+            tier = short
+            scores.append(f"{s.halt_prob:.2f}")
+        if scores:
+            parts.append(f"{tier} {' '.join(scores)}")
+        return " | ".join(parts)
 
     def note_candidate(self, *, answer: str, halt_prob: float, model: str) -> None:
         """Record a candidate answer; keeps the best (ties go to the latest)."""
@@ -133,18 +158,29 @@ class RunTrace:
         tiers = " -> ".join(self.tier_stops) if self.tier_stops else " -> ".join(
             _dedupe_consecutive(s.tier_model for s in self.steps)
         )
+        stop = self.stop_reason
+        if stop == "validated" and self.validated_confidence < 1.0:
+            stop += f" (STATISTICAL, confidence={self.validated_confidence:g} — not exhaustive)"
         lines = [
-            f"stop_reason : {self.stop_reason} (halted={self.halted})",
+            f"stop_reason : {stop} (halted={self.halted})",
             f"final_model : {self.final_model}",
             f"tier path   : {tiers or '(none)'}",
             f"steps       : {len(self.steps)}   claude calls: {self.total_calls}"
             + (f"   wall: {self.wall_seconds:.1f}s" if self.wall_seconds else ""),
         ]
+        if self.steps:
+            lines.append(f"trajectory  : {self.trajectory()}")
         if self.error:
             lines.append(f"error       : {self.error}")
         if self.oracle_rung:
-            what = "calibrated validator installed" if self.oracle_rung <= 3 else "demoted — judge only"
+            if self.oracle_rung <= 3:
+                what = "calibrated validator installed" + (", GATE only" if self.oracle_gate_only else "")
+            else:
+                what = "demoted — judge only"
             lines.append(f"oracle      : rung {self.oracle_rung} ({what})")
+            rejected = sum(1 for s in self.steps if s.gate_rejected)
+            if rejected:
+                lines.append(f"gate        : {rejected} answer(s) mechanically rejected (judge skipped)")
             if self.oracle_residuals:
                 lines.append(f"residuals   : {'; '.join(self.oracle_residuals)[:200]}")
         if self.needs_human_review:
