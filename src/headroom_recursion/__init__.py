@@ -11,6 +11,7 @@ affordable.
 from headroom_recursion.config import RecurseConfig, Tier, DEFAULT_LADDER
 from headroom_recursion.trace import RunTrace, StepTrace
 from headroom_recursion.ladder import RunError, recurse
+from headroom_recursion.clients import CompletionClient, OpenAIClient
 from headroom_recursion.retrieval import (
     Retriever,
     NullRetriever,
@@ -28,6 +29,8 @@ __all__ = [
     "StepTrace",
     "recurse",
     "RunError",
+    "CompletionClient",
+    "OpenAIClient",
     "Retriever",
     "NullRetriever",
     "LightRAGRetriever",

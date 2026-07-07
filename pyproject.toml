@@ -1,7 +1,7 @@
 [project]
 name = "headroom-recursion"
 version = "0.1.0"
-description = "Recursive-reasoning harness for Claude — a TRM-style draft/refine/escalate loop with Headroom context compression across all Claude model tiers."
+description = "Recursive reasoning harness for Claude. A small model refines its answer in a loop; larger models take over only when it stalls. Based on arXiv:2510.04871."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -18,6 +18,8 @@ headroom = ["headroom-ai[all]>=0.1"]
 # LightRAG retrieval layer. Optional; the loop runs ungrounded without it. Note you
 # must also supply an embedding backend (see references/lightrag-setup.md).
 lightrag = ["lightrag-hku>=1.0"]
+# OpenAI (and OpenAI-compatible: Ollama, vLLM, LM Studio, ...) model backend.
+openai = ["openai>=1"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 
 [project.scripts]
