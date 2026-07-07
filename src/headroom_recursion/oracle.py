@@ -381,6 +381,16 @@ def lean_verify(
     if runner is None:
         return False, "lean not installed"
 
+    # Two rung-1 false positives, rejected before compiling: `sorry` (Lean treats
+    # proof holes as a WARNING — exit 0) and custom `axiom`s (an arbitrary axiom
+    # "proves" anything, silently). A proof carrying either is not a proof.
+    import re as _re
+
+    if _re.search(r"\b(sorry|admit)\b", code):
+        return False, "rejected: proof contains sorry/admit (holes are not proofs)"
+    if _re.search(r"^\s*axiom\b", code, _re.MULTILINE):
+        return False, "rejected: proof declares a custom axiom"
+
     with tempfile.NamedTemporaryFile("w", suffix=".lean", delete=False) as fh:
         fh.write(code)
         path = fh.name
@@ -403,5 +413,8 @@ def lean_verify(
             pass
 
     if out.returncode == 0:
+        chatter = (out.stdout or "") + (out.stderr or "")
+        if "sorry" in chatter:
+            return False, "rejected: compiled with sorry warnings (holes are not proofs)"
         return True, "compiled clean (rung 1)"
     return False, (out.stderr or out.stdout or f"lean exited {out.returncode}").strip()[:500]

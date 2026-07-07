@@ -134,6 +134,13 @@ class RecurseConfig:
     # fails are final for the step, passes defer to the judge.
     oracle_sufficient: bool = True
 
+    # Oracle feedback (CEGIS-style counterexample-guided repair): called with each
+    # step's answer AFTER the halt decision; whatever string it returns is appended
+    # to the scratchpad as [ORACLE FEEDBACK] so the NEXT step refines against
+    # mechanical findings (compiler errors, failing test cases, counterexamples).
+    # The canonical use: Lean proof-repair — feedback = the compiler's error output.
+    feedback: Optional[Callable[[str], str]] = None
+
     # Claim auditing (claims.py): parse [KNOWN]/[NEW] claims from each answer,
     # resolve [KNOWN] citations against the retriever (unresolvable -> UNSOURCED)
     # and hunt prior art for [NEW] labels. Requires a retriever to have teeth.

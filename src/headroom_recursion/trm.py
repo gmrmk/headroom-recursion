@@ -223,6 +223,13 @@ def run_tier(
 
         if halted:
             return TierResult(answer, scratchpad, True, stop_reason)
+
+        # --- oracle feedback (CEGIS): mechanical findings guide the next step ---
+        if cfg.feedback is not None:
+            fb = _safe_feedback(cfg.feedback, answer)
+            if fb:
+                scratchpad = f"{scratchpad}\n\n[ORACLE FEEDBACK on the last answer]\n{fb}"
+
         if converged:
             # This tier has stopped moving — escalate rather than spin.
             return TierResult(answer, scratchpad, False, "converged")
@@ -282,6 +289,15 @@ def _norm(s: str) -> str:
 def _preview(s: str, n: int = 160) -> str:
     s = (s or "").strip().replace("\n", " ")
     return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def _safe_feedback(feedback, answer: str) -> str:
+    """Run the feedback hook; a broken hook is silence, never a crash."""
+
+    try:
+        return (feedback(answer) or "").strip()[:4000]
+    except Exception as exc:
+        return f"(feedback hook failed: {type(exc).__name__}: {exc})"
 
 
 def _safe_validate(validator, answer: str) -> tuple[bool, str, Optional[Verdict]]:

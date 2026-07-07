@@ -196,3 +196,51 @@ def test_trajectory_groups_by_tier():
 
     assert trace.trajectory() == "sonnet 0.25 0.28 | opus 0.30 0.22"
     assert "trajectory  : sonnet 0.25 0.28 | opus 0.30 0.22" in trace.summary()
+
+
+# ---------------------------------------------------------------------------
+# Oracle feedback (CEGIS) + Lean guards
+# ---------------------------------------------------------------------------
+
+def test_feedback_reaches_the_next_step():
+    seen = []
+
+    def feedback(answer):
+        seen.append(answer)
+        return f"error: {answer} is wrong at line 3"
+
+    stub = StubClient(answers=["attempt-1", "attempt-2"])
+    cfg = RecurseConfig(ladder=(Tier("m0"),), n=1, T=2, feedback=feedback)
+    recurse("prove it", client=stub, config=cfg)
+
+    assert seen == ["attempt-1", "attempt-2"]
+    latents = [u for k, u in stub.prompts_seen if k == "latent"]
+    assert "[ORACLE FEEDBACK" in latents[1] and "attempt-1 is wrong at line 3" in latents[1]
+    assert "[ORACLE FEEDBACK" not in latents[0]  # nothing to feed back yet
+
+
+def test_feedback_hook_failure_is_contained():
+    def boom(answer):
+        raise RuntimeError("hook bug")
+
+    cfg = RecurseConfig(ladder=(Tier("m0"),), n=1, T=2, feedback=boom)
+    trace = recurse("x", client=StubClient(), config=cfg)
+    assert trace.stop_reason in {"exhausted", "converged"}  # run survived the hook
+
+
+def test_lean_verify_rejects_sorry_and_axiom():
+    ran = []
+    fake = lambda argv, **kw: ran.append(1) or SimpleNamespace(returncode=0, stdout="", stderr="")
+    ok, why = oracle.lean_verify("theorem t : 1 = 2 := by sorry", runner=fake)
+    assert ok is False and "sorry" in why
+    ok, why = oracle.lean_verify("axiom bad : 1 = 2\ntheorem t : 1 = 2 := bad", runner=fake)
+    assert ok is False and "axiom" in why
+    assert ran == []  # rejected before the compiler was even invoked
+
+
+def test_lean_verify_rejects_sorry_warning_from_compiler():
+    warn = lambda argv, **kw: SimpleNamespace(
+        returncode=0, stdout="", stderr="foo.lean:1:8: warning: declaration uses `sorry`"
+    )
+    ok, why = oracle.lean_verify("theorem t : 1 = 2 := hidden_hole", runner=warn)
+    assert ok is False and "holes" in why
