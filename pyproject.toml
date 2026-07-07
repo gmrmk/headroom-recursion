@@ -18,6 +18,8 @@ headroom = ["headroom-ai[all]>=0.1"]
 # LightRAG retrieval layer. Optional; the loop runs ungrounded without it. Note you
 # must also supply an embedding backend (see references/lightrag-setup.md).
 lightrag = ["lightrag-hku>=1.0"]
+# OpenAI (and OpenAI-compatible: Ollama, vLLM, LM Studio, ...) model backend.
+openai = ["openai>=1"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 
 [project.scripts]

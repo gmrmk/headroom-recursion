@@ -64,6 +64,10 @@ recurse --lightrag ./kb --index corpus.txt "<question over the corpus>"
 
 See `references/lightrag-setup.md`.
 
+Other providers: `--client openai --ladder "model-a,model-b"` runs the same loop on
+OpenAI or any OpenAI-compatible server (`--base-url http://localhost:11434/v1` for
+Ollama etc.). Missing SDKs are offered for install on first use.
+
 Tune-ables: `--n` (latent updates/step, default 6), `--steps` (steps/tier, default 3),
 `--threshold` (halt bar, default 0.9), `--judge-model` (pin the verifier, e.g. to
 Haiku), `--judge-votes` (median of N verifier votes), `--no-headroom` (A/B the token

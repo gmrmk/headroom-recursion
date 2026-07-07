@@ -73,6 +73,10 @@ def ensure_dependency(
 
 def build_config(args) -> RecurseConfig:
     cfg = RecurseConfig()
+    if getattr(args, "ladder", None):
+        from headroom_recursion.config import Tier
+
+        cfg.ladder = tuple(Tier(m.strip()) for m in args.ladder.split(",") if m.strip())
     if args.n is not None:
         cfg.n = args.n
     if args.steps is not None:
@@ -120,9 +124,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--index", action="append", metavar="FILE", help="index a text file into LightRAG before running (repeatable; runs on every invocation — LightRAG dedupes identical content)")
     p.add_argument("--retrieval-k", type=int, help="snippets to retrieve per step (default 4)")
     p.add_argument("--retrieval-max-chars", dest="retrieval_max_chars", type=int, help="cap on injected knowledge per step (default 8000 chars)")
+    p.add_argument("--client", choices=("claude", "openai"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url")
+    p.add_argument("--ladder", help="comma-separated model ladder, cheapest first (default: the Claude tiers)")
     p.add_argument("--dry-run", action="store_true", help="print the call schedule and exit")
     p.add_argument("--json", action="store_true", help="emit the full trace as JSON")
-    p.add_argument("--base-url", dest="base_url", help="Anthropic base_url (e.g. a headroom proxy)")
+    p.add_argument("--base-url", dest="base_url", help="API base_url (a headroom proxy, an OpenAI-compatible server, ...)")
     args = p.parse_args(argv)
 
     cfg = build_config(args)
@@ -141,7 +147,10 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Check the run's dependencies up front, offering to install missing ones
     # (interactive sessions only; scripts get a copy-pasteable error instead).
-    if not ensure_dependency("anthropic", "anthropic>=0.40"):
+    if args.client == "openai":
+        if not ensure_dependency("openai", "openai>=1"):
+            p.error("--client openai requires the OpenAI SDK: python -m pip install 'openai>=1'")
+    elif not ensure_dependency("anthropic", "anthropic>=0.40"):
         p.error("the Anthropic SDK is required: python -m pip install 'anthropic>=0.40'")
     if cfg.use_headroom and not ensure_dependency("headroom", "headroom-ai[all]"):
         print(
@@ -153,14 +162,20 @@ def main(argv: Optional[list[str]] = None) -> int:
         p.error("--lightrag requires LightRAG: python -m pip install lightrag-hku")
 
     # Import the real client lazily so --dry-run and --help need no API key / SDK.
-    from headroom_recursion.claude import ClaudeClient
-
-    client = ClaudeClient(
+    client_kwargs = dict(
         base_url=args.base_url,
         timeout=args.timeout,
         max_retries=args.max_retries,
         headroom_min_tokens=args.headroom_min_tokens,
     )
+    if args.client == "openai":
+        from headroom_recursion.clients import OpenAIClient
+
+        client = OpenAIClient(**client_kwargs)
+    else:
+        from headroom_recursion.claude import ClaudeClient
+
+        client = ClaudeClient(**client_kwargs)
 
     # Optional LightRAG retrieval layer.
     if args.lightrag:
