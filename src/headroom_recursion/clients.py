@@ -9,6 +9,9 @@ Shipped backends:
 * ``OpenAIClient`` (here) — the OpenAI SDK, which also covers every OpenAI-compatible
   server: Ollama, vLLM, LM Studio, llama.cpp, OpenRouter, ... — point ``base_url`` at
   it and put your model names in the ladder.
+* ``CLITransportClient`` (here) — headless ``claude -p``; uses an existing Claude
+  Code login instead of an API key. Retries per call: single stalled CLI calls
+  were the leading cause of dead runs before this client existed.
 
 Example (local Ollama):
 
@@ -23,7 +26,8 @@ Example (local Ollama):
 from __future__ import annotations
 
 import os
-from typing import Optional, Protocol, runtime_checkable
+import subprocess
+from typing import Callable, Optional, Protocol, runtime_checkable
 
 from headroom_recursion import headroom
 from headroom_recursion.claude import CallResult
@@ -105,3 +109,77 @@ class OpenAIClient:
             # Normalize to the Anthropic vocabulary the loop's truncation flag checks.
             stop_reason="max_tokens" if finish == "length" else finish,
         )
+
+
+class CLITransportClient:
+    """A ``CompletionClient`` backed by headless ``claude -p``.
+
+    Uses an existing Claude Code session login — no API key required. Each
+    completion spawns one CLI process; because a single process occasionally
+    stalls, every call gets ``attempts`` tries with a per-attempt ``timeout_s``.
+    Headroom compression runs in front of the CLI exactly as it does for the
+    SDK client, and the trace gets Headroom's token accounting.
+
+    ``runner`` is injectable for tests (same signature as ``subprocess.run``).
+    """
+
+    def __init__(
+        self,
+        *,
+        attempts: int = 3,
+        timeout_s: float = 420.0,
+        headroom_min_tokens: int = 0,
+        executable: str = "claude",
+        runner: Optional[Callable] = None,
+    ):
+        if attempts < 1:
+            raise ValueError(f"attempts must be >= 1 (got {attempts})")
+        if timeout_s <= 0:
+            raise ValueError(f"timeout_s must be > 0 (got {timeout_s})")
+        self._attempts = attempts
+        self._timeout_s = timeout_s
+        self._headroom_min_tokens = headroom_min_tokens
+        self._executable = executable
+        self._runner = runner or subprocess.run
+
+    def complete(
+        self,
+        *,
+        model: str,
+        system: str,
+        user: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+        use_headroom: bool = True,
+    ) -> CallResult:
+        messages = [{"role": "user", "content": user}]
+        sent, before, after = headroom.compress(
+            messages, model=model, use_headroom=use_headroom, min_tokens=self._headroom_min_tokens
+        )
+        send_text = user
+        if sent and isinstance(sent[0].get("content"), str):
+            send_text = sent[0]["content"]
+
+        last_exc: Optional[BaseException] = None
+        for _ in range(self._attempts):
+            try:
+                out = self._runner(
+                    [self._executable, "-p", "--model", model, "--system-prompt", system],
+                    input=send_text,
+                    capture_output=True,
+                    text=True,
+                    timeout=self._timeout_s,
+                )
+            except subprocess.TimeoutExpired as exc:
+                last_exc = exc
+                continue
+            if out.returncode != 0:
+                last_exc = RuntimeError(
+                    f"claude CLI failed ({model}): {(out.stderr or '').strip()[:300]}"
+                )
+                continue
+            return CallResult(
+                text=(out.stdout or "").strip(), tokens_before=before, tokens_after=after
+            )
+        assert last_exc is not None
+        raise last_exc

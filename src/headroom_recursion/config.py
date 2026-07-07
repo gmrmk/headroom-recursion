@@ -34,6 +34,11 @@ class Tier:
     max_steps: Optional[int] = None
     # Token cap per Claude call at this tier.
     max_tokens: int = 2048
+    # Escalate past this tier when a single improvement step takes longer than
+    # this many seconds (checked when the step completes). A *hung call* is the
+    # transport client's job (see clients.CLITransportClient); this guards
+    # against a tier that is merely too slow to be worth its steps.
+    step_timeout_s: Optional[float] = None
 
 
 DEFAULT_LADDER: tuple[Tier, ...] = (
@@ -43,11 +48,37 @@ DEFAULT_LADDER: tuple[Tier, ...] = (
     Tier(FABLE),
 )
 
+# For research-mode runs (graded rubrics, open problems, anything where partial
+# credit exists): live-run data shows fabrication pressure rises as capability
+# falls — the cheapest tier fabricated citations in 4/4 graded steps where
+# Sonnet+ did not. Start research ladders at Sonnet; use Haiku only where a
+# mechanical oracle checks its work.
+RESEARCH_LADDER: tuple[Tier, ...] = (
+    Tier(SONNET),
+    Tier(OPUS),
+    Tier(FABLE),
+)
 
-# An optional oracle: given a candidate answer string, return True if it is provably
-# correct/complete (e.g. a solved Sudoku grid validates). When supplied and it
-# returns True, the loop halts immediately regardless of the self-eval judge.
-Validator = Callable[[str], bool]
+
+@dataclass(frozen=True)
+class Verdict:
+    """A structured validator result for claims reality hasn't graded yet.
+
+    ``settles_at`` (ISO date) marks the verdict PROVISIONAL: the mechanical check
+    passed today (coherence, backtest, simulation), but the claim is about the
+    future and only settles when the date arrives. The trace carries it forward
+    so a scheduler can re-grade the claim against reality on settlement day.
+    """
+
+    passed: bool
+    settles_at: Optional[str] = None
+    note: str = ""
+
+
+# An optional oracle: given a candidate answer string, return True (or a Verdict)
+# if it is provably correct/complete (e.g. a solved Sudoku grid validates). When
+# it passes, the loop halts immediately regardless of the self-eval judge.
+Validator = Callable[[str], "bool | Verdict"]
 
 
 @dataclass
@@ -81,6 +112,28 @@ class RecurseConfig:
 
     # Optional oracle for structured tasks (see ``Validator``).
     validator: Optional[Validator] = None
+
+    # Oracle Compiler (oracle.py): when True and no validator was supplied, step
+    # zero compiles + sandbox-calibrates a mechanical verifier for the problem.
+    # A validator that fails calibration is demoted — the judge keeps authority.
+    oracle_auto: bool = False
+    # Model that compiles the oracle. None -> the strongest model in the ladder.
+    oracle_model: Optional[str] = None
+    # Sandbox timeout per validator invocation.
+    oracle_timeout_s: float = 10.0
+    # Internal: set by the compile step — one line telling the judge what the
+    # oracle verifies and what residuals remain for the judge to score.
+    oracle_note: str = ""
+
+    # Claim auditing (claims.py): parse [KNOWN]/[NEW] claims from each answer,
+    # resolve [KNOWN] citations against the retriever (unresolvable -> UNSOURCED)
+    # and hunt prior art for [NEW] labels. Requires a retriever to have teeth.
+    claim_audit: bool = False
+
+    # Initial scratchpad content — e.g. verified claims loaded from a run ledger,
+    # so later runs build on settled ground instead of re-deriving (or worse,
+    # re-fabricating) it.
+    seed_scratchpad: str = ""
 
     # Optional retrieval layer (e.g. a LightRAG-backed knowledge base). When set, each
     # improvement step retrieves relevant snippets and injects them into the prompts so
@@ -122,6 +175,8 @@ class RecurseConfig:
                 bad(f"tier {tier.model}: max_steps must be >= 1 (got {tier.max_steps})")
             if tier.max_tokens < 1:
                 bad(f"tier {tier.model}: max_tokens must be >= 1 (got {tier.max_tokens})")
+            if tier.step_timeout_s is not None and tier.step_timeout_s <= 0:
+                bad(f"tier {tier.model}: step_timeout_s must be > 0 (got {tier.step_timeout_s})")
         if not (0.0 < self.halt_threshold <= 1.0):
             bad(
                 f"halt_threshold must be in (0, 1] (got {self.halt_threshold}) — "
@@ -141,3 +196,5 @@ class RecurseConfig:
             bad(f"max_total_calls must be >= 1 (got {self.max_total_calls})")
         if self.max_wall_seconds is not None and self.max_wall_seconds <= 0:
             bad(f"max_wall_seconds must be > 0 (got {self.max_wall_seconds})")
+        if self.oracle_timeout_s <= 0:
+            bad(f"oracle_timeout_s must be > 0 (got {self.oracle_timeout_s})")

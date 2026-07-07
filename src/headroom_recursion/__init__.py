@@ -8,10 +8,11 @@ Headroom compresses the growing context before each call so long recursion stays
 affordable.
 """
 
-from headroom_recursion.config import RecurseConfig, Tier, DEFAULT_LADDER
+from headroom_recursion.config import RecurseConfig, Tier, DEFAULT_LADDER, RESEARCH_LADDER
 from headroom_recursion.trace import RunTrace, StepTrace
 from headroom_recursion.ladder import RunError, recurse
-from headroom_recursion.clients import CompletionClient, OpenAIClient
+from headroom_recursion.clients import CompletionClient, OpenAIClient, CLITransportClient
+from headroom_recursion.oracle import CompiledOracle, compile_oracle
 from headroom_recursion.retrieval import (
     Retriever,
     NullRetriever,
@@ -31,6 +32,10 @@ __all__ = [
     "RunError",
     "CompletionClient",
     "OpenAIClient",
+    "CLITransportClient",
+    "RESEARCH_LADDER",
+    "CompiledOracle",
+    "compile_oracle",
     "Retriever",
     "NullRetriever",
     "LightRAGRetriever",
