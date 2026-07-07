@@ -11,6 +11,14 @@ affordable.
 from headroom_recursion.config import RecurseConfig, Tier, DEFAULT_LADDER
 from headroom_recursion.trace import RunTrace, StepTrace
 from headroom_recursion.ladder import recurse
+from headroom_recursion.retrieval import (
+    Retriever,
+    NullRetriever,
+    LightRAGRetriever,
+    Embedding,
+    simple_local_embedding,
+    build_claude_llm_func,
+)
 
 __all__ = [
     "RecurseConfig",
@@ -19,6 +27,12 @@ __all__ = [
     "RunTrace",
     "StepTrace",
     "recurse",
+    "Retriever",
+    "NullRetriever",
+    "LightRAGRetriever",
+    "Embedding",
+    "simple_local_embedding",
+    "build_claude_llm_func",
 ]
 
 __version__ = "0.1.0"

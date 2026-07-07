@@ -17,6 +17,8 @@ Sudoku, Maze). The transferable lesson has two halves, and this harness applies 
 
 [Headroom](https://github.com/headroomlabs-ai/headroom) compresses the growing
 scratchpad and history before every call, so all that looping stays affordable.
+An optional [LightRAG](https://github.com/HKUDS/LightRAG) retrieval layer grounds each
+step in a knowledge base for fact-heavy tasks.
 
 ## How the paper maps onto Claude
 
@@ -86,6 +88,17 @@ print(trace.summary())          # answer + tier path + Headroom savings
 Structured tasks can pass a `validator` — an oracle that returns `True` when the answer
 is provably correct (e.g. a solved grid). It halts the loop immediately, no judge call.
 
+Knowledge-heavy tasks can pass a `retriever`. LightRAG (Claude-backed) grounds each
+step in a knowledge base:
+
+```bash
+pip install -e '.[lightrag]'
+recurse --lightrag ./kb --index corpus.txt "What does the corpus say about X?"
+```
+
+See `references/lightrag-setup.md`. Retrieval is pluggable — any object with
+`retrieve(query, *, k) -> list[str]` works.
+
 ## Test
 
 ```bash
@@ -103,6 +116,7 @@ src/headroom_recursion/
   config.py    trm.py          # config + the core recursion loop
   ladder.py    halting.py      # tier escalation + the halt predictor
   headroom.py  claude.py       # Headroom compression + the Claude wrapper
+  retrieval.py                 # optional LightRAG retrieval layer (Claude-backed)
   prompts.py   trace.py  cli.py
 references/  examples/  tests/
 ```

@@ -54,6 +54,16 @@ Or from Python — see `README.md` (`from headroom_recursion import recurse`). F
 structured answers, pass a `validator` in `RecurseConfig` to halt on a verified
 solution with zero judge calls.
 
+For knowledge-heavy tasks, ground the recursion in a corpus with the optional
+LightRAG retrieval layer (each step retrieves and injects relevant snippets):
+
+```bash
+pip install -e '.[lightrag]'
+recurse --lightrag ./kb --index corpus.txt "<question over the corpus>"
+```
+
+See `references/lightrag-setup.md`.
+
 Tune-ables: `--n` (latent updates/step, default 6), `--steps` (steps/tier, default 3),
 `--threshold` (halt bar, default 0.9), `--judge-model` (pin the verifier, e.g. to
 Haiku), `--no-headroom` (A/B the token savings).
@@ -62,4 +72,5 @@ Haiku), `--no-headroom` (A/B the token savings).
 
 - `references/paper-mapping.md` — the full TRM → Claude mapping and rationale.
 - `references/headroom-setup.md` — Headroom library / proxy / MCP integration modes.
+- `references/lightrag-setup.md` — the optional LightRAG retrieval layer.
 - `examples/run_sudoku.md` — a worked run and the shape of its trace.

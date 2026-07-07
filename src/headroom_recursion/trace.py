@@ -18,6 +18,8 @@ class StepTrace:
     halted: bool
     converged: bool
     reason: str = ""
+    # Number of knowledge snippets retrieved and injected this step (0 if no retriever).
+    retrieved_snippets: int = 0
     # Headroom accounting for this step, summed across its requests.
     tokens_before: int = 0
     tokens_after: int = 0
@@ -86,6 +88,9 @@ class RunTrace:
                 f"headroom    : {self.tokens_before} -> {self.tokens_after} tokens "
                 f"({self.savings_pct:.0f}% saved)"
             )
+        retrieved = sum(s.retrieved_snippets for s in self.steps)
+        if retrieved:
+            lines.append(f"retrieval   : {retrieved} snippets injected across {len(self.steps)} steps")
         lines.append("")
         lines.append("ANSWER:")
         lines.append(self.final_answer)

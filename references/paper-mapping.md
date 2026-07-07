@@ -53,6 +53,7 @@ Key mechanisms:
 | halt when solved | `halt_prob ≥ halt_threshold`, or convergence, or validator | `trm.run_tier` |
 | "tiny beats big" | **tier ladder**, escalate only on non-halt | `ladder.recurse` |
 | (new axis) | **Headroom** compresses context per call | `headroom.compress`, `claude.ClaudeClient` |
+| (new axis) | **LightRAG** retrieves + injects evidence per step (optional) | `retrieval.LightRAGRetriever`, `trm._retrieve` |
 
 ## What's deliberately different
 

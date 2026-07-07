@@ -20,7 +20,7 @@ LATENT_SYSTEM = (
 LATENT_UPDATE = """\
 PROBLEM:
 {problem}
-
+{context}
 CURRENT CANDIDATE ANSWER:
 {answer}
 
@@ -28,8 +28,9 @@ REASONING SCRATCHPAD SO FAR:
 {scratchpad}
 
 Critique the current candidate answer against the problem. Find the most important
-flaw, gap, or unverified assumption. Update the scratchpad with the sharpest next
-deduction. Output ONLY the revised scratchpad (no answer, no preamble)."""
+flaw, gap, or unverified assumption. Prefer facts from RETRIEVED KNOWLEDGE (if any)
+over guesses. Update the scratchpad with the sharpest next deduction. Output ONLY the
+revised scratchpad (no answer, no preamble)."""
 
 
 ANSWER_SYSTEM = (
@@ -41,7 +42,7 @@ ANSWER_SYSTEM = (
 ANSWER_UPDATE = """\
 PROBLEM:
 {problem}
-
+{context}
 REASONING SCRATCHPAD:
 {scratchpad}
 
@@ -49,6 +50,20 @@ PREVIOUS CANDIDATE ANSWER:
 {answer}
 
 Produce the improved final answer. Output ONLY the answer."""
+
+
+def format_context(snippets) -> str:
+    """Render retrieved knowledge as a prompt block, or '' when there is none.
+
+    Returned string is safe to drop straight into the ``{context}`` slot of the
+    prompt templates (it carries its own surrounding blank lines).
+    """
+
+    snippets = [s.strip() for s in (snippets or []) if s and s.strip()]
+    if not snippets:
+        return "\n"
+    body = "\n\n".join(f"[{i + 1}] {s}" for i, s in enumerate(snippets))
+    return f"\nRETRIEVED KNOWLEDGE:\n{body}\n"
 
 
 HALT_SYSTEM = (

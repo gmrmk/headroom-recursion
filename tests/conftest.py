@@ -38,6 +38,7 @@ class StubClient:
     tokens_before: int = 100
     tokens_after: int = 40
     calls: list[tuple[str, str]] = field(default_factory=list)  # (kind, model)
+    prompts_seen: list[tuple[str, str]] = field(default_factory=list)  # (kind, user prompt)
     _answer_idx: int = 0
 
     def complete(
@@ -52,6 +53,7 @@ class StubClient:
     ) -> CallResult:
         kind = _kind(system)
         self.calls.append((kind, model))
+        self.prompts_seen.append((kind, user))
 
         if kind == "answer":
             if self.answers:
@@ -79,6 +81,18 @@ class StubClient:
             if not seen or seen[-1] != m:
                 seen.append(m)
         return seen
+
+
+@dataclass
+class StubRetriever:
+    """Records queries and returns fixed snippets."""
+
+    snippets: list[str] = field(default_factory=lambda: ["FACT: the sky is blue."])
+    queries: list[tuple[str, int]] = field(default_factory=list)
+
+    def retrieve(self, query: str, *, k: int) -> list[str]:
+        self.queries.append((query, k))
+        return list(self.snippets)
 
 
 @pytest.fixture
