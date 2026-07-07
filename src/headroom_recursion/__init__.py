@@ -10,7 +10,7 @@ affordable.
 
 from headroom_recursion.config import RecurseConfig, Tier, DEFAULT_LADDER
 from headroom_recursion.trace import RunTrace, StepTrace
-from headroom_recursion.ladder import recurse
+from headroom_recursion.ladder import RunError, recurse
 from headroom_recursion.retrieval import (
     Retriever,
     NullRetriever,
@@ -27,6 +27,7 @@ __all__ = [
     "RunTrace",
     "StepTrace",
     "recurse",
+    "RunError",
     "Retriever",
     "NullRetriever",
     "LightRAGRetriever",

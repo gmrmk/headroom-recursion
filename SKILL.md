@@ -66,7 +66,14 @@ See `references/lightrag-setup.md`.
 
 Tune-ables: `--n` (latent updates/step, default 6), `--steps` (steps/tier, default 3),
 `--threshold` (halt bar, default 0.9), `--judge-model` (pin the verifier, e.g. to
-Haiku), `--no-headroom` (A/B the token savings).
+Haiku), `--judge-votes` (median of N verifier votes), `--no-headroom` (A/B the token
+savings).
+
+Safety rails: `--max-calls` / `--max-seconds` hard-stop a run with the best answer so
+far (never escalating past a blown budget); Ctrl-C and API errors still print the
+partial trace (exit 130 / 1); exit 2 means "finished without a confident halt — best
+answer printed anyway". Bad configs (`--n 0`, `--threshold 1.5`) fail fast before any
+API call.
 
 ## More detail
 

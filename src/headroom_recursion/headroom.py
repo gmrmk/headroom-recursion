@@ -63,25 +63,31 @@ def _run_maybe_async(value: Any) -> Any:
             loop = None
         if loop is not None:
             # We're already inside an event loop; run the coroutine on a fresh one
-            # in a worker thread to avoid re-entrancy errors.
+            # in a worker thread to avoid re-entrancy errors. The timeout keeps a
+            # wedged compressor from hanging the whole run — the resulting
+            # TimeoutError degrades to passthrough in ``compress``.
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                return ex.submit(asyncio.run, value).result()
+                return ex.submit(asyncio.run, value).result(timeout=60)
         return asyncio.run(value)
     return value
 
 
-def compress(messages: Messages, model: str, *, use_headroom: bool) -> tuple[Messages, int, int]:
+def compress(
+    messages: Messages, model: str, *, use_headroom: bool, min_tokens: int = 0
+) -> tuple[Messages, int, int]:
     """Compress ``messages`` for ``model``.
 
     Returns ``(out_messages, tokens_before, tokens_after)``. When Headroom is
     disabled or unavailable, ``out_messages is messages`` and before == after.
+    ``min_tokens`` skips compression for small prompts, where the savings are
+    negligible and a lossy pass is all downside.
     """
 
     before = estimate_tokens(messages)
 
-    if not use_headroom or not headroom_available():
+    if not use_headroom or not headroom_available() or before < min_tokens:
         return messages, before, before
 
     try:
@@ -93,9 +99,10 @@ def compress(messages: Messages, model: str, *, use_headroom: bool) -> tuple[Mes
         return messages, before, before
 
     # Headroom returns the compressed message list (some builds return a wrapper
-    # object with a ``.messages`` attribute); accept both.
+    # object with a ``.messages`` attribute); accept both. An empty result is a
+    # failure, not a 100% compression — never send Claude nothing.
     out = getattr(result, "messages", result)
-    if not isinstance(out, list):
+    if not isinstance(out, list) or not out:
         return messages, before, before
 
     after = estimate_tokens(out)
