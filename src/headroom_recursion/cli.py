@@ -113,7 +113,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--temperature", type=float, help="sampling temperature (default 0.7)")
     p.add_argument("--judge-model", dest="judge_model", help="pin the halt judge to this model (reduces self-preference)")
     p.add_argument("--judge-votes", dest="judge_votes", type=int, help="judge calls per step; the median wins (default 1)")
-    p.add_argument("--max-calls", dest="max_calls", type=int, help="hard cap on total Claude calls; stops with the best answer, never escalates past it")
+    p.add_argument("--max-calls", dest="max_calls", type=int, help="hard cap on total model calls; stops with the best answer, never escalates past it")
     p.add_argument("--max-seconds", dest="max_seconds", type=float, help="hard wall-clock cap for the run")
     p.add_argument("--no-headroom", action="store_true", help="disable Headroom compression")
     p.add_argument("--headroom-min-tokens", dest="headroom_min_tokens", type=int, default=0, help="skip compression for prompts under this size (est. tokens)")

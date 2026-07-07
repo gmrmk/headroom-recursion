@@ -163,6 +163,7 @@ src/headroom_recursion/
   config.py    trm.py          # config + the core recursion loop
   ladder.py    halting.py      # tier escalation + the halt predictor
   headroom.py  claude.py       # Headroom compression + the Claude wrapper
+  clients.py                   # CompletionClient protocol + OpenAI-compatible backend
   retrieval.py                 # optional LightRAG retrieval layer (Claude-backed)
   prompts.py   trace.py  cli.py
 references/  examples/  tests/
