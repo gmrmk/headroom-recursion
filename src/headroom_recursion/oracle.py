@@ -365,6 +365,7 @@ def lean_verify(
     code: str,
     *,
     timeout_s: float = 120.0,
+    project_dir: Optional[str] = None,
     runner: Optional[Callable] = None,
 ) -> tuple[bool, str]:
     """Check a self-contained Lean 4 file: compile == verified at rung 1.
@@ -375,6 +376,11 @@ def lean_verify(
     ``(False, "lean not installed")`` — absence of the checker never upgrades a
     claim. Mathematical claims should only ever score above the judged ceiling
     when they carry a formalization that passes here.
+
+    ``project_dir``: a Lake project (e.g. one depending on Mathlib). When set,
+    the file is checked with ``lake env lean`` from that directory so its
+    imports (``import Mathlib``) resolve. Without it, only core Lean 4 is
+    available. Import-heavy files load slowly — raise ``timeout_s`` accordingly.
     """
 
     runner = runner or (subprocess.run if lean_available() else None)
@@ -394,13 +400,23 @@ def lean_verify(
     with tempfile.NamedTemporaryFile("w", suffix=".lean", delete=False) as fh:
         fh.write(code)
         path = fh.name
+    if project_dir:
+        cmd = ["lake", "env", "lean", path]
+        # lake/elan need HOME to locate the toolchain and the olean cache.
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": os.environ.get("HOME", "")}
+        cwd = project_dir
+    else:
+        cmd = ["lean", path]
+        env = {"PATH": os.environ.get("PATH", "")}
+        cwd = None
     try:
         out = runner(
-            ["lean", path],
+            cmd,
             capture_output=True,
             text=True,
             timeout=timeout_s,
-            env={"PATH": os.environ.get("PATH", "")},
+            env=env,
+            cwd=cwd,
         )
     except subprocess.TimeoutExpired:
         return False, f"lean timed out after {timeout_s}s"

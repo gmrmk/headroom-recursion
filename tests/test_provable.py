@@ -244,3 +244,19 @@ def test_lean_verify_rejects_sorry_warning_from_compiler():
     )
     ok, why = oracle.lean_verify("theorem t : 1 = 2 := hidden_hole", runner=warn)
     assert ok is False and "holes" in why
+
+
+def test_lean_verify_project_dir_routes_through_lake_env():
+    seen = {}
+
+    def runner(argv, **kw):
+        seen["argv"] = argv
+        seen["cwd"] = kw.get("cwd")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    ok, _ = oracle.lean_verify(
+        "import Mathlib\ntheorem t : 1 = 1 := rfl", project_dir="/proj", runner=runner
+    )
+    assert ok is True
+    assert seen["argv"][:3] == ["lake", "env", "lean"]  # Mathlib imports resolve
+    assert seen["cwd"] == "/proj"
