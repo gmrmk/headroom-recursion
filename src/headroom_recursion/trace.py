@@ -22,6 +22,10 @@ class StepTrace:
     retrieved_snippets: int = 0
     # Why retrieval returned nothing, when it failed (empty = no failure).
     retrieval_error: str = ""
+    # Claim audit (rung 4): [KNOWN] claims whose citations failed to resolve, and
+    # [NEW] claims with candidate prior art in the corpus.
+    unsourced_claims: int = 0
+    flagged_new_claims: int = 0
     # Model outputs rejected this step (empty/whitespace completions that would have
     # destroyed the scratchpad or answer; the previous value was kept instead).
     rejected_updates: int = 0
@@ -67,6 +71,16 @@ class RunTrace:
     # Set when the run stopped abnormally (stop_reason "error"/"interrupted").
     error: str = ""
     wall_seconds: float = 0.0
+    # Oracle Compiler record: rung 0 = no oracle attempted; 5 = demoted to judge.
+    oracle_rung: int = 0
+    oracle_residuals: list[str] = field(default_factory=list)
+    oracle_calls: int = 0
+    # True when the outcome rests on judged opinion at a score high enough to
+    # matter (>= 0.40) — i.e. NOT mechanically validated. Read it before believing.
+    needs_human_review: bool = False
+    # Set when a Verdict-returning validator passed provisionally: the mechanical
+    # check succeeded, but the claim is about the future and settles on this date.
+    settles_at: str = ""
     steps: list[StepTrace] = field(default_factory=list)
 
     def add(self, step: StepTrace) -> None:
@@ -83,9 +97,10 @@ class RunTrace:
 
     @property
     def total_calls(self) -> int:
-        # Per step: latent calls + 1 answer + actual judge calls. Retriever-internal
-        # LLM calls (e.g. LightRAG entity extraction) are NOT counted — see docs.
-        return sum(s.latent_calls + 1 + s.judge_calls for s in self.steps)
+        # Per step: latent calls + 1 answer + actual judge calls, plus any oracle
+        # compilation calls. Retriever-internal LLM calls (e.g. LightRAG entity
+        # extraction) are NOT counted — see docs.
+        return sum(s.latent_calls + 1 + s.judge_calls for s in self.steps) + self.oracle_calls
 
     @property
     def tokens_before(self) -> int:
@@ -127,6 +142,27 @@ class RunTrace:
         ]
         if self.error:
             lines.append(f"error       : {self.error}")
+        if self.oracle_rung:
+            what = "calibrated validator installed" if self.oracle_rung <= 3 else "demoted — judge only"
+            lines.append(f"oracle      : rung {self.oracle_rung} ({what})")
+            if self.oracle_residuals:
+                lines.append(f"residuals   : {'; '.join(self.oracle_residuals)[:200]}")
+        if self.needs_human_review:
+            lines.append(
+                "review      : NEEDS HUMAN REVIEW — outcome rests on judged opinion, "
+                "not mechanical verification"
+            )
+        if self.settles_at:
+            lines.append(
+                f"settlement  : PROVISIONAL — validated today, settles against reality on {self.settles_at}"
+            )
+        unsourced = sum(s.unsourced_claims for s in self.steps)
+        flagged = sum(s.flagged_new_claims for s in self.steps)
+        if unsourced or flagged:
+            lines.append(
+                f"claim audit : {unsourced} unsourced citation claim(s), "
+                f"{flagged} [NEW] claim(s) with candidate prior art"
+            )
         if self.tokens_before:
             lines.append(
                 f"headroom    : {self.tokens_before} -> {self.tokens_after} tokens "

@@ -109,6 +109,20 @@ print(trace.summary())          # answer + tier path + Headroom savings
 Structured tasks can pass a `validator` — an oracle that returns `True` when the answer
 is provably correct (e.g. a solved grid). It halts the loop immediately, no judge call.
 
+## Provable results: the oracle compiler
+
+`--auto-oracle` makes step zero of a run *synthesize its own verifier*: a model
+writes a mechanical checker for the problem, the checker is calibrated against
+planted good/bad cases in a sandbox, and only if it discriminates them all does
+it gain halt authority — otherwise the judge keeps full control. Residuals
+(what the checker can't verify) are printed in the trace and handed to the
+judge. Research-mode extras: `--claim-audit` resolves `[KNOWN]` citations and
+hunts prior art for `[NEW]` claims via the retriever; `--ledger` carries
+verified results across runs; validators can return provisional `Verdict`s with
+a settlement date for claims only the future can grade. Any outcome resting on
+judged opinion at ≥ 0.40 is flagged `NEEDS HUMAN REVIEW`. Full doctrine and the
+live-run evidence behind it: `references/oracle-compiler.md`.
+
 ## Safety rails
 
 A self-refining loop has sharp edges; these are built in:

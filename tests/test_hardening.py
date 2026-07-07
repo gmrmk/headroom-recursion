@@ -92,17 +92,28 @@ def test_halting_answer_still_wins_over_earlier_best():
 # 2.1 — a run never loses its work
 # ---------------------------------------------------------------------------
 
-def test_api_error_raises_runerror_with_partial_trace():
-    # n=1 -> 3 calls per step; call 5 is step 2's latent call.
+def test_api_error_soft_fails_the_tier_and_escalates():
+    # n=1 -> 3 calls per step; call 5 is step 2's latent call. The tier dies,
+    # the ladder escalates, and the completed step's work is preserved.
     stub = StubClient(raise_on_call=5)
-    with pytest.raises(RunError) as excinfo:
-        recurse("x", client=stub, config=one_tier(n=1, T=3))
+    cfg = RecurseConfig(ladder=(Tier("m0"), Tier("m1")), n=1, T=3)
+    trace = recurse("x", client=stub, config=cfg)
 
-    trace = excinfo.value.trace
-    assert trace.stop_reason == "error"
-    assert "RuntimeError" in trace.error
+    assert trace.stop_reason == "failed"  # m1 also dies (raise_on_call keeps firing)
+    assert trace.halted is False
     assert len(trace.steps) == 1  # step 1 completed and is preserved
     assert trace.final_answer == "answer-v0"  # best-so-far, not lost
+    assert trace.tier_stops[0].startswith("m0: failed (RuntimeError")
+    assert trace.tier_stops[1].startswith("m1: failed (RuntimeError")
+
+
+def test_single_tier_transport_death_still_returns_partial_trace():
+    stub = StubClient(raise_on_call=5)
+    trace = recurse("x", client=stub, config=one_tier(n=1, T=3))
+
+    assert trace.stop_reason == "failed"
+    assert len(trace.steps) == 1
+    assert trace.final_answer == "answer-v0"
 
 
 def test_keyboard_interrupt_returns_partial_trace():

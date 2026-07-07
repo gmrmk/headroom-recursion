@@ -16,6 +16,7 @@ to a more expensive tier after the budget is already gone.
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 from typing import Optional
 
 from headroom_recursion import trm
@@ -51,7 +52,9 @@ def recurse(
     deadline = start + cfg.max_wall_seconds if cfg.max_wall_seconds is not None else None
 
     answer = ""
-    scratchpad = ""
+    # A seeded scratchpad lets a run start from settled ground (e.g. verified
+    # claims from a ledger) instead of re-deriving — or re-fabricating — it.
+    scratchpad = cfg.seed_scratchpad
     stop_reason = "no-op"
     final_model = ""
 
@@ -64,14 +67,52 @@ def recurse(
         else:
             # Abnormal / non-confident exit: prefer the best-scoring answer seen.
             trace.final_answer = trace.best_answer if trace.best_step_index >= 0 else answer
+        # Anything scored high on judged opinion alone is flagged for a human:
+        # "validated" means a mechanical validator fired; everything else is a
+        # judge's view, and >= 0.40 is high enough to matter.
+        trace.needs_human_review = reason != "validated" and (
+            trace.best_halt_prob >= 0.40 or (halted and reason == "halt")
+        )
         return trace
+
+    # --- step zero: compile an oracle if asked and none was hand-supplied ---
+    if cfg.oracle_auto and cfg.validator is None and cfg.ladder:
+        from headroom_recursion import oracle as _oracle
+
+        try:
+            compiled = _oracle.compile_oracle(
+                problem,
+                client=client,
+                model=cfg.oracle_model or cfg.ladder[-1].model,
+                timeout_s=cfg.oracle_timeout_s,
+                use_headroom=False,  # the compiler prompt must arrive verbatim
+            )
+        except Exception as exc:  # a broken compile never blocks the run
+            compiled = _oracle._demoted(f"compile crashed: {type(exc).__name__}: {exc}")
+        trace.oracle_rung = compiled.rung
+        trace.oracle_residuals = list(compiled.residuals)
+        trace.oracle_calls = 1
+        # Pre-registration: frozen now, before any solution attempt; the working
+        # config is a copy so the caller's config object is never mutated.
+        cfg = replace(cfg, validator=compiled.validator, oracle_note=compiled.note)
 
     try:
         for tier in cfg.ladder:
             final_model = tier.model
-            result = trm.run_tier(
-                client, cfg, tier, problem, answer, scratchpad, trace, deadline=deadline
-            )
+            try:
+                result = trm.run_tier(
+                    client, cfg, tier, problem, answer, scratchpad, trace, deadline=deadline
+                )
+            except KeyboardInterrupt:
+                raise
+            except Exception as exc:
+                # Soft-fail: a dead tier (transport stall, API outage) escalates
+                # instead of killing the run — completed steps and the best answer
+                # are already in the trace. Live runs died this way three times
+                # before this except existed.
+                trace.tier_stops.append(f"{tier.model}: failed ({type(exc).__name__}: {exc})"[:160])
+                stop_reason = "failed"
+                continue
             answer, scratchpad = result.answer, result.scratchpad
             trace.tier_stops.append(f"{tier.model}: {result.stop_reason}")
             stop_reason = result.stop_reason
@@ -120,6 +161,11 @@ def plan_schedule(cfg: Optional[RecurseConfig] = None) -> str:
         lines.append(
             "  judge: runs on the working tier (self-preference risk); pin --judge-model "
             "to a different model to reduce it"
+        )
+    if cfg.oracle_auto:
+        lines.append(
+            "  oracle: auto-compile enabled — 1 extra call, sandbox-calibrated; a "
+            "validator that fails calibration is demoted (judge keeps authority)"
         )
     if cfg.max_total_calls is not None:
         lines.append(f"  budget: max {cfg.max_total_calls} Claude calls (stops, never escalates past it)")

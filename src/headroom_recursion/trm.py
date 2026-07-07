@@ -28,8 +28,9 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
+from headroom_recursion import claims as claims_mod
 from headroom_recursion import halting, prompts
-from headroom_recursion.config import RecurseConfig, Tier
+from headroom_recursion.config import RecurseConfig, Tier, Verdict
 from headroom_recursion.trace import RunTrace, StepTrace
 
 
@@ -56,6 +57,11 @@ def run_tier(
     steps = cfg.steps_for(tier)
     judge_model = cfg.judge_model or tier.model
     judge_headroom = cfg.use_headroom and cfg.compress_judge
+    # The judge (and only the judge) is told what the compiled oracle already
+    # covers, so it scores the residuals instead of re-litigating verified ground.
+    judge_problem = (
+        f"{problem}\n\n[ORACLE STATUS] {cfg.oracle_note}" if cfg.oracle_note else problem
+    )
     stop_reason = "exhausted"
     # All answers this tier has seen (seeded with the carried-in draft): repeating any
     # of them means the tier is cycling and should escalate, not spin.
@@ -68,6 +74,7 @@ def run_tier(
         if deadline is not None and time.monotonic() >= deadline:
             return TierResult(answer, scratchpad, False, "budget")
 
+        step_start = time.monotonic()
         tb = ta = 0
         latent_calls = 0
         rejected = 0
@@ -127,8 +134,19 @@ def run_tier(
         if norm:
             seen.add(norm)
 
+        # --- claim audit (rung 4): mechanical citation/novelty findings for the judge ---
+        claim_note = ""
+        unsourced = flagged_new = 0
+        if cfg.claim_audit and cfg.retriever is not None:
+            audited = claims_mod.audit_claims(claims_mod.parse_claims(answer), cfg.retriever)
+            claim_note = claims_mod.judge_addendum(audited)
+            unsourced = sum(1 for c in audited if c.label == "UNSOURCED")
+            flagged_new = sum(1 for c in audited if c.label == "NEW" and c.prior_art)
+
         # --- oracle short-circuit ---
-        validated, validator_error = _safe_validate(cfg.validator, answer)
+        validated, validator_error, verdict_obj = _safe_validate(cfg.validator, answer)
+        if validated and verdict_obj is not None and verdict_obj.settles_at:
+            trace.settles_at = verdict_obj.settles_at
 
         # --- halt predictor (Q-head) ---
         judge_calls = 0
@@ -138,7 +156,7 @@ def run_tier(
             verdict = halting.judge(
                 client,
                 model=judge_model,
-                problem=problem,
+                problem=judge_problem + (f"\n\n{claim_note}" if claim_note else ""),
                 answer=answer,
                 scratchpad=scratchpad,
                 max_tokens=min(256, tier.max_tokens),
@@ -167,6 +185,8 @@ def run_tier(
                 reason=reason,
                 retrieved_snippets=len(snippets),
                 retrieval_error=retrieval_error,
+                unsourced_claims=unsourced,
+                flagged_new_claims=flagged_new,
                 rejected_updates=rejected,
                 truncated=truncated,
                 validator_error=validator_error,
@@ -181,6 +201,9 @@ def run_tier(
         if converged:
             # This tier has stopped moving — escalate rather than spin.
             return TierResult(answer, scratchpad, False, "converged")
+        if tier.step_timeout_s is not None and time.monotonic() - step_start > tier.step_timeout_s:
+            # Too slow to be worth its remaining steps — hand the draft upward.
+            return TierResult(answer, scratchpad, False, "step-timeout")
 
     return TierResult(answer, scratchpad, False, stop_reason)
 
@@ -236,12 +259,19 @@ def _preview(s: str, n: int = 160) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-def _safe_validate(validator, answer: str) -> tuple[bool, str]:
-    """Run the user's oracle; a buggy validator is recorded, never fatal."""
+def _safe_validate(validator, answer: str) -> tuple[bool, str, Optional[Verdict]]:
+    """Run the user's oracle; a buggy validator is recorded, never fatal.
+
+    Validators may return a plain bool or a structured ``Verdict`` (whose
+    ``settles_at`` marks a provisional pass on a claim reality grades later).
+    """
 
     if validator is None:
-        return False, ""
+        return False, "", None
     try:
-        return bool(validator(answer)), ""
+        result = validator(answer)
     except Exception as exc:
-        return False, f"{type(exc).__name__}: {exc}"
+        return False, f"{type(exc).__name__}: {exc}", None
+    if isinstance(result, Verdict):
+        return result.passed, "", result
+    return bool(result), "", None

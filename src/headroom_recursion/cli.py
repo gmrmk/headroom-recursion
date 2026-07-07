@@ -97,6 +97,12 @@ def build_config(args) -> RecurseConfig:
         cfg.max_total_calls = args.max_calls
     if args.max_seconds is not None:
         cfg.max_wall_seconds = args.max_seconds
+    if getattr(args, "auto_oracle", False):
+        cfg.oracle_auto = True
+    if getattr(args, "oracle_model", None):
+        cfg.oracle_model = args.oracle_model
+    if getattr(args, "claim_audit", False):
+        cfg.claim_audit = True
     cfg.use_headroom = not args.no_headroom
     return cfg
 
@@ -124,6 +130,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--index", action="append", metavar="FILE", help="index a text file into LightRAG before running (repeatable; runs on every invocation — LightRAG dedupes identical content)")
     p.add_argument("--retrieval-k", type=int, help="snippets to retrieve per step (default 4)")
     p.add_argument("--retrieval-max-chars", dest="retrieval_max_chars", type=int, help="cap on injected knowledge per step (default 8000 chars)")
+    p.add_argument("--auto-oracle", dest="auto_oracle", action="store_true", help="compile + calibrate a mechanical verifier for the problem before solving (oracle compiler)")
+    p.add_argument("--oracle-model", dest="oracle_model", help="model that compiles the oracle (default: strongest ladder model)")
+    p.add_argument("--claim-audit", dest="claim_audit", action="store_true", help="audit [KNOWN]/[NEW] claims against the retrieval corpus (needs --lightrag)")
+    p.add_argument("--ledger", metavar="PATH", help="run ledger: seed from prior verified results, record this run's outcome")
     p.add_argument("--client", choices=("claude", "openai"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url")
     p.add_argument("--ladder", help="comma-separated model ladder, cheapest first (default: the Claude tiers)")
     p.add_argument("--dry-run", action="store_true", help="print the call schedule and exit")
@@ -190,6 +200,15 @@ def main(argv: Optional[list[str]] = None) -> int:
                 p.error(f"--index {path}: {exc}")
         cfg.retriever = retriever
 
+    # Run ledger: start from settled ground, never re-derive it.
+    if args.ledger:
+        from headroom_recursion import ledger as ledger_mod
+
+        seed = ledger_mod.seed_for(args.ledger, problem)
+        if seed:
+            cfg.seed_scratchpad = seed
+            print(f"note: seeded from ledger ({args.ledger})", file=sys.stderr)
+
     def emit(trace, *, to_stderr: bool = False) -> None:
         out = json.dumps(trace.to_dict(), indent=2) if args.json else trace.summary()
         print(out, file=sys.stderr if to_stderr else sys.stdout)
@@ -201,6 +220,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         emit(exc.trace, to_stderr=True)
         print(f"recurse: run failed: {exc}", file=sys.stderr)
         return 1
+
+    if args.ledger:
+        ledger_mod.record(args.ledger, problem, trace)
 
     emit(trace)
     if trace.stop_reason == "interrupted":
