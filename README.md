@@ -1,14 +1,14 @@
 # headroom-recursion
 
-**Recursive reasoning for Claude — a tiny idea that punches far above its weight.**
+Solve hard reasoning problems by refining in a loop instead of answering once. A cheap
+Claude model drafts, critiques, and rewrites its answer; larger models take over only
+when it stops making progress.
 
-This is a Claude Agent Skill plus a runnable harness that ports the principle of
+This is a Claude Agent Skill plus a runnable harness based on
 [*"Less is More: Recursive Reasoning with Tiny Networks"*](https://arxiv.org/abs/2510.04871)
-(arXiv:2510.04871) to the Claude model family.
-
-The paper shows a **2-layer, 7M-parameter** network that **recursively refines** a draft
-answer, beating models tens of thousands of times larger on hard reasoning (ARC-AGI,
-Sudoku, Maze). The transferable lesson has two halves, and this harness applies both:
+(arXiv:2510.04871), which shows a 2-layer, 7M-parameter network that recursively
+refines a draft answer outperforming much larger models on hard reasoning benchmarks
+(ARC-AGI, Sudoku, Maze). Two ideas from the paper carry over to LLMs:
 
 1. **Recursive refinement** — don't answer once. Draft, then loop: refine a reasoning
    *scratchpad*, rewrite the answer from it, and repeat.
@@ -58,7 +58,8 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 `headroom-ai` is optional: without it the loop still runs (uncompressed) and reports
-zero token savings.
+zero token savings. When a run needs something that isn't installed, the CLI offers to
+install it (interactive sessions only — scripts get an error with the pip command).
 
 ## Use
 

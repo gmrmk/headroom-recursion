@@ -16,12 +16,59 @@ printed anyway); 1 = run died mid-flight (partial trace printed to stderr);
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+import subprocess
 import sys
-from typing import Optional
+from typing import Callable, Optional
 
 from headroom_recursion.config import RecurseConfig
 from headroom_recursion.ladder import RunError, plan_schedule, recurse
+
+
+def _module_present(module: str) -> bool:
+    importlib.invalidate_caches()  # a just-completed pip install must be visible
+    return importlib.util.find_spec(module) is not None
+
+
+def ensure_dependency(
+    module: str,
+    pip_spec: str,
+    *,
+    interactive: Optional[bool] = None,
+    probe: Callable[[str], bool] = _module_present,
+    asker: Callable[[str], str] = input,
+    installer: Optional[Callable[[str], bool]] = None,
+) -> bool:
+    """Return True if ``module`` is importable, offering to install it when missing.
+
+    In an interactive session the user is asked before anything is installed; in a
+    non-interactive one (scripts, CI) nothing is installed and False is returned so
+    the caller can fail with a copy-pasteable command instead of hanging on a prompt.
+    ``probe``/``asker``/``installer`` are injectable for tests.
+    """
+
+    if probe(module):
+        return True
+    if interactive is None:
+        interactive = sys.stdin.isatty()
+    if not interactive:
+        return False
+
+    try:
+        reply = asker(f"'{module}' is not installed. Install {pip_spec} now? [y/N] ")
+    except (EOFError, KeyboardInterrupt):
+        return False
+    if reply.strip().lower() not in {"y", "yes"}:
+        return False
+
+    if installer is None:
+        def installer(spec: str) -> bool:
+            return subprocess.run([sys.executable, "-m", "pip", "install", spec]).returncode == 0
+
+    if not installer(pip_spec):
+        return False
+    return probe(module)
 
 
 def build_config(args) -> RecurseConfig:
@@ -91,6 +138,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     problem = args.problem or (sys.stdin.read().strip() if not sys.stdin.isatty() else "")
     if not problem:
         p.error("no problem given (pass as an argument or via stdin)")
+
+    # Check the run's dependencies up front, offering to install missing ones
+    # (interactive sessions only; scripts get a copy-pasteable error instead).
+    if not ensure_dependency("anthropic", "anthropic>=0.40"):
+        p.error("the Anthropic SDK is required: python -m pip install 'anthropic>=0.40'")
+    if cfg.use_headroom and not ensure_dependency("headroom", "headroom-ai[all]"):
+        print(
+            "note: headroom-ai is not installed — running uncompressed "
+            "(pass --no-headroom to silence this note)",
+            file=sys.stderr,
+        )
+    if args.lightrag and not ensure_dependency("lightrag", "lightrag-hku"):
+        p.error("--lightrag requires LightRAG: python -m pip install lightrag-hku")
 
     # Import the real client lazily so --dry-run and --help need no API key / SDK.
     from headroom_recursion.claude import ClaudeClient
