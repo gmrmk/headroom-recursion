@@ -1,0 +1,13 @@
+{
+  "ts": 1783474810.9060664,
+  "iso": "2026-07-08T01:40:10Z",
+  "calls": 1,
+  "cost_usd": 0.0608,
+  "uptime_s": 31.2,
+  "run": 0,
+  "of": 1,
+  "dry": 0,
+  "phase": "latent",
+  "model": "claude-sonnet-5",
+  "status": "in-call"
+}

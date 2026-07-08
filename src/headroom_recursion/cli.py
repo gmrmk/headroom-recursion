@@ -161,7 +161,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--heartbeat", metavar="FILE", help="campaign: heartbeat JSON path (default <trace-dir>/heartbeat.json)")
     p.add_argument("--corpus", metavar="FILE", help="curated corpus (one entry per line) for CorpusRetriever — rung-4 lookups without LightRAG")
     p.add_argument("--research", action="store_true", help="research mode: wrap the problem in the proven graded-rubric template, default the ladder to Sonnet+, auto-enable --claim-audit when a corpus/retriever is configured")
-    p.add_argument("--client", choices=("claude", "openai"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url")
+    p.add_argument("--client", choices=("claude", "openai", "cli"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url; 'cli' runs headless `claude -p` off an existing Claude Code login (no API key)")
     p.add_argument("--ladder", help="comma-separated model ladder, cheapest first (default: the Claude tiers)")
     p.add_argument("--trace-dir", dest="trace_dir", metavar="DIR", help="persist every run's trace JSON + summary (and lean decider artifacts) under this directory")
     p.add_argument("--doctor", action="store_true", help="readiness check: deps, CLI transport + per-model canaries, lean levels, paths, stub loop; exit 0/1")
@@ -208,7 +208,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.client == "openai":
         if not ensure_dependency("openai", "openai>=1"):
             p.error("--client openai requires the OpenAI SDK: python -m pip install 'openai>=1'")
-    elif not ensure_dependency("anthropic", "anthropic>=0.40"):
+    elif args.client == "claude" and not ensure_dependency("anthropic", "anthropic>=0.40"):
         p.error("the Anthropic SDK is required: python -m pip install 'anthropic>=0.40'")
     if cfg.use_headroom and not ensure_dependency("headroom", "headroom-ai[all]"):
         print(
@@ -230,6 +230,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         from headroom_recursion.clients import OpenAIClient
 
         client = OpenAIClient(**client_kwargs)
+    elif args.client == "cli":
+        import shutil as _shutil
+
+        from headroom_recursion.clients import CLITransportClient
+
+        if _shutil.which("claude") is None:
+            p.error("--client cli requires the `claude` CLI on PATH")
+        client = CLITransportClient(
+            timeout_s=args.timeout if args.timeout is not None else 420.0,
+            headroom_min_tokens=args.headroom_min_tokens,
+        )
     else:
         from headroom_recursion.claude import ClaudeClient
 
