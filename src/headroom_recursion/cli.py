@@ -77,7 +77,16 @@ def build_config(args) -> RecurseConfig:
     if getattr(args, "ladder", None):
         from headroom_recursion.config import Tier
 
-        cfg.ladder = tuple(Tier(m.strip()) for m in args.ladder.split(",") if m.strip())
+        def tier(spec: str) -> Tier:
+            # "model" or "model:steps" — per-tier improvement-step counts let a
+            # ladder spend its budget where the capability is (e.g. fable:6).
+            model, _, steps = spec.partition(":")
+            try:
+                return Tier(model.strip(), max_steps=int(steps) if steps.strip() else None)
+            except ValueError:
+                raise ValueError(f"--ladder: bad tier spec {spec!r} (want model or model:steps)")
+
+        cfg.ladder = tuple(tier(m) for m in args.ladder.split(",") if m.strip())
     if args.n is not None:
         cfg.n = args.n
     if args.steps is not None:
@@ -162,7 +171,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--corpus", metavar="FILE", help="curated corpus (one entry per line) for CorpusRetriever — rung-4 lookups without LightRAG")
     p.add_argument("--research", action="store_true", help="research mode: wrap the problem in the proven graded-rubric template, default the ladder to Sonnet+, auto-enable --claim-audit when a corpus/retriever is configured")
     p.add_argument("--client", choices=("claude", "openai", "cli"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url; 'cli' runs headless `claude -p` off an existing Claude Code login (no API key)")
-    p.add_argument("--ladder", help="comma-separated model ladder, cheapest first (default: the Claude tiers)")
+    p.add_argument("--ladder", help="comma-separated model ladder, cheapest first (default: the Claude tiers); a tier may carry its own step count as model:steps, e.g. 'claude-haiku-4-5-20251001:2,claude-fable-5:6'")
     p.add_argument("--trace-dir", dest="trace_dir", metavar="DIR", help="persist every run's trace JSON + summary (and lean decider artifacts) under this directory")
     p.add_argument("--doctor", action="store_true", help="readiness check: deps, CLI transport + per-model canaries, lean levels, paths, stub loop; exit 0/1")
     p.add_argument("--no-probe", dest="no_probe", action="store_true", help="doctor: skip the live per-model canary calls")
@@ -171,8 +180,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--base-url", dest="base_url", help="API base_url (a headroom proxy, an OpenAI-compatible server, ...)")
     args = p.parse_args(argv)
 
-    cfg = build_config(args)
     try:
+        cfg = build_config(args)
         cfg.validate()
     except ValueError as exc:
         p.error(str(exc))

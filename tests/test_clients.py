@@ -148,3 +148,16 @@ def test_openai_unrelated_errors_are_not_swallowed(monkeypatch):
 
     with _pytest.raises(RuntimeError, match="rate limited"):
         OpenAIClient(api_key="x").complete(model="m", system="s", user="u", use_headroom=False)
+
+
+def test_ladder_flag_accepts_per_tier_step_counts():
+    cfg = build_config(_args(ladder="tiny-1:2, big-2 ,huge-3:6"))
+    assert [(t.model, t.max_steps) for t in cfg.ladder] == [
+        ("tiny-1", 2), ("big-2", None), ("huge-3", 6),
+    ]
+    cfg.validate()
+
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError, match="bad tier spec"):
+        build_config(_args(ladder="model:lots"))
