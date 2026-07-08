@@ -22,3 +22,4 @@ venv/
 # OS
 .DS_Store
 runs/install-lean.log
+runs/heartbeat.json
