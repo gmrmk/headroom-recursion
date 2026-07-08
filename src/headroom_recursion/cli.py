@@ -77,7 +77,16 @@ def build_config(args) -> RecurseConfig:
     if getattr(args, "ladder", None):
         from headroom_recursion.config import Tier
 
-        cfg.ladder = tuple(Tier(m.strip()) for m in args.ladder.split(",") if m.strip())
+        def tier(spec: str) -> Tier:
+            # "model" or "model:steps" — per-tier improvement-step counts let a
+            # ladder spend its budget where the capability is (e.g. fable:6).
+            model, _, steps = spec.partition(":")
+            try:
+                return Tier(model.strip(), max_steps=int(steps) if steps.strip() else None)
+            except ValueError:
+                raise ValueError(f"--ladder: bad tier spec {spec!r} (want model or model:steps)")
+
+        cfg.ladder = tuple(tier(m) for m in args.ladder.split(",") if m.strip())
     if args.n is not None:
         cfg.n = args.n
     if args.steps is not None:
@@ -161,8 +170,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--heartbeat", metavar="FILE", help="campaign: heartbeat JSON path (default <trace-dir>/heartbeat.json)")
     p.add_argument("--corpus", metavar="FILE", help="curated corpus (one entry per line) for CorpusRetriever — rung-4 lookups without LightRAG")
     p.add_argument("--research", action="store_true", help="research mode: wrap the problem in the proven graded-rubric template, default the ladder to Sonnet+, auto-enable --claim-audit when a corpus/retriever is configured")
-    p.add_argument("--client", choices=("claude", "openai"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url")
-    p.add_argument("--ladder", help="comma-separated model ladder, cheapest first (default: the Claude tiers)")
+    p.add_argument("--client", choices=("claude", "openai", "cli"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url; 'cli' runs headless `claude -p` off an existing Claude Code login (no API key)")
+    p.add_argument("--ladder", help="comma-separated model ladder, cheapest first (default: the Claude tiers); a tier may carry its own step count as model:steps, e.g. 'claude-haiku-4-5-20251001:2,claude-fable-5:6'")
     p.add_argument("--trace-dir", dest="trace_dir", metavar="DIR", help="persist every run's trace JSON + summary (and lean decider artifacts) under this directory")
     p.add_argument("--doctor", action="store_true", help="readiness check: deps, CLI transport + per-model canaries, lean levels, paths, stub loop; exit 0/1")
     p.add_argument("--no-probe", dest="no_probe", action="store_true", help="doctor: skip the live per-model canary calls")
@@ -171,8 +180,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--base-url", dest="base_url", help="API base_url (a headroom proxy, an OpenAI-compatible server, ...)")
     args = p.parse_args(argv)
 
-    cfg = build_config(args)
     try:
+        cfg = build_config(args)
         cfg.validate()
     except ValueError as exc:
         p.error(str(exc))
@@ -208,7 +217,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.client == "openai":
         if not ensure_dependency("openai", "openai>=1"):
             p.error("--client openai requires the OpenAI SDK: python -m pip install 'openai>=1'")
-    elif not ensure_dependency("anthropic", "anthropic>=0.40"):
+    elif args.client == "claude" and not ensure_dependency("anthropic", "anthropic>=0.40"):
         p.error("the Anthropic SDK is required: python -m pip install 'anthropic>=0.40'")
     if cfg.use_headroom and not ensure_dependency("headroom", "headroom-ai[all]"):
         print(
@@ -230,32 +239,53 @@ def main(argv: Optional[list[str]] = None) -> int:
         from headroom_recursion.clients import OpenAIClient
 
         client = OpenAIClient(**client_kwargs)
+    elif args.client == "cli":
+        import shutil as _shutil
+
+        from headroom_recursion.clients import CLITransportClient
+
+        if _shutil.which("claude") is None:
+            p.error("--client cli requires the `claude` CLI on PATH")
+        client = CLITransportClient(
+            timeout_s=args.timeout if args.timeout is not None else 420.0,
+            headroom_min_tokens=args.headroom_min_tokens,
+        )
     else:
         from headroom_recursion.claude import ClaudeClient
 
         client = ClaudeClient(**client_kwargs)
 
     # Optional curated-corpus retrieval (rung 4 without LightRAG).
+    corpus_retriever = None
     if args.corpus:
         from headroom_recursion.retrieval import CorpusRetriever
 
         try:
-            cfg.retriever = CorpusRetriever.from_file(args.corpus)
+            corpus_retriever = CorpusRetriever.from_file(args.corpus)
         except OSError as exc:
             p.error(f"--corpus {args.corpus}: {exc}")
+        cfg.retriever = corpus_retriever
 
     # Optional LightRAG retrieval layer.
     if args.lightrag:
-        from headroom_recursion.retrieval import LightRAGRetriever
+        from headroom_recursion.retrieval import LightRAGRetriever, MultiRetriever
 
-        retriever = LightRAGRetriever(args.lightrag, client=client, mode=args.lightrag_mode)
+        rag = LightRAGRetriever(args.lightrag, client=client, mode=args.lightrag_mode)
         for path in args.index or []:
             try:
                 with open(path, "r", encoding="utf-8", errors="replace") as fh:
-                    retriever.index(fh.read())
+                    rag.index(fh.read())
             except OSError as exc:
                 p.error(f"--index {path}: {exc}")
-        cfg.retriever = retriever
+        if corpus_retriever is not None:
+            # Both backends: fuzzy + exact ground the reasoning, but the claim
+            # audit keeps the exact corpus — a fuzzy backend that returns
+            # loosely-related context for any query would "resolve" fabricated
+            # citations and defang the firewall.
+            cfg.retriever = MultiRetriever(corpus_retriever, rag)
+            cfg.audit_retriever = corpus_retriever
+        else:
+            cfg.retriever = rag
 
     # Rung-1 Lean oracle: a decider (pinned statement) or a gate (compile-only).
     if getattr(args, "lean_statement", None) or getattr(args, "lean_gate", False):
@@ -327,9 +357,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.ledger:
         from headroom_recursion import ledger as ledger_mod
 
-        seed = ledger_mod.seed_for(args.ledger, problem)
-        if seed:
-            cfg.seed_scratchpad = seed
+        pad_seed, ans_seed = ledger_mod.seed_pair(args.ledger, problem)
+        if ans_seed:
+            cfg.seed_scratchpad = pad_seed
+            cfg.seed_answer = ans_seed
             print(f"note: seeded from ledger ({args.ledger})", file=sys.stderr)
 
     def emit(trace, *, to_stderr: bool = False) -> None:

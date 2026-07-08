@@ -44,6 +44,33 @@ def seed_for(path: str, problem: str) -> str:
     return f"{header}\n{entry['answer']}"
 
 
+def seed_pair(path: str, problem: str) -> tuple[str, str]:
+    """(scratchpad_seed, answer_seed) for ``problem``, or ('', '').
+
+    The incumbent answer is seeded as the run's CURRENT CANDIDATE (so tiers
+    refine it instead of rebuilding it from a scratchpad paraphrase — a live
+    run measured the cheapest tier degrading carried work under rebuild); the
+    scratchpad seed carries only provenance and the improvement instruction.
+    """
+
+    entry = load(path).get(problem_key(problem))
+    if not entry or not entry.get("answer"):
+        return "", ""
+    if entry.get("verified"):
+        note = (
+            "[LEDGER — VERIFIED] The current candidate answer was mechanically "
+            "validated by a previous run. Preserve its verified content; extend it."
+        )
+    else:
+        note = (
+            "[LEDGER — JUDGED, NOT VERIFIED] The current candidate answer is a previous "
+            f"run's best judged attempt (halt_prob {entry.get('best_halt_prob', 0):.2f}). "
+            "It is a draft, not ground truth: verify before trusting, improve rather "
+            "than rebuild, and never discard correct content."
+        )
+    return note, entry["answer"]
+
+
 # A judged (non-verified) entry must beat the incumbent by this margin to be
 # recorded. Judged scores are noisy; a zero-margin ratchet "improves" forever
 # on judge variance alone and defeats any dry-stop rule built on ledger

@@ -107,8 +107,9 @@ def run_campaign(
 
     for i in range(runs):
         hb.meta.update(run=i, of=runs, dry=dry)
-        cfg = replace(base_config, seed_scratchpad=ledger_mod.seed_for(ledger_path, problem))
-        log(f"run {i}: starting (seeded={'yes' if cfg.seed_scratchpad else 'no'}, "
+        pad_seed, ans_seed = ledger_mod.seed_pair(ledger_path, problem)
+        cfg = replace(base_config, seed_scratchpad=pad_seed, seed_answer=ans_seed)
+        log(f"run {i}: starting (seeded={'yes' if ans_seed else 'no'}, "
             f"spent ${hb.cost_usd:.2f})")
         try:
             trace = recurse(problem, client=hb, config=cfg)

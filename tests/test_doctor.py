@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from headroom_recursion import doctor
 
 
-def cli_envelope(result="CANARY", **over):
+def cli_envelope(result="4", **over):
     body = {"type": "result", "subtype": "success", "is_error": False,
             "result": result, "stop_reason": "end_turn", "total_cost_usd": 0.01}
     body.update(over)
@@ -34,7 +34,7 @@ def test_model_refusal_is_fail_and_noncompliance_is_warn(monkeypatch):
     assert {c.name: c.level for c in checks}["model: bad"] == doctor.FAIL
 
     checks = doctor.check_cli_transport(
-        ("chatty",), probe=True, runner=lambda argv, **kw: cli_envelope("Sure! CANARY it is.")
+        ("chatty",), probe=True, runner=lambda argv, **kw: cli_envelope("Sure! The answer is 4.")
     )
     assert {c.name: c.level for c in checks}["model: chatty"] == doctor.WARN
 

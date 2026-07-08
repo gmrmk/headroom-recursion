@@ -48,6 +48,33 @@ class NullRetriever:
         return []
 
 
+class MultiRetriever:
+    """Interleave results from several retrievers (order-preserving dedupe).
+
+    Lets a run ground its reasoning in BOTH a curated corpus (exact, auditable)
+    and a knowledge base (broad, fuzzy). Note the firewall rule: claim AUDITS
+    should keep an exact retriever (``RecurseConfig.audit_retriever``) — a
+    fuzzy backend that returns loosely-related context for any query would
+    "resolve" fabricated citations.
+    """
+
+    def __init__(self, *retrievers):
+        self._retrievers = [r for r in retrievers if r is not None]
+
+    def retrieve(self, query: str, *, k: int) -> list[str]:
+        rounds = [r.retrieve(query, k=k) or [] for r in self._retrievers]
+        out: list[str] = []
+        seen: set[str] = set()
+        for i in range(max((len(r) for r in rounds), default=0)):
+            for hits in rounds:
+                if i < len(hits) and hits[i] and hits[i].strip() and hits[i] not in seen:
+                    seen.add(hits[i])
+                    out.append(hits[i])
+                    if len(out) >= k:
+                        return out
+        return out
+
+
 class CorpusRetriever:
     """Keyword-overlap retrieval over a small curated corpus — a rung-4 source
     without LightRAG.
@@ -168,7 +195,11 @@ def simple_local_embedding(dim: int = 256, max_token_size: int = 8192) -> Embedd
     replace it with a real model (OpenAI, sentence-transformers) for real retrieval.
     """
 
-    async def embed(texts: list[str]) -> list[list[float]]:
+    async def embed(texts: list[str]):
+        # numpy ships with LightRAG (whose newer builds require array output —
+        # they call .size on it); this helper only runs alongside LightRAG.
+        import numpy as np
+
         out: list[list[float]] = []
         for text in texts:
             vec = [0.0] * dim
@@ -177,7 +208,7 @@ def simple_local_embedding(dim: int = 256, max_token_size: int = 8192) -> Embedd
                 vec[h % dim] += 1.0
             norm = math.sqrt(sum(v * v for v in vec)) or 1.0
             out.append([v / norm for v in vec])
-        return out
+        return np.asarray(out, dtype=np.float32)
 
     return Embedding(func=embed, dim=dim, max_token_size=max_token_size)
 
@@ -245,7 +276,18 @@ class LightRAGRetriever:
         # Everything runs on the retriever's single persistent loop — LightRAG's
         # loop-bound state (locks, sessions) must live and die on one loop.
         self._runner.run(self._rag.initialize_storages())
-        self._runner.run(self._rag.initialize_pipeline_status())
+        # API drift: older builds expose initialize_pipeline_status as a method,
+        # newer ones as a module-level function in kg.shared_storage.
+        init_pipeline = getattr(self._rag, "initialize_pipeline_status", None)
+        if init_pipeline is None:
+            try:
+                from lightrag.kg.shared_storage import (  # type: ignore
+                    initialize_pipeline_status as init_pipeline,
+                )
+            except Exception:
+                init_pipeline = None
+        if init_pipeline is not None:
+            self._runner.run(init_pipeline())
         self._initialized = True
 
     def index(self, docs) -> None:
