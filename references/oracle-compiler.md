@@ -74,6 +74,9 @@ extra rungs, it needs these:
 | P vs NP ×3, ironclad | judge-only (rung 5) | 36/36 votes ≤ 0.02 — no fabrication credited |
 | P vs NP, graded | judge-only (rung 5) | cheapest tier fabricated citations 4/4 steps (caught); verified ground scored 0.15; inflated [NEW] revoked |
 | P vs NP, fully instrumented | ladder+audit+ledger+oracle | ledger ratchet 0.02→0.15→0.30; floor lifted 0.02→0.22; models *self-flagged* "[not in provided corpus]" and withdrew a [NEW] label — the audit changed behavior at the source; 15% Headroom on 302k tokens; zero transport deaths |
+| Lean proof-repair (`double_eq`) | rung 1 (core Lean) | Sonnet one-shot a machine-checked induction proof; independently re-verified; `#print axioms` = `[propext, Quot.sound]` — no `sorryAx` |
+| P vs NP + Lean rung live | rung 1 in the loop | ledger 0.30→**0.55**, score climbing *as verified content accumulated* (0.28→0.40→0.45→0.55); 9-lemma Shannon lower bound machine-checked vs Mathlib, axiom-audited clean → `examples/shannon_lower_bound.lean` |
+| AIME-style benchmark | rung 2 (brute-force truth) | `solve()` sample-4 + majority vote: **3/3 correct, unanimous** on ground truths computed by brute force (738/11/819) → `examples/aimo_benchmark.py` |
 
 The graded run is why rungs 4 and 1 exist in this design: the judge caught
 fabricated citations as *pattern recognition* — the firewall makes it a lookup;
