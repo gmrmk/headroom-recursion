@@ -256,26 +256,36 @@ def main(argv: Optional[list[str]] = None) -> int:
         client = ClaudeClient(**client_kwargs)
 
     # Optional curated-corpus retrieval (rung 4 without LightRAG).
+    corpus_retriever = None
     if args.corpus:
         from headroom_recursion.retrieval import CorpusRetriever
 
         try:
-            cfg.retriever = CorpusRetriever.from_file(args.corpus)
+            corpus_retriever = CorpusRetriever.from_file(args.corpus)
         except OSError as exc:
             p.error(f"--corpus {args.corpus}: {exc}")
+        cfg.retriever = corpus_retriever
 
     # Optional LightRAG retrieval layer.
     if args.lightrag:
-        from headroom_recursion.retrieval import LightRAGRetriever
+        from headroom_recursion.retrieval import LightRAGRetriever, MultiRetriever
 
-        retriever = LightRAGRetriever(args.lightrag, client=client, mode=args.lightrag_mode)
+        rag = LightRAGRetriever(args.lightrag, client=client, mode=args.lightrag_mode)
         for path in args.index or []:
             try:
                 with open(path, "r", encoding="utf-8", errors="replace") as fh:
-                    retriever.index(fh.read())
+                    rag.index(fh.read())
             except OSError as exc:
                 p.error(f"--index {path}: {exc}")
-        cfg.retriever = retriever
+        if corpus_retriever is not None:
+            # Both backends: fuzzy + exact ground the reasoning, but the claim
+            # audit keeps the exact corpus — a fuzzy backend that returns
+            # loosely-related context for any query would "resolve" fabricated
+            # citations and defang the firewall.
+            cfg.retriever = MultiRetriever(corpus_retriever, rag)
+            cfg.audit_retriever = corpus_retriever
+        else:
+            cfg.retriever = rag
 
     # Rung-1 Lean oracle: a decider (pinned statement) or a gate (compile-only).
     if getattr(args, "lean_statement", None) or getattr(args, "lean_gate", False):
@@ -347,9 +357,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.ledger:
         from headroom_recursion import ledger as ledger_mod
 
-        seed = ledger_mod.seed_for(args.ledger, problem)
-        if seed:
-            cfg.seed_scratchpad = seed
+        pad_seed, ans_seed = ledger_mod.seed_pair(args.ledger, problem)
+        if ans_seed:
+            cfg.seed_scratchpad = pad_seed
+            cfg.seed_answer = ans_seed
             print(f"note: seeded from ledger ({args.ledger})", file=sys.stderr)
 
     def emit(trace, *, to_stderr: bool = False) -> None:

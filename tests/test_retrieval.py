@@ -156,3 +156,41 @@ def test_build_claude_llm_func_adapts_signature():
     assert isinstance(out, str) and out  # returns text
     assert ("other", "a prompt") in stub.prompts_seen  # routed through ClaudeClient.complete
     assert stub.calls[-1][1] == "m0"  # on the requested model
+
+
+def test_multi_retriever_interleaves_and_dedupes():
+    from headroom_recursion.retrieval import MultiRetriever
+
+    class Fixed:
+        def __init__(self, hits):
+            self.hits = hits
+
+        def retrieve(self, query, *, k):
+            return self.hits[:k]
+
+    multi = MultiRetriever(Fixed(["a", "b", "c"]), Fixed(["b", "d"]), None)
+    assert multi.retrieve("q", k=4) == ["a", "b", "d", "c"]
+    assert multi.retrieve("q", k=2) == ["a", "b"]
+    assert MultiRetriever().retrieve("q", k=3) == []
+
+
+def test_audit_uses_exact_retriever_when_context_is_fuzzy():
+    from headroom_recursion.config import RecurseConfig, Tier
+    from headroom_recursion.ladder import recurse
+    from tests.conftest import StubClient
+
+    class Fuzzy:  # resolves anything -> would defang the firewall
+        def retrieve(self, query, *, k):
+            return ["vaguely related text"]
+
+    class Exact:  # resolves nothing -> the citation stays unsourced
+        def retrieve(self, query, *, k):
+            return []
+
+    cfg = RecurseConfig(
+        ladder=(Tier("m0"),), n=1, T=1, claim_audit=True,
+        retriever=Fuzzy(), audit_retriever=Exact(),
+    )
+    stub = StubClient(answers=["[KNOWN] result X, see Fakename (2019)."], halt_prob=0.0)
+    trace = recurse("p", client=stub, config=cfg)
+    assert trace.steps[0].unsourced_claims == 1  # exact audit; fuzzy context ignored

@@ -153,12 +153,24 @@ class RecurseConfig:
     # so later runs build on settled ground instead of re-deriving (or worse,
     # re-fabricating) it.
     seed_scratchpad: str = ""
+    # Initial ANSWER candidate. Live-run finding: seeding only the scratchpad
+    # hands prior top-tier work to the cheapest tier for reconstruction, which
+    # measurably degrades it before better tiers recover. Seeding the answer
+    # makes the incumbent the current candidate — tiers refine, never rebuild,
+    # and the best-answer rail stops them making it worse.
+    seed_answer: str = ""
 
     # Optional retrieval layer (e.g. a LightRAG-backed knowledge base). When set, each
     # improvement step retrieves relevant snippets and injects them into the prompts so
     # the recursion is grounded in external knowledge. Any object with a
     # ``retrieve(query, k) -> list[str]`` method works (see ``retrieval.Retriever``).
     retriever: Optional["Retriever"] = None
+    # Retriever used by the CLAIM AUDIT (citation firewall / novelty triage).
+    # None -> fall back to ``retriever``. Set this to an exact-match backend
+    # (e.g. CorpusRetriever) when ``retriever`` is fuzzy: a backend that
+    # returns loosely-related context for any query would "resolve" fabricated
+    # citations and defang the firewall.
+    audit_retriever: Optional["Retriever"] = None
     # How many snippets to request per retrieval.
     retrieval_k: int = 4
     # Max characters of (problem + scratchpad) used to form the retrieval query.

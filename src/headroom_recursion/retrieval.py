@@ -48,6 +48,33 @@ class NullRetriever:
         return []
 
 
+class MultiRetriever:
+    """Interleave results from several retrievers (order-preserving dedupe).
+
+    Lets a run ground its reasoning in BOTH a curated corpus (exact, auditable)
+    and a knowledge base (broad, fuzzy). Note the firewall rule: claim AUDITS
+    should keep an exact retriever (``RecurseConfig.audit_retriever``) — a
+    fuzzy backend that returns loosely-related context for any query would
+    "resolve" fabricated citations.
+    """
+
+    def __init__(self, *retrievers):
+        self._retrievers = [r for r in retrievers if r is not None]
+
+    def retrieve(self, query: str, *, k: int) -> list[str]:
+        rounds = [r.retrieve(query, k=k) or [] for r in self._retrievers]
+        out: list[str] = []
+        seen: set[str] = set()
+        for i in range(max((len(r) for r in rounds), default=0)):
+            for hits in rounds:
+                if i < len(hits) and hits[i] and hits[i].strip() and hits[i] not in seen:
+                    seen.add(hits[i])
+                    out.append(hits[i])
+                    if len(out) >= k:
+                        return out
+        return out
+
+
 class CorpusRetriever:
     """Keyword-overlap retrieval over a small curated corpus — a rung-4 source
     without LightRAG.

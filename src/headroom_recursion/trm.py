@@ -138,8 +138,9 @@ def run_tier(
         # --- claim audit (rung 4): mechanical citation/novelty findings for the judge ---
         claim_note = ""
         unsourced = flagged_new = 0
-        if cfg.claim_audit and cfg.retriever is not None:
-            audited = claims_mod.audit_claims(claims_mod.parse_claims(answer), cfg.retriever)
+        audit_retriever = cfg.audit_retriever or cfg.retriever
+        if cfg.claim_audit and audit_retriever is not None:
+            audited = claims_mod.audit_claims(claims_mod.parse_claims(answer), audit_retriever)
             claim_note = claims_mod.judge_addendum(audited)
             unsourced = sum(1 for c in audited if c.label == "UNSOURCED")
             flagged_new = sum(1 for c in audited if c.label == "NEW" and c.prior_art)

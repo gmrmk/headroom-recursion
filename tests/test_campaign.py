@@ -221,3 +221,55 @@ def test_campaign_requires_sane_knobs(tmp_path):
         run_campaign(tmp_path, PerRunScores([0.1]), runs=0)
     with pytest.raises(ValueError):
         run_campaign(tmp_path, PerRunScores([0.1]), dry_stop=0)
+
+
+# ---------------------------------------------------------------------------
+# Answer seeding: the incumbent is refined, never rebuilt
+# ---------------------------------------------------------------------------
+
+
+def test_seed_pair_provides_answer_and_provenance_note(tmp_path):
+    path = str(tmp_path / "ledger.json")
+    ledger.record(path, "p", _trace(0.30, answer="the incumbent draft"))
+    note, answer = ledger.seed_pair(path, "p")
+    assert answer == "the incumbent draft"
+    assert "JUDGED, NOT VERIFIED" in note and "0.30" in note
+    assert ledger.seed_pair(path, "unknown problem") == ("", "")
+
+    ledger.record(path, "p", _trace(0.10, answer="proved", stop="validated"))
+    note, answer = ledger.seed_pair(path, "p")
+    assert answer == "proved" and "VERIFIED" in note
+
+
+def test_seeded_answer_is_the_first_candidate_not_rebuilt():
+    from headroom_recursion.ladder import recurse
+
+    cfg = tiny_cfg(seed_answer="THE INCUMBENT", seed_scratchpad="[LEDGER] provenance")
+    stub = PerRunScores([0.0])
+    prompts_seen = []
+
+    class Spy:
+        def complete(self, *, model, system, user, **kw):
+            prompts_seen.append((system, user))
+            return stub.complete(model=model, system=system, user=user)
+
+    recurse("p", client=Spy(), config=cfg)
+    latent = [u for s, u in prompts_seen if s == prompts.LATENT_SYSTEM]
+    assert "THE INCUMBENT" in latent[0]          # candidate answer, not "(none yet)"
+    assert "(none yet)" not in latent[0]
+    assert "[LEDGER] provenance" in latent[0]    # provenance rides the scratchpad
+
+
+def test_campaign_seeds_answer_between_runs(tmp_path):
+    seeded_answers = []
+
+    class AnswerSeedSpy(PerRunScores):
+        def complete(self, *, model, system, user, **kw):
+            if system == prompts.LATENT_SYSTEM and "CURRENT CANDIDATE ANSWER:" in user:
+                block = user.split("CURRENT CANDIDATE ANSWER:")[1].split("REASONING")[0]
+                seeded_answers.append("answer-" in block)
+            return super().complete(model=model, system=system, user=user, **kw)
+
+    run_campaign(tmp_path, AnswerSeedSpy([0.30, 0.40, 0.41]), runs=3, dry_stop=5)
+    assert seeded_answers[0] is False   # run 0 starts fresh
+    assert seeded_answers[1] is True    # run 1+ carries the incumbent answer

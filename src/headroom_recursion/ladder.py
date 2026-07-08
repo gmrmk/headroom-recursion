@@ -51,9 +51,10 @@ def recurse(
     start = time.monotonic()
     deadline = start + cfg.max_wall_seconds if cfg.max_wall_seconds is not None else None
 
-    answer = ""
-    # A seeded scratchpad lets a run start from settled ground (e.g. verified
-    # claims from a ledger) instead of re-deriving — or re-fabricating — it.
+    # Seeds let a run start from settled ground (e.g. a ledger's incumbent):
+    # the answer enters as the CURRENT CANDIDATE so tiers refine rather than
+    # rebuild it; the scratchpad carries its provenance and caveats.
+    answer = cfg.seed_answer
     scratchpad = cfg.seed_scratchpad
     stop_reason = "no-op"
     final_model = ""
