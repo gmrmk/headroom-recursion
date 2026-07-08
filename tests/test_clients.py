@@ -86,3 +86,65 @@ def test_ladder_flag_overrides_models():
 def test_default_ladder_is_claude():
     cfg = build_config(_args())
     assert all(m.startswith("claude-") for m in (t.model for t in cfg.ladder))
+
+
+def test_openai_flips_to_max_completion_tokens_on_param_400(monkeypatch):
+    """Newer OpenAI models reject max_tokens; the client flips once and remembers."""
+
+    import sys as _sys
+    import types as _types
+
+    calls = []
+
+    class FakeCompletions:
+        def create(self, **kw):
+            calls.append(kw)
+            if "max_tokens" in kw:
+                raise RuntimeError(
+                    "Unsupported parameter: 'max_tokens' is not supported with this "
+                    "model. Use 'max_completion_tokens' instead."
+                )
+            choice = SimpleNamespace(
+                message=SimpleNamespace(content="ok"), finish_reason="stop"
+            )
+            return SimpleNamespace(choices=[choice])
+
+    class FakeOpenAI:
+        def __init__(self, **kw):
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    fake = _types.ModuleType("openai")
+    fake.OpenAI = FakeOpenAI
+    monkeypatch.setitem(_sys.modules, "openai", fake)
+    from headroom_recursion.clients import OpenAIClient
+
+    client = OpenAIClient(api_key="x")
+    res = client.complete(model="o-next", system="s", user="u", max_tokens=77, use_headroom=False)
+    assert res.text == "ok"
+    assert "max_tokens" in calls[0] and calls[1]["max_completion_tokens"] == 77
+
+    client.complete(model="o-next", system="s", user="u", max_tokens=5, use_headroom=False)
+    assert calls[2]["max_completion_tokens"] == 5  # decision cached, no re-probe
+
+
+def test_openai_unrelated_errors_are_not_swallowed(monkeypatch):
+    import sys as _sys
+    import types as _types
+
+    class FakeCompletions:
+        def create(self, **kw):
+            raise RuntimeError("rate limited, try later")
+
+    class FakeOpenAI:
+        def __init__(self, **kw):
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    fake = _types.ModuleType("openai")
+    fake.OpenAI = FakeOpenAI
+    monkeypatch.setitem(_sys.modules, "openai", fake)
+    from headroom_recursion.clients import OpenAIClient
+
+    import pytest as _pytest
+
+    with _pytest.raises(RuntimeError, match="rate limited"):
+        OpenAIClient(api_key="x").complete(model="m", system="s", user="u", use_headroom=False)

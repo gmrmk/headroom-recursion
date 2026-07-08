@@ -53,7 +53,8 @@ class RunTrace:
 
     ``stop_reason`` vocabulary:
       halt | validated  — confident stop; ``final_answer`` is the halting answer
-      converged | exhausted — ladder ran out; ``final_answer`` is the BEST-scoring answer
+      converged | exhausted | step-timeout — ladder ran out; ``final_answer`` is the
+                          BEST-scoring answer
       budget            — a hard budget hit; best answer, no escalation past the hit
       error | interrupted — run cut short; best answer so far, ``error`` says why
       no-op             — empty ladder

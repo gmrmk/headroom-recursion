@@ -25,8 +25,10 @@ Example (local Ollama):
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+import time
 from typing import Callable, Optional, Protocol, runtime_checkable
 
 from headroom_recursion import headroom
@@ -75,6 +77,11 @@ class OpenAIClient:
             kwargs["max_retries"] = max_retries
         self._client = OpenAI(**kwargs)
         self._headroom_min_tokens = headroom_min_tokens
+        # Newer OpenAI models reject `max_tokens` in favor of `max_completion_tokens`;
+        # older OpenAI-compatible servers (Ollama, vLLM, ...) only know `max_tokens`.
+        # Start with the legacy name for compatibility and flip permanently the first
+        # time the server's 400 names it as the problem.
+        self._tokens_param = "max_tokens"
 
     def complete(
         self,
@@ -94,12 +101,25 @@ class OpenAIClient:
             messages, model=model, use_headroom=use_headroom, min_tokens=self._headroom_min_tokens
         )
 
-        resp = self._client.chat.completions.create(
-            model=model,
-            messages=sent,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
+        try:
+            resp = self._client.chat.completions.create(
+                model=model,
+                messages=sent,
+                temperature=temperature,
+                **{self._tokens_param: max_tokens},
+            )
+        except Exception as exc:
+            if self._tokens_param not in str(exc):
+                raise
+            self._tokens_param = (
+                "max_completion_tokens" if self._tokens_param == "max_tokens" else "max_tokens"
+            )
+            resp = self._client.chat.completions.create(
+                model=model,
+                messages=sent,
+                temperature=temperature,
+                **{self._tokens_param: max_tokens},
+            )
         choice = resp.choices[0]
         finish = str(getattr(choice, "finish_reason", "") or "")
         return CallResult(
@@ -111,16 +131,36 @@ class OpenAIClient:
         )
 
 
+class TransportRefused(RuntimeError):
+    """The CLI transport returned a structured error envelope (a policy refusal
+    or upstream API error). Deterministic for the same input — retrying the
+    same call is wasted spend, so it raises immediately; the ladder soft-fails
+    the tier and escalates with all completed work intact."""
+
+
 class CLITransportClient:
-    """A ``CompletionClient`` backed by headless ``claude -p``.
+    """A ``CompletionClient`` backed by headless ``claude -p --output-format json``.
 
     Uses an existing Claude Code session login — no API key required. Each
     completion spawns one CLI process; because a single process occasionally
-    stalls, every call gets ``attempts`` tries with a per-attempt ``timeout_s``.
-    Headroom compression runs in front of the CLI exactly as it does for the
-    SDK client, and the trace gets Headroom's token accounting.
+    stalls, every call gets ``attempts`` tries (exponential backoff between
+    them) with a per-attempt ``timeout_s``. Headroom compression runs in front
+    of the CLI exactly as for the SDK client.
 
-    ``runner`` is injectable for tests (same signature as ``subprocess.run``).
+    The JSON envelope is load-bearing, not cosmetic: refusals and API errors
+    arrive on stdout with EXIT CODE 0 (measured live), so plain-text mode would
+    install "API Error: ..." as the answer and poison the loop's state. The
+    envelope also carries the real ``stop_reason`` (the truncation flag works
+    over this transport) and ``total_cost_usd`` (the campaign cost meter).
+
+    Honest limitations of this transport: ``temperature`` and ``max_tokens``
+    are NOT honored — ``claude -p`` has no flags for them. In particular the
+    halt judge is never temperature-0 deterministic here; its median-of-N
+    voting does not rely on determinism, so verdicts remain sound, just not
+    reproducible call-for-call.
+
+    ``runner`` is injectable for tests (same signature as ``subprocess.run``);
+    ``sleeper`` likewise (defaults to ``time.sleep``).
     """
 
     def __init__(
@@ -130,7 +170,9 @@ class CLITransportClient:
         timeout_s: float = 420.0,
         headroom_min_tokens: int = 0,
         executable: str = "claude",
+        extra_args: Optional[list[str]] = None,
         runner: Optional[Callable] = None,
+        sleeper: Optional[Callable[[float], None]] = None,
     ):
         if attempts < 1:
             raise ValueError(f"attempts must be >= 1 (got {attempts})")
@@ -140,7 +182,9 @@ class CLITransportClient:
         self._timeout_s = timeout_s
         self._headroom_min_tokens = headroom_min_tokens
         self._executable = executable
+        self._extra_args = list(extra_args or [])
         self._runner = runner or subprocess.run
+        self._sleeper = sleeper if sleeper is not None else time.sleep
 
     def complete(
         self,
@@ -160,11 +204,20 @@ class CLITransportClient:
         if sent and isinstance(sent[0].get("content"), str):
             send_text = sent[0]["content"]
 
+        argv = [
+            self._executable, "-p",
+            "--model", model,
+            "--system-prompt", system,
+            "--output-format", "json",
+            *self._extra_args,
+        ]
         last_exc: Optional[BaseException] = None
-        for _ in range(self._attempts):
+        for attempt in range(self._attempts):
+            if attempt:
+                self._sleeper(2.0 ** attempt)
             try:
                 out = self._runner(
-                    [self._executable, "-p", "--model", model, "--system-prompt", system],
+                    argv,
                     input=send_text,
                     capture_output=True,
                     text=True,
@@ -178,8 +231,33 @@ class CLITransportClient:
                     f"claude CLI failed ({model}): {(out.stderr or '').strip()[:300]}"
                 )
                 continue
-            return CallResult(
-                text=(out.stdout or "").strip(), tokens_before=before, tokens_after=after
-            )
+            try:
+                envelope = json.loads(out.stdout or "")
+            except json.JSONDecodeError:
+                last_exc = RuntimeError(
+                    f"claude CLI returned non-JSON output ({model}): "
+                    f"{(out.stdout or '').strip()[:200]}"
+                )
+                continue
+            return self._parse(envelope, model=model, before=before, after=after)
         assert last_exc is not None
         raise last_exc
+
+    @staticmethod
+    def _parse(envelope: dict, *, model: str, before: int, after: int) -> CallResult:
+        text = str(envelope.get("result") or "").strip()
+        refused = (
+            bool(envelope.get("is_error"))
+            or envelope.get("subtype") not in (None, "success")
+            or text.startswith("API Error:")  # measured: refusals can arrive exit-0
+        )
+        if refused:
+            raise TransportRefused(f"claude CLI refused/errored ({model}): {text[:300]}")
+        cost = envelope.get("total_cost_usd")
+        return CallResult(
+            text=text,
+            tokens_before=before,
+            tokens_after=after,
+            stop_reason=str(envelope.get("stop_reason") or ""),
+            cost_usd=float(cost) if isinstance(cost, (int, float)) else 0.0,
+        )

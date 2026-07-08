@@ -219,3 +219,45 @@ def test_loop_runner_propagates_exceptions():
             runner.run(boom())
     finally:
         runner.close()
+
+
+# ---------------------------------------------------------------------------
+# Sandbox resource limits (accident isolation, POSIX)
+# ---------------------------------------------------------------------------
+
+
+def test_memory_hog_validator_dies_cleanly_not_the_host():
+    """A validator allocating past RLIMIT_AS is (None, why), never a verdict."""
+
+    from headroom_recursion import oracle
+
+    hog = "def validate(answer: str) -> bool:\n    x = bytearray(700 * 1024 * 1024)\n    return True\n"
+    verdict, err = oracle.run_validator(hog, "anything", timeout_s=10.0)
+    assert verdict is None
+    assert err  # MemoryError (or the OOM'd interpreter's stderr) is reported
+
+
+def test_wellbehaved_validator_unaffected_by_rlimits():
+    from headroom_recursion import oracle
+
+    ok = "def validate(answer: str) -> bool:\n    return answer.strip() == '42'\n"
+    assert oracle.run_validator(ok, "42", timeout_s=10.0) == (True, "")
+    assert oracle.run_validator(ok, "41", timeout_s=10.0) == (False, "")
+
+
+# ---------------------------------------------------------------------------
+# Convergence normalization: markdown decoration is presentation, not content
+# ---------------------------------------------------------------------------
+
+
+def test_markdown_restyled_repeat_counts_as_converged():
+    from headroom_recursion.config import RecurseConfig, Tier
+    from headroom_recursion.ladder import recurse
+    from tests.conftest import StubClient
+
+    cfg = RecurseConfig(ladder=(Tier("m0"), Tier("m1")), n=1, T=4)
+    stub = StubClient(answers=["**42**", "# `42`", "unique-3", "unique-4"])
+    trace = recurse("x", client=stub, config=cfg)
+
+    assert trace.tier_stops[0] == "m0: converged"
+    assert len([s for s in trace.steps if s.tier_model == "m0"]) == 2

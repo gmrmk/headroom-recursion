@@ -39,7 +39,8 @@ class TierResult:
     answer: str
     scratchpad: str
     halted: bool
-    stop_reason: str  # "validated" | "halt" | "converged" | "exhausted" | "budget"
+    # "validated" | "halt" | "converged" | "exhausted" | "budget" | "step-timeout"
+    stop_reason: str
 
 
 def run_tier(
@@ -278,12 +279,21 @@ def _bound_snippets(snippets: list[str], max_chars: int) -> list[str]:
     return out
 
 
-def _same(a: str, b: str) -> bool:
-    return _norm(a) == _norm(b)
-
-
 def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "").strip()).lower()
+    """Normalize an answer for convergence comparison.
+
+    Case, whitespace, and markdown decoration (emphasis, inline code, heading
+    and quote markers) are presentation, not content — an answer that repeats
+    modulo formatting has still converged. Deliberately conservative beyond
+    that: no fuzzy similarity, because a false ``converged`` forfeits the
+    tier's remaining steps, and long research documents legitimately stay very
+    similar between steps ("exhausted" escalation is their intended path).
+    """
+
+    s = (s or "").lower()
+    s = re.sub(r"[`*_~]", "", s)
+    s = re.sub(r"^[#>\s]+", "", s, flags=re.MULTILINE)
+    return re.sub(r"\s+", " ", s).strip()
 
 
 def _preview(s: str, n: int = 160) -> str:
