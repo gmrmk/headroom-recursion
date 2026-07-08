@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-08T13:07:12Z",
+  "generated": "2026-07-08T13:30:28Z",
   "toolchain": "leanprover/lean4:v4.31.0",
   "checkers": {
     "leanchecker": "distributed with the pinned toolchain (kernel replay, --fresh)",
@@ -43,6 +43,21 @@
       "export_sha256": "30d15bddae3bf2170badabcdfd635fd0fe023bb5eadd1a55e77f91386d247894"
     },
     {
+      "artifact": "gate-3e4d9e66a8db.lean",
+      "sha256": "cb02e48b76b665d118ba085bbb9c3ef10fc0aff36b5b37ed6bed837f5fcd237c",
+      "module": "Acb02e48b76b6",
+      "decls": [
+        "karp_lipton_case_split"
+      ],
+      "compile": true,
+      "tier1_leanchecker": true,
+      "tier2_nanoda": true,
+      "decls_checked": 110,
+      "error": "",
+      "tier1_mode": "incremental",
+      "export_sha256": "b0c5633f68cd6709ef5aa6b630f8cadf8da291c17ef231b0f5ddbb71fe3ec3b1"
+    },
+    {
       "artifact": "gate-403a9b0c80bd.lean",
       "sha256": "653496082f4a97b9f48d53f9eae9f372b47ac6825023600134b8cdf837f10ecb",
       "module": "A653496082f4a",
@@ -56,6 +71,21 @@
       "error": "",
       "tier1_mode": "incremental",
       "export_sha256": "f0b370670399ac32c02045ff013a0b0959f85c51de5d45eacc36675a894e028f"
+    },
+    {
+      "artifact": "gate-4209a5a2e3e3.lean",
+      "sha256": "0bbbced1e962b351e660918f073e78b87fc515d9638ebaa1964b24d851350e26",
+      "module": "A0bbbced1e962",
+      "decls": [
+        "exists_hard_function"
+      ],
+      "compile": true,
+      "tier1_leanchecker": true,
+      "tier2_nanoda": true,
+      "decls_checked": 4096,
+      "error": "",
+      "tier1_mode": "incremental",
+      "export_sha256": "ba95032d5966166049411943289941fb91c5c5666de21bd59fd6b22718e1dd3e"
     }
   ]
 }
