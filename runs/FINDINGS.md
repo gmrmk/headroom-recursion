@@ -94,6 +94,24 @@ where the model is strongest.
    absorb it by escalation. Long-document rewrites need either longer per-attempt budgets
    or a smaller rewrite unit.
 
+## Independent verification (added post-finale)
+
+Every Lean artifact the campaign produced is re-verified by the pipeline in
+`scripts/verify_artifacts.py`, per the assurance ladder in the Lean Language
+Reference ("Validating a Lean Proof"): kernel replay via `leanchecker`
+(distributed with the pinned toolchain; `--fresh` for import-free artifacts),
+then export to Lean's specified NDJSON format (`lean4export` @ v4.31.0) and
+re-typechecking by `nanoda` — an independently implemented Rust kernel — with
+the axiom whitelist {propext, Classical.choice, Quot.sound} enforced.
+Result: 3/3 artifacts verified at both tiers, including the counting theorem's
+full used-Mathlib closure (3,611 declarations) re-checked without our
+toolchain. The NDJSON exports in `runs/verify/` are the objects of record: a
+third party needs only those files and any conforming checker. Residuals,
+stated: consistency of Lean's type theory + the three axioms, the export-format
+spec, nanoda's correctness (mitigable by a second export-consuming checker),
+and the informal-to-formal statement gap — the theorems verify exactly what
+they state, and two of the three state hypothesis-conditional folklore.
+
 ## Authority statement
 
 Ledger incumbent at wrap-up: see `pvnp-ledger.json` — judged opinion, NEEDS HUMAN REVIEW
