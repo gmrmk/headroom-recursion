@@ -104,10 +104,19 @@ def build_config(args) -> RecurseConfig:
     if getattr(args, "claim_audit", False):
         cfg.claim_audit = True
     if getattr(args, "research", False):
-        if not getattr(args, "ladder", None):
-            from headroom_recursion.config import RESEARCH_LADDER
+        # Research doctrine, proven across the live P-vs-NP runs, applied as
+        # DEFAULTS rather than advice (explicit flags still win): Sonnet+
+        # workers (the cheapest tier fabricated citations 4/4 graded steps), a
+        # pinned strong judge that is not the top-tier worker, and 3-vote
+        # median scoring (robust to one sycophantic self-grade).
+        from headroom_recursion.config import OPUS, RESEARCH_LADDER
 
+        if not getattr(args, "ladder", None):
             cfg.ladder = RESEARCH_LADDER
+        if args.judge_model is None:
+            cfg.judge_model = OPUS
+        if args.judge_votes is None:
+            cfg.judge_votes = 3
         if getattr(args, "lightrag", None) or getattr(args, "corpus", None):
             cfg.claim_audit = True
     cfg.use_headroom = not args.no_headroom
@@ -149,6 +158,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--research", action="store_true", help="research mode: wrap the problem in the proven graded-rubric template, default the ladder to Sonnet+, auto-enable --claim-audit when a corpus/retriever is configured")
     p.add_argument("--client", choices=("claude", "openai"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url")
     p.add_argument("--ladder", help="comma-separated model ladder, cheapest first (default: the Claude tiers)")
+    p.add_argument("--trace-dir", dest="trace_dir", metavar="DIR", help="persist every run's trace JSON + summary (and lean decider artifacts) under this directory")
+    p.add_argument("--doctor", action="store_true", help="readiness check: deps, CLI transport + per-model canaries, lean levels, paths, stub loop; exit 0/1")
+    p.add_argument("--no-probe", dest="no_probe", action="store_true", help="doctor: skip the live per-model canary calls")
     p.add_argument("--dry-run", action="store_true", help="print the call schedule and exit")
     p.add_argument("--json", action="store_true", help="emit the full trace as JSON")
     p.add_argument("--base-url", dest="base_url", help="API base_url (a headroom proxy, an OpenAI-compatible server, ...)")
@@ -163,6 +175,20 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.dry_run:
         print(plan_schedule(cfg))
         return 0
+
+    if args.doctor:
+        from headroom_recursion import doctor
+
+        checks, code = doctor.run_doctor(
+            models=tuple(t.model for t in cfg.ladder),
+            probe_models=not args.no_probe,
+            lean_project=args.lean_project or "lean",
+            lean_timeout_s=args.lean_timeout,
+            corpus=args.corpus,
+            writable=(args.trace_dir or "runs",),
+        )
+        print(doctor.render(checks))
+        return code
 
     problem = args.problem or (sys.stdin.read().strip() if not sys.stdin.isatty() else "")
     if not problem:
@@ -233,10 +259,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         from headroom_recursion import lean_oracle
 
         project = args.lean_project or ("lean" if _os.path.isdir("lean") else None)
+        lean_artifacts = (
+            _os.path.join(args.trace_dir, "lean") if getattr(args, "trace_dir", None) else None
+        )
         try:
             if args.lean_statement:
                 oracle_obj = lean_oracle.make_decider_oracle(
-                    args.lean_statement, project_dir=project, timeout_s=args.lean_timeout
+                    args.lean_statement,
+                    project_dir=project,
+                    timeout_s=args.lean_timeout,
+                    artifact_dir=lean_artifacts,
                 )
             else:
                 oracle_obj = lean_oracle.make_gate_oracle(
@@ -259,14 +291,32 @@ def main(argv: Optional[list[str]] = None) -> int:
             cfg.seed_scratchpad = seed
             print(f"note: seeded from ledger ({args.ledger})", file=sys.stderr)
 
+    # A toothless audit looks like diligence — say so up front instead.
+    if cfg.claim_audit and cfg.retriever is None:
+        print(
+            "note: --claim-audit has no retriever (add --corpus or --lightrag) — "
+            "citations cannot be resolved and the audit will be toothless",
+            file=sys.stderr,
+        )
+
     def emit(trace, *, to_stderr: bool = False) -> None:
         out = json.dumps(trace.to_dict(), indent=2) if args.json else trace.summary()
         print(out, file=sys.stderr if to_stderr else sys.stdout)
 
+    def persist(trace) -> None:
+        if not getattr(args, "trace_dir", None):
+            return
+        try:
+            trace.persist(args.trace_dir)
+        except OSError as exc:
+            print(f"note: --trace-dir {args.trace_dir}: {exc}", file=sys.stderr)
+
     try:
         trace = recurse(problem, client=client, config=cfg)
     except RunError as exc:
-        # The run died, but everything completed before the error is in the trace.
+        # The run died, but everything completed before the error is in the
+        # trace — evidence persists on the failure path too.
+        persist(exc.trace)
         emit(exc.trace, to_stderr=True)
         print(f"recurse: run failed: {exc}", file=sys.stderr)
         return 1
@@ -274,6 +324,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.ledger:
         ledger_mod.record(args.ledger, problem, trace)
 
+    persist(trace)
     emit(trace)
     if trace.stop_reason == "interrupted":
         return 130

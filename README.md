@@ -128,9 +128,23 @@ Halt authority matches declared coverage: a compiled validator must claim
 (and skip the judge, saving the run's dominant cost), but its passes defer to
 the judge and never halt as "validated". For research work, `--research` wraps
 the problem in the graded-rubric template proven across the live P-vs-NP runs
-and defaults the ladder to Sonnet+; `--corpus bibliography.txt` powers the
-citation firewall with a curated file (see `examples/complexity-bibliography.txt`)
-via `CorpusRetriever` — no LightRAG required.
+and applies the doctrine those runs earned as defaults: a Sonnet+ ladder, the
+judge pinned to Opus, and 3-vote median scoring (explicit flags still win);
+`--corpus bibliography.txt` powers the citation firewall with a curated file
+(see `examples/complexity-bibliography.txt`) via `CorpusRetriever` — no
+LightRAG required.
+
+Rung 1 runs live via Lean 4: `--lean-gate` mechanically rejects any answer
+whose ```lean blocks fail to compile (compiler errors are fed back into the
+next step), while passes defer to the judge — compiling is not the same as
+proving the right thing. `--lean-statement FILE` upgrades to a **decider**: a
+trusted skeleton pins the theorem statement, the model contributes only the
+proof, and a validated halt requires a kernel-checked compile plus a
+`#print axioms` audit against Lean's three standard axioms (failing closed).
+`--trace-dir runs` persists every run's trace, summary, and decider artifacts
+so any claim is auditable offline; `lean/` is the pinned Mathlib project and
+`scripts/install_lean.sh` installs the toolchain (building from source where
+egress policy blocks release binaries).
 
 ## Safety rails
 

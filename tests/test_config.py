@@ -55,3 +55,44 @@ def test_empty_ladder_is_a_safe_noop():
     trace = recurse("x", client=StubClient(), config=RecurseConfig(ladder=()))
     assert trace.stop_reason == "no-op"
     assert trace.final_answer == ""
+
+
+def test_research_mode_applies_doctrine_defaults():
+    """--research defaults: Sonnet+ ladder, pinned OPUS judge, 3-vote median."""
+
+    from types import SimpleNamespace
+
+    from headroom_recursion.cli import build_config
+    from headroom_recursion.config import OPUS, RESEARCH_LADDER
+
+    def args(**over):
+        base = dict(
+            ladder=None, n=None, steps=None, threshold=None, temperature=None,
+            judge_model=None, judge_votes=None, retrieval_k=None,
+            retrieval_max_chars=None, max_calls=None, max_seconds=None,
+            no_headroom=False, research=True,
+        )
+        base.update(over)
+        return SimpleNamespace(**base)
+
+    cfg = build_config(args())
+    assert cfg.ladder == RESEARCH_LADDER
+    assert cfg.judge_model == OPUS and cfg.judge_votes == 3
+
+    cfg = build_config(args(judge_model="claude-haiku-4-5-20251001", judge_votes=1))
+    assert cfg.judge_model == "claude-haiku-4-5-20251001" and cfg.judge_votes == 1
+
+
+def test_trace_persist_writes_json_and_summary(tmp_path):
+    from headroom_recursion.trace import RunTrace
+
+    trace = RunTrace(problem="p", final_answer="42", halted=True, stop_reason="halt")
+    path = trace.persist(str(tmp_path), stem="run-001")
+
+    import json as _json
+
+    with open(path) as fh:
+        data = _json.load(fh)
+    assert data["final_answer"] == "42"
+    summary = (tmp_path / "run-001.summary.txt").read_text()
+    assert "stop_reason : halt" in summary and "42" in summary
