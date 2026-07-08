@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import os
+import time
 from dataclasses import dataclass, field, asdict
 from typing import Any, Optional
 
@@ -145,6 +148,25 @@ class RunTrace:
         if self.tokens_before <= 0:
             return 0.0
         return 100.0 * self.tokens_saved / self.tokens_before
+
+    def persist(self, directory: str, stem: Optional[str] = None) -> str:
+        """Write ``<stem>.json`` + ``<stem>.summary.txt`` into ``directory``.
+
+        The evidence rule: any claim a run makes must be reproducible from
+        artifacts alone, so both the machine-readable trace and the human
+        summary land on disk. Returns the JSON path. Never raises past OSError
+        context — callers persist evidence on the failure path too.
+        """
+
+        os.makedirs(directory, exist_ok=True)
+        if stem is None:
+            stem = time.strftime("run-%Y%m%dT%H%M%SZ", time.gmtime())
+        json_path = os.path.join(directory, f"{stem}.json")
+        with open(json_path, "w", encoding="utf-8") as fh:
+            json.dump(self.to_dict(), fh, indent=2)
+        with open(os.path.join(directory, f"{stem}.summary.txt"), "w", encoding="utf-8") as fh:
+            fh.write(self.summary() + "\n")
+        return json_path
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
