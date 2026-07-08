@@ -1,0 +1,12 @@
+name = "leanoracle"
+defaultTargets = ["LeanOracle"]
+
+# Mathlib pinned to a release tag: lean-toolchain is copied verbatim from this tag,
+# and `lake exe cache get` only serves prebuilt oleans for exact pinned commits.
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.31.0"
+
+[[lean_lib]]
+name = "LeanOracle"

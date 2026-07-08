@@ -1,0 +1,337 @@
+[01:06:13] === install_lean.sh start (current level: none) ===
+[01:06:13] installing elan
+[01:06:13] + sh -c curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+info: downloading installer
+curl: (22) The requested URL returned error: 403
+elan: command failed: curl -sSfL https://github.com/leanprover/elan/releases/latest/download/elan-x86_64-unknown-linux-gnu.tar.gz
+[01:06:14] FATAL: elan install failed (see log). Level: none
+[01:11:09] === install_lean.sh start (current level: none) ===
+[01:11:09] installing elan
+[01:11:09] + sh -c curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+info: downloading installer
+curl: (22) The requested URL returned error: 403
+elan: command failed: curl -sSfL https://github.com/leanprover/elan/releases/latest/download/elan-x86_64-unknown-linux-gnu.tar.gz
+[01:11:10] elan install failed (release downloads may be egress-blocked)
+[01:11:10] falling back to FROM-SOURCE build of lean4 @ v4.31.0 (sanctioned git route; ~1-2h)
+[01:11:10] + git clone --depth 1 --branch v4.31.0 https://github.com/leanprover/lean4 /root/lean4-src
+Cloning into '/root/lean4-src'...
+Note: switching to '68218e876d2a38b1985b8590fff244a83c321783'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Updating files:  31% (4037/12738)Updating files:  32% (4077/12738)Updating files:  33% (4204/12738)Updating files:  34% (4331/12738)Updating files:  35% (4459/12738)Updating files:  35% (4538/12738)Updating files:  36% (4586/12738)Updating files:  37% (4714/12738)Updating files:  38% (4841/12738)Updating files:  39% (4968/12738)Updating files:  39% (5065/12738)Updating files:  40% (5096/12738)Updating files:  41% (5223/12738)Updating files:  42% (5350/12738)Updating files:  43% (5478/12738)Updating files:  44% (5605/12738)Updating files:  45% (5733/12738)Updating files:  46% (5860/12738)Updating files:  47% (5987/12738)Updating files:  48% (6115/12738)Updating files:  49% (6242/12738)Updating files:  50% (6369/12738)Updating files:  51% (6497/12738)Updating files:  52% (6624/12738)Updating files:  53% (6752/12738)Updating files:  54% (6879/12738)Updating files:  55% (7006/12738)Updating files:  56% (7134/12738)Updating files:  57% (7261/12738)Updating files:  58% (7389/12738)Updating files:  59% (7516/12738)Updating files:  60% (7643/12738)Updating files:  61% (7771/12738)Updating files:  62% (7898/12738)Updating files:  63% (8025/12738)Updating files:  64% (8153/12738)Updating files:  65% (8280/12738)Updating files:  66% (8408/12738)Updating files:  67% (8535/12738)Updating files:  68% (8662/12738)Updating files:  69% (8790/12738)Updating files:  70% (8917/12738)Updating files:  71% (9044/12738)Updating files:  72% (9172/12738)Updating files:  73% (9299/12738)Updating files:  74% (9427/12738)Updating files:  75% (9554/12738)Updating files:  76% (9681/12738)Updating files:  77% (9809/12738)Updating files:  78% (9936/12738)Updating files:  79% (10064/12738)Updating files:  80% (10191/12738)Updating files:  81% (10318/12738)Updating files:  82% (10446/12738)Updating files:  83% (10573/12738)Updating files:  84% (10700/12738)Updating files:  85% (10828/12738)Updating files:  86% (10955/12738)Updating files:  87% (11083/12738)Updating files:  88% (11210/12738)Updating files:  89% (11337/12738)Updating files:  90% (11465/12738)Updating files:  91% (11592/12738)Updating files:  92% (11719/12738)Updating files:  93% (11847/12738)Updating files:  94% (11974/12738)Updating files:  95% (12102/12738)Updating files:  96% (12229/12738)Updating files:  97% (12356/12738)Updating files:  98% (12484/12738)Updating files:  99% (12611/12738)Updating files: 100% (12738/12738)Updating files: 100% (12738/12738), done.
+[01:11:43] + cmake --preset release
+-- The CXX compiler identification is GNU 13.3.0
+-- The C compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found Git: /usr/bin/git (found version "2.43.0") 
+-- 
+-- No build type selected, default to 'Release'
+-- Architecture: x64
+-- Override standard malloc (MI_OVERRIDE=ON)
+-- Performing Test mi_has_libpthread
+-- Performing Test mi_has_libpthread - Success
+-- Performing Test mi_has_librt
+-- Performing Test mi_has_librt - Success
+-- Performing Test mi_has_libatomic
+-- Performing Test mi_has_libatomic - Success
+-- 
+-- Library name     : mimalloc
+-- Version          : 2.2.3
+-- Build type       : release
+-- C Compiler       : /usr/bin/cc
+-- Compiler flags   : -Wall;-Wextra;-Wno-unknown-pragmas;-fvisibility=hidden;-Wstrict-prototypes;-ftls-model=initial-exec;-fno-builtin-malloc
+-- Compiler defines : MI_CMAKE_BUILD_TYPE=release;MI_BUILD_RELEASE
+-- Link libraries   : pthread;rt;atomic
+-- Build targets    : shared;static;object;tests
+-- 
+-- Configuring done (3.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: /root/lean4-src/build/release
+[01:11:47] + make -C build/release -j4 stage1
+make: Entering directory '/root/lean4-src/build/release'
+make[1]: Entering directory '/root/lean4-src/build/release'
+make[2]: Entering directory '/root/lean4-src/build/release'
+make[3]: Entering directory '/root/lean4-src/build/release'
+make[3]: Leaving directory '/root/lean4-src/build/release'
+make[3]: Entering directory '/root/lean4-src/build/release'
+[  4%] Creating directories for 'cadical'
+[  8%] Performing download step (git clone) for 'cadical'
+Cloning into 'cadical'...
+HEAD is now at 3ff42f04 fixed version number in NEWS
+[ 12%] Performing update step for 'cadical'
+[ 16%] No patch step for 'cadical'
+[ 20%] No configure step for 'cadical'
+[ 25%] Performing build step for 'cadical'
+make[4]: Entering directory '/root/lean4-src/build/release/cadical/src/cadical'
+make[4]: Leaving directory '/root/lean4-src/build/release/cadical/src/cadical'
+[ 29%] No install step for 'cadical'
+[ 33%] Completed 'cadical'
+make[3]: Leaving directory '/root/lean4-src/build/release'
+[ 33%] Built target cadical
+make[3]: Entering directory '/root/lean4-src/build/release'
+make[3]: Leaving directory '/root/lean4-src/build/release'
+make[3]: Entering directory '/root/lean4-src/build/release'
+[ 37%] Creating directories for 'stage0'
+[ 41%] No download step for 'stage0'
+[ 45%] No update step for 'stage0'
+[ 50%] No patch step for 'stage0'
+[ 54%] Performing configure step for 'stage0'
+-- The CXX compiler identification is GNU 13.3.0
+-- The C compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+cc: error: unrecognized command-line option '--print-target-triple'
+cc: fatal error: no input files
+compilation terminated.
+-- No build type selected, default to Release
+-- 64-bit machine detected
+-- Found GMP: /usr/include/x86_64-linux-gnu (Required is at least version "5.0.5") 
+-- Found PkgConfig: /usr/bin/pkg-config (found version "1.8.1") 
+-- Checking for one of the modules 'libuv'
+-- LIBUV_LDFLAGS: -L/usr/lib/x86_64-linux-gnu-luv-lpthread-ldl-lrt
+-- LIBUV_INCLUDE_DIRS: /usr/include
+-- Found LibUV: TRUE (Required is at least version "1.0.0") 
+CMake Warning at CMakeLists.txt:452 (message):
+  Disabling LLVM support
+
+
+-- stage0 sha1: ac979599759bc90431d943fb8c2b2faba2ee8ef9
+-- Configuring done (0.6s)
+-- Generating done (0.0s)
+-- Build files have been written to: /root/lean4-src/build/release/stage0
+[ 58%] Performing build step for 'stage0'
+make[4]: Entering directory '/root/lean4-src/build/release/stage0'
+make[5]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[  0%] Building CXX object library/constructions/CMakeFiles/constructions.dir/cases_on.cpp.o
+[  1%] Building CXX object util/CMakeFiles/util.dir/name.cpp.o
+[  2%] Building CXX object CMakeFiles/leanshell.dir/util/shell.cpp.o
+[  2%] Building CXX object initialize/CMakeFiles/initialize.dir/init.cpp.o
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[  2%] Built target initialize
+[  3%] Building CXX object util/CMakeFiles/util.dir/name_set.cpp.o
+[  3%] Linking CXX static library lib/temp/libleanshell.a
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[  3%] Built target leanshell
+[  3%] Building CXX object util/CMakeFiles/util.dir/escaped.cpp.o
+[  4%] Building CXX object library/constructions/CMakeFiles/constructions.dir/init_module.cpp.o
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[  5%] Building CXX object kernel/CMakeFiles/kernel.dir/level.cpp.o
+[  6%] Building CXX object kernel/CMakeFiles/kernel.dir/expr.cpp.o
+[  7%] Building CXX object util/CMakeFiles/util.dir/bit_tricks.cpp.o
+[  8%] Building CXX object library/constructions/CMakeFiles/constructions.dir/util.cpp.o
+[  9%] Building CXX object util/CMakeFiles/util.dir/ascii.cpp.o
+[  9%] Building CXX object util/CMakeFiles/util.dir/path.cpp.o
+[ 10%] Building CXX object kernel/CMakeFiles/kernel.dir/expr_eq_fn.cpp.o
+[ 11%] Building CXX object util/CMakeFiles/util.dir/lbool.cpp.o
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[ 12%] Building CXX object library/CMakeFiles/library.dir/expr_lt.cpp.o
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 12%] Built target constructions
+[ 13%] Building CXX object util/CMakeFiles/util.dir/init_module.cpp.o
+[ 14%] Building CXX object library/CMakeFiles/library.dir/bin_app.cpp.o
+[ 15%] Building CXX object util/CMakeFiles/util.dir/list_fn.cpp.o
+[ 15%] Building CXX object kernel/CMakeFiles/kernel.dir/for_each_fn.cpp.o
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+Error copying file (if different) from "/root/lean4-src/build/release/leantar/leantar-v0.1.19-x86_64-unknown-linux-musl/leantar" to "/root/lean4-src/build/release/stage0/bin/leantar".
+make[6]: *** [CMakeFiles/copy-leantar.dir/build.make:70: CMakeFiles/copy-leantar] Error 1
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[5]: *** [CMakeFiles/Makefile2:1104: CMakeFiles/copy-leantar.dir/all] Error 2
+make[5]: *** Waiting for unfinished jobs....
+[ 15%] Building CXX object util/CMakeFiles/util.dir/timeit.cpp.o
+[ 16%] Building CXX object library/CMakeFiles/library.dir/constants.cpp.o
+[ 17%] Building CXX object kernel/CMakeFiles/kernel.dir/replace_fn.cpp.o
+[ 18%] Building CXX object util/CMakeFiles/util.dir/timer.cpp.o
+[ 18%] Building CXX object library/CMakeFiles/library.dir/max_sharing.cpp.o
+[ 19%] Building CXX object util/CMakeFiles/util.dir/name_generator.cpp.o
+[ 20%] Building CXX object kernel/CMakeFiles/kernel.dir/abstract.cpp.o
+[ 21%] Building CXX object library/CMakeFiles/library.dir/module.cpp.o
+[ 22%] Building CXX object kernel/CMakeFiles/kernel.dir/instantiate.cpp.o
+[ 23%] Building CXX object util/CMakeFiles/util.dir/kvmap.cpp.o
+[ 23%] Building CXX object util/CMakeFiles/util.dir/map_foreach.cpp.o
+/root/lean4-src/stage0/src/library/module.cpp: In function 'lean::object* lean::lean_compacted_region_save(b_obj_arg, b_obj_arg, b_obj_arg, b_obj_arg, obj_arg, object*)':
+/root/lean4-src/stage0/src/library/module.cpp:237:16: warning: 'char* __builtin_strncpy(char*, const char*, long unsigned int)' output truncated before terminating nul copying 40 bytes from a string of the same length [-Wstringop-truncation]
+  237 |         strncpy(header.githash, LEAN_GITHASH, sizeof(header.githash));
+      |                ^
+/root/lean4-src/stage0/src/library/module.cpp:236:16: warning: 'char* __builtin_strncpy(char*, const char*, long unsigned int)' specified bound 33 equals destination size [-Wstringop-truncation]
+  236 |         strncpy(header.lean_version, get_short_version_string().c_str(), sizeof(header.lean_version));
+      |                ^
+[ 24%] Building CXX object library/CMakeFiles/library.dir/dynlib.cpp.o
+[ 24%] Building CXX object kernel/CMakeFiles/kernel.dir/local_ctx.cpp.o
+[ 25%] Building CXX object kernel/CMakeFiles/kernel.dir/declaration.cpp.o
+[ 26%] Building CXX object util/CMakeFiles/util.dir/options.cpp.o
+[ 27%] Building CXX object library/CMakeFiles/library.dir/replace_visitor.cpp.o
+[ 27%] Building CXX object library/CMakeFiles/library.dir/num.cpp.o
+[ 28%] Building CXX object util/CMakeFiles/util.dir/option_declarations.cpp.o
+[ 29%] Building CXX object kernel/CMakeFiles/kernel.dir/environment.cpp.o
+[ 30%] Building CXX object util/CMakeFiles/util.dir/ffi.cpp.o
+In file included from /root/lean4-src/build/release/stage0/util/ffi.cpp:8:
+/root/lean4-src/build/release/stage0/include/lean/lean.h:75:21: warning: attributes are not permitted in this position [-Wattributes]
+   75 | #define LEAN_EXPORT __attribute__((visibility("default")))
+      |                     ^~~~~~~~~~~~~
+/root/lean4-src/build/release/stage0/util/ffi.cpp:12:1: note: in expansion of macro 'LEAN_EXPORT'
+   12 | LEAN_EXPORT extern "C" object * lean_get_leanc_extra_flags(object *) {
+      | ^~~~~~~~~~~
+/root/lean4-src/build/release/stage0/util/ffi.cpp:12:23: note: attributes may be inserted here
+   12 | LEAN_EXPORT extern "C" object * lean_get_leanc_extra_flags(object *) {
+      |                       ^
+/root/lean4-src/build/release/stage0/include/lean/lean.h:75:21: warning: attributes are not permitted in this position [-Wattributes]
+   75 | #define LEAN_EXPORT __attribute__((visibility("default")))
+      |                     ^~~~~~~~~~~~~
+/root/lean4-src/build/release/stage0/util/ffi.cpp:16:1: note: in expansion of macro 'LEAN_EXPORT'
+   16 | LEAN_EXPORT extern "C" object * lean_get_leanc_internal_flags(object *) {
+      | ^~~~~~~~~~~
+/root/lean4-src/build/release/stage0/util/ffi.cpp:16:23: note: attributes may be inserted here
+   16 | LEAN_EXPORT extern "C" object * lean_get_leanc_internal_flags(object *) {
+      |                       ^
+/root/lean4-src/build/release/stage0/include/lean/lean.h:75:21: warning: attributes are not permitted in this position [-Wattributes]
+   75 | #define LEAN_EXPORT __attribute__((visibility("default")))
+      |                     ^~~~~~~~~~~~~
+/root/lean4-src/build/release/stage0/util/ffi.cpp:20:1: note: in expansion of macro 'LEAN_EXPORT'
+   20 | LEAN_EXPORT extern "C" object * lean_get_linker_flags(uint8 link_static) {
+      | ^~~~~~~~~~~
+/root/lean4-src/build/release/stage0/util/ffi.cpp:20:23: note: attributes may be inserted here
+   20 | LEAN_EXPORT extern "C" object * lean_get_linker_flags(uint8 link_static) {
+      |                       ^
+/root/lean4-src/build/release/stage0/include/lean/lean.h:75:21: warning: attributes are not permitted in this position [-Wattributes]
+   75 | #define LEAN_EXPORT __attribute__((visibility("default")))
+      |                     ^~~~~~~~~~~~~
+/root/lean4-src/build/release/stage0/util/ffi.cpp:24:1: note: in expansion of macro 'LEAN_EXPORT'
+   24 | LEAN_EXPORT extern "C" object * lean_get_internal_linker_flags(object *) {
+      | ^~~~~~~~~~~
+/root/lean4-src/build/release/stage0/util/ffi.cpp:24:23: note: attributes may be inserted here
+   24 | LEAN_EXPORT extern "C" object * lean_get_internal_linker_flags(object *) {
+      |                       ^
+[ 30%] Building CXX object kernel/CMakeFiles/kernel.dir/type_checker.cpp.o
+[ 31%] Building CXX object library/CMakeFiles/library.dir/util.cpp.o
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 31%] Built target util
+[ 32%] Building CXX object library/CMakeFiles/library.dir/print.cpp.o
+[ 33%] Building CXX object library/CMakeFiles/library.dir/annotation.cpp.o
+[ 34%] Building CXX object kernel/CMakeFiles/kernel.dir/init_module.cpp.o
+[ 35%] Building CXX object kernel/CMakeFiles/kernel.dir/expr_cache.cpp.o
+[ 35%] Building CXX object library/CMakeFiles/library.dir/init_module.cpp.o
+[ 36%] Building CXX object library/CMakeFiles/library.dir/profiling.cpp.o
+[ 37%] Building CXX object library/CMakeFiles/library.dir/time_task.cpp.o
+[ 38%] Building CXX object kernel/CMakeFiles/kernel.dir/equiv_manager.cpp.o
+[ 38%] Building CXX object library/CMakeFiles/library.dir/formatter.cpp.o
+[ 39%] Building CXX object library/CMakeFiles/library.dir/elab_environment.cpp.o
+[ 39%] Building CXX object kernel/CMakeFiles/kernel.dir/quot.cpp.o
+[ 40%] Building CXX object library/CMakeFiles/library.dir/init_attribute.cpp.o
+[ 41%] Building CXX object kernel/CMakeFiles/kernel.dir/inductive.cpp.o
+[ 42%] Building CXX object kernel/CMakeFiles/kernel.dir/trace.cpp.o
+[ 43%] Building CXX object library/CMakeFiles/library.dir/llvm.cpp.o
+[ 43%] Building CXX object library/CMakeFiles/library.dir/ir_interpreter.cpp.o
+[ 44%] Building CXX object library/CMakeFiles/library.dir/instantiate_mvars.cpp.o
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 44%] Built target kernel
+/root/lean4-src/stage0/src/library/instantiate_mvars.cpp: In member function 'lean::level lean::instantiate_lmvars_all_fn::visit(const lean::level&)':
+/root/lean4-src/stage0/src/library/instantiate_mvars.cpp:167:5: warning: control reaches end of non-void function [-Wreturn-type]
+  167 |     }
+      |     ^
+/root/lean4-src/stage0/src/library/instantiate_mvars.cpp: In member function 'lean::expr lean::instantiate_direct_fn::visit(const lean::expr&)':
+/root/lean4-src/stage0/src/library/instantiate_mvars.cpp:325:5: warning: control reaches end of non-void function [-Wreturn-type]
+  325 |     }
+      |     ^
+In static member function 'static lean::object* lean::ir::interpreter::stub_m_aux(lean::object**)',
+    inlined from 'static lean::object* lean::ir::interpreter::stub_1_aux(lean::object*)' at /root/lean4-src/stage0/src/library/ir_interpreter.cpp:1006:105:
+/root/lean4-src/stage0/src/library/ir_interpreter.cpp:999:29: warning: array subscript 1 is outside array bounds of 'lean::object* [1]' {aka 'lean_object* [1]'} [-Warray-bounds=]
+  999 |         options opts(args[1]);
+      |                             ^
+/root/lean4-src/stage0/src/library/ir_interpreter.cpp: In static member function 'static lean::object* lean::ir::interpreter::stub_1_aux(lean::object*)':
+/root/lean4-src/stage0/src/library/ir_interpreter.cpp:1006:57: note: at offset 8 into object 'args' of size 8
+ 1006 |     static object * stub_1_aux(object * x_1) { object * args[] = { x_1 }; return interpreter::stub_m_aux(args); }
+      |                                                         ^~~~
+In file included from /root/lean4-src/stage0/src/runtime/string_ref.h:10,
+                 from /root/lean4-src/stage0/src/util/name.h:14,
+                 from /root/lean4-src/stage0/src/util/name_set.h:9,
+                 from /root/lean4-src/stage0/src/kernel/environment.h:15,
+                 from /root/lean4-src/stage0/src/library/elab_environment.h:8,
+                 from /root/lean4-src/stage0/src/library/ir_interpreter.h:8,
+                 from /root/lean4-src/stage0/src/library/ir_interpreter.cpp:38:
+In member function 'lean::object* lean::object_ref::raw() const',
+    inlined from 'const T& lean::cnstr_get_ref_t(const object_ref&, unsigned int) [with T = name]' at /root/lean4-src/stage0/src/runtime/object_ref.h:146:48,
+    inlined from 'const lean::ir::fun_id& lean::ir::decl_fun_id(const decl&)' at /root/lean4-src/stage0/src/library/ir_interpreter.cpp:180:76,
+    inlined from 'static lean::object* lean::ir::interpreter::stub_m_aux(lean::object**)' at /root/lean4-src/stage0/src/library/ir_interpreter.cpp:1000:65,
+    inlined from 'static lean::object* lean::ir::interpreter::stub_1_aux(lean::object*)' at /root/lean4-src/stage0/src/library/ir_interpreter.cpp:1006:105:
+/root/lean4-src/stage0/src/runtime/object_ref.h:42:35: warning: array subscript 2 is outside array bounds of 'lean::object* [1]' {aka 'lean_object* [1]'} [-Warray-bounds=]
+   42 |     object * raw() const { return m_obj; }
+      |                                   ^~~~~
+/root/lean4-src/stage0/src/library/ir_interpreter.cpp: In static member function 'static lean::object* lean::ir::interpreter::stub_1_aux(lean::object*)':
+/root/lean4-src/stage0/src/library/ir_interpreter.cpp:1006:57: note: at offset 16 into object 'args' of size 8
+ 1006 |     static object * stub_1_aux(object * x_1) { object * args[] = { x_1 }; return interpreter::stub_m_aux(args); }
+      |                                                         ^~~~
+In member function 'lean::object* lean::object_ref::raw() const',
+    inlined from 'const T& lean::cnstr_get_ref_t(const object_ref&, unsigned int) [with T = name]' at /root/lean4-src/stage0/src/runtime/object_ref.h:146:48,
+    inlined from 'const lean::ir::fun_id& lean::ir::decl_fun_id(const decl&)' at /root/lean4-src/stage0/src/library/ir_interpreter.cpp:180:76,
+    inlined from 'static lean::object* lean::ir::interpreter::stub_m_aux(lean::object**)' at /root/lean4-src/stage0/src/library/ir_interpreter.cpp:1000:65,
+    inlined from 'static lean::object* lean::ir::interpreter::stub_2_aux(lean::object*, lean::object*)' at /root/lean4-src/stage0/src/library/ir_interpreter.cpp:1007:124:
+/root/lean4-src/stage0/src/runtime/object_ref.h:42:35: warning: array subscript 2 is outside array bounds of 'lean::object* [2]' {aka 'lean_object* [2]'} [-Warray-bounds=]
+   42 |     object * raw() const { return m_obj; }
+      |                                   ^~~~~
+/root/lean4-src/stage0/src/library/ir_interpreter.cpp: In static member function 'static lean::object* lean::ir::interpreter::stub_2_aux(lean::object*, lean::object*)':
+/root/lean4-src/stage0/src/library/ir_interpreter.cpp:1007:71: note: at offset 16 into object 'args' of size 16
+ 1007 |     static object * stub_2_aux(object * x_1, object * x_2) { object * args[] = { x_1, x_2 }; return interpreter::stub_m_aux(args); }
+      |                                                                       ^~~~
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 44%] Built target library
+make[5]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[4]: *** [Makefile:146: all] Error 2
+make[4]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[3]: *** [CMakeFiles/stage0.dir/build.make:95: stage0-prefix/src/stage0-stamp/stage0-build] Error 2
+make[3]: Leaving directory '/root/lean4-src/build/release'
+make[2]: *** [CMakeFiles/Makefile2:157: CMakeFiles/stage0.dir/all] Error 2
+make[2]: Leaving directory '/root/lean4-src/build/release'
+make[1]: *** [CMakeFiles/Makefile2:192: CMakeFiles/stage1.dir/rule] Error 2
+make[1]: Leaving directory '/root/lean4-src/build/release'
+make: *** [Makefile:195: stage1] Error 2
+make: Leaving directory '/root/lean4-src/build/release'
+[01:12:49] FATAL: lean4 source build failed. Level: none
