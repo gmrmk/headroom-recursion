@@ -150,12 +150,25 @@ def run_tier(
         # and only its REJECTIONS are mechanical (final for the step, judge
         # skipped). Sufficient validators keep full halt authority.
         gate_rejected = False
-        gate_passed = False
+        gate_note_text = ""
         if cfg.validator is not None and not cfg.oracle_sufficient:
-            passed, validator_error, _ = _safe_validate(cfg.validator, answer)
+            passed, validator_error, gate_verdict = _safe_validate(cfg.validator, answer)
             validated, verdict_obj = False, None
-            if passed:
-                gate_passed = True
+            if validator_error:
+                # An ERRORED oracle checked nothing. It must never mechanically
+                # reject — one broken toolchain would zero every step of a run.
+                # The judge scores the step, told that the gate was down.
+                gate_note_text = (
+                    f"the mechanical gate ERRORED ({validator_error}) — nothing "
+                    "was checked; correctness is entirely yours to score"
+                )
+            elif passed:
+                detail = (
+                    gate_verdict.note
+                    if gate_verdict is not None and gate_verdict.note
+                    else "format/constraints only — correctness is entirely yours to score"
+                )
+                gate_note_text = f"the mechanical gate PASSED ({detail})"
             else:
                 gate_rejected = True
         else:
@@ -172,12 +185,7 @@ def run_tier(
         elif gate_rejected:
             halt_prob, reason = 0.0, "oracle gate rejected (mechanical; judge skipped)"
         else:
-            gate_note = (
-                "\n\n[ORACLE GATE] the mechanical gate PASSED (format/constraints only — "
-                "correctness is entirely yours to score)"
-                if gate_passed
-                else ""
-            )
+            gate_note = f"\n\n[ORACLE GATE] {gate_note_text}" if gate_note_text else ""
             verdict = halting.judge(
                 client,
                 model=judge_model,

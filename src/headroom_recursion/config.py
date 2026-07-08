@@ -128,6 +128,9 @@ class RecurseConfig:
     # Internal: set by the compile step — one line telling the judge what the
     # oracle verifies and what residuals remain for the judge to score.
     oracle_note: str = ""
+    # Internal: verification rung of a hand-wired validator (e.g. 1 for the Lean
+    # oracle), copied into the trace so summaries report it. 0 = unknown/unset.
+    oracle_rung: int = 0
     # Internal: halt authority of the installed validator. True (default, and
     # always true for hand-supplied validators) = a pass halts as "validated".
     # False (compiled oracle that declared itself insufficient) = GATE mode:
