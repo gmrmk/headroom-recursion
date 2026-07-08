@@ -1,0 +1,22 @@
+{
+  "problem_key": "6c2293f54c8418a6",
+  "problem_preview": "GRAND TARGET: Resolve P vs NP.  WORKING TARGET: verified progress toward it.\n\nYou are one step in an iterative refinement loop. Your output will be critiqued,\nrefined, and re-judged many times. Maximize VERIFIED altitude per step, not\napparent completeness.\n\n=== WHAT TO PRODUCE EACH STEP ===\nA cumul",
+  "dry_stop": 2,
+  "max_cost_usd": 10.0,
+  "runs": [
+    {
+      "run": 0,
+      "stem": "run-000",
+      "stop_reason": "exhausted",
+      "halted": false,
+      "best_halt_prob": 0.3,
+      "ledger_improved": true,
+      "calls": 12,
+      "cost_usd_cumulative": 1.3469,
+      "needs_human_review": false
+    }
+  ],
+  "stopped": "exhausted",
+  "total_cost_usd": 1.3469,
+  "total_calls": 12
+}
