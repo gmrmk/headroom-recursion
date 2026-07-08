@@ -146,6 +146,46 @@ so any claim is auditable offline; `lean/` is the pinned Mathlib project and
 `scripts/install_lean.sh` installs the toolchain (building from source where
 egress policy blocks release binaries).
 
+## Independent verification
+
+Compiling a proof on the toolchain we built ourselves is only the first tier of
+trust. `scripts/verify_artifacts.py` re-checks every persisted Lean artifact
+*independently*:
+
+1. **Kernel replay** — `leanchecker` (shipped inside Lean ≥ 4.28) re-runs each
+   proof through the kernel from a fresh environment, catching any
+   elaborator/metaprogram circumvention.
+2. **Second, independent kernel** — the proof is serialized with
+   [`lean4export`](https://github.com/leanprover/lean4export) (v4.31.0) to Lean's
+   NDJSON export format and re-typechecked by
+   [`nanoda`](https://github.com/ammkrn/nanoda_lib), an independently written Rust
+   reimplementation of the Lean kernel, with the axiom set audited against
+   `{propext, Classical.choice, Quot.sound}`. The export file is published, so a
+   third party can re-verify **without trusting our toolchain at all**.
+
+`runs/verify/report.json` records the outcome and the checker versions. What this
+buys, stated honestly: a *sound* proof, re-checked by two independent
+implementations. It does **not** buy novelty — see below.
+
+## Case study: the P vs NP campaign
+
+`runs/FINDINGS.md` is the live-run writeup of pointing this whole stack at
+"Resolve P vs NP" — chosen not because we expected to solve it, but because a
+genuinely open problem is the one benchmark that **cannot be faked**: any credit
+the system awards must be manufactured by its own verification machinery, and a
+"validated" halt would by construction be a bug, not a discovery.
+
+The honest result: **no novel mathematics.** Across every configuration, the
+best judged score was 0.30 (all-`[KNOWN]` restatements; the rubric caps
+fabrication at 0.05 and no run cleared it). The Lean artifacts that *were*
+independently verified — a Shannon-style counting argument, formalized skeletons
+of the relativization and Karp–Lipton barriers — are **classical folklore, not
+new results**; what the kernels confirm is that they are *sound*, and what the
+campaign demonstrates is the *methodology* (verification-gated refinement with
+mechanically-audited credit), not progress on the problem. The value here is a
+loop that reasons hard and refuses to overclaim — including refusing to let its
+own operators call folklore novel.
+
 ## Safety rails
 
 A self-refining loop has sharp edges; these are built in:
@@ -196,16 +236,25 @@ for library / proxy / MCP integration modes.
 
 ```
 SKILL.md                       # the Claude Agent Skill
+CREDITS.md                     # attribution — everyone this work stands on
 src/headroom_recursion/
   config.py    trm.py          # config + the core recursion loop
   ladder.py    halting.py      # tier escalation + the halt predictor
   headroom.py  claude.py       # Headroom compression + the Claude wrapper
-  clients.py                   # CompletionClient protocol + OpenAI-compatible backend
+  clients.py                   # CompletionClient protocol + OpenAI/CLI backends
+  oracle.py    lean_oracle.py  # oracle compiler + rung-1 Lean gate/decider
+  claims.py    ledger.py       # citation firewall + cross-run ledger
+  campaign.py  heartbeat.py    # multi-run goal loop + per-call telemetry
+  doctor.py                    # readiness check (deps, transport, Lean levels)
   retrieval.py                 # optional LightRAG retrieval layer (Claude-backed)
   prompts.py   trace.py  cli.py
+lean/                          # pinned Lean 4 + Mathlib project (rung-1 backend)
+scripts/                       # install_lean.sh, verify_artifacts.py
+runs/                          # persisted evidence: traces, verification, FINDINGS.md
 references/  examples/  tests/
 ```
 
 ## License
 
-MIT.
+MIT — see `CREDITS.md` for the work this builds on and the attribution that
+license (and honesty) asks you to preserve.
