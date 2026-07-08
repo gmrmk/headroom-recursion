@@ -14,6 +14,17 @@
       "calls": 67,
       "cost_usd_cumulative": 35.2423,
       "needs_human_review": false
+    },
+    {
+      "run": 1,
+      "stem": "run-001",
+      "stop_reason": "failed",
+      "halted": false,
+      "best_halt_prob": 0.32,
+      "ledger_improved": false,
+      "calls": 47,
+      "cost_usd_cumulative": 62.5779,
+      "needs_human_review": false
     }
   ]
 }

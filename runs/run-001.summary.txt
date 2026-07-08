@@ -1,73 +1,126 @@
-stop_reason : budget (halted=False)
+stop_reason : failed (halted=False)
 final_model : claude-fable-5
-tier path   : claude-haiku-4-5-20251001: exhausted -> claude-sonnet-5: exhausted -> claude-opus-4-8: exhausted -> claude-fable-5: budget
-steps       : 9   claude calls: 90   wall: 5985.6s
-trajectory  : haiku 0.04 0.06 | sonnet 0.30 0.15 0.15 | opus 0.12 0.12 0.30 | fable 0.12
+tier path   : claude-sonnet-5: exhausted -> claude-opus-4-8: exhausted -> claude-fable-5: failed (RuntimeError: claude CLI failed (claude-fable-5): )
+steps       : 5   claude calls: 47   wall: 4901.4s
+trajectory  : sonnet 0.30 | opus 0.27 0.00 | fable 0.32 0.30
 oracle      : rung 1 (calibrated validator installed, GATE only)
-claim audit : 0 unsourced citation claim(s), 10 [NEW] claim(s) with candidate prior art
-headroom    : 527920 -> 527920 tokens (0% saved)
-retrieval   : 36 snippets injected across 9 steps
-note        : answer taken from step 7 (best halt_prob 0.30), not the last step
+gate        : 1 answer(s) mechanically rejected (judge skipped)
+claim audit : 11 unsourced citation claim(s), 9 [NEW] claim(s) with candidate prior art
+headroom    : 349050 -> 349050 tokens (0% saved)
+retrieval   : 20 snippets injected across 5 steps
+note        : answer taken from step 3 (best halt_prob 0.32), not the last step
 
 ANSWER:
-# P vs NP — Cumulative Research Document (Step 33)
+# P vs NP — Cumulative Research Document (Step 6)
 
 ## 1. ATTACK LINE
 
-I study the constructivity of the canonical high-complexity property and report honestly where it does and does not lead. Fix the total set Π = {f : CC(f) > 2^{εn}} = complement of MCSP[2^{εn}] (N = 2^n; 0 < ε < 1). By the threshold dichotomy (item 9), Π is large (item 8(ii)) and useful against **all** of P/poly (item 9(⇐)) *unconditionally*; its sole missing natural-proof ingredient is constructivity, i.e. whether MCSP[2^{εn}] ∈ DTIME(poly(N)). Naming the object plainly: **the attack line is exactly the known open problem "MCSP[2^{εn}] ∈ P?"**, wrapped in Razborov–Rudich vocabulary. I flag at the outset the structural ceiling this implies (and prove it below at item 12): *neither answer separates P from NP.* A positive answer produces a natural property useful against P/poly — which, by the natural-proofs meta-theorem, is a **barrier** result plus crypto/learning payoffs (item 11), **not** a lower bound for any NP language; it is also widely believed false. A negative answer isolates constructivity as the obstruction but proves no separation. The line is pursued because it is the most concrete crystallization of the barrier landscape around P/poly, not because it has a route to the grand target; no such route is claimed.
+Investigate whether unconditional circuit lower bounds against nonuniform classes (in the style of Kannan (1982)) can be pushed toward P vs NP, while explicitly mapping which known barriers (relativization, algebrization, natural proofs) constrain any such attempt. The substance is unchanged from Step 5; this step reconciles item 4 to a **single consistent scale**. The prior draft trapped the hard function inside the window (nᵏ, n^{k+1}] at the *n-input* scale and justified this by a "monotonicity of realized-function-counts" sentence that was in fact circular (asserting the window is nonempty *is* the goal restated). The repair adopts the textbook log-scale construction (Arora–Barak §6.5): work on m = (k+1)·log₂n inputs, where the whole truth table has poly length 2^m = Θ(n^{k+1}), get existence by counting and window-membership from the Lupanov upper bound — both elementary and self-contained. The FAILED log and the witness framing are reconciled to this same scale so no internal scale contradiction remains. No new [NEW] claim is asserted and none is reachable in this territory (see §3(b)).
 
 ## 2. ESTABLISHED
 
-1. **[KNOWN] Relativization barrier.** There exist oracles A, B with P^A = NP^A and P^B ≠ NP^B (Baker, Gill, Solovay (1975)). Any technique preserved under relativization cannot resolve P vs NP.
+1. **[KNOWN] Relativization barrier.** There exist oracles A, B such that P^A = NP^A and P^B ≠ NP^B (Baker, Gill, Solovay (1975)). Consequence: any proof technique whose correctness is preserved under relativization (goes through unchanged when all machines are given access to an arbitrary oracle) cannot resolve P vs NP, since such a proof would apply equally to the A- and B-worlds and contradict one of the two oracle results. This restricts the space of admissible techniques but says nothing about which specific unconditional results are or are not relativizing.
 
-2. **[KNOWN] Algebrization barrier.** Aaronson and Wigderson (2008) exhibit algebrizing analogues of the BGS oracles, so arithmetization-based techniques (strictly stronger than relativizing ones) cannot by themselves separate P from NP.
+2. **[KNOWN] Algebrization barrier.** Aaronson and Wigderson (2008) extend the oracle-separation technique to "algebrizing" proofs — those that remain valid when machines are given oracle access to a low-degree extension of a function over a larger field, in addition to the function itself. They exhibit algebrizing analogues of the BGS oracles, showing that arithmetization-based techniques (which underlie essentially all non-relativizing results known at the time, e.g., IP = PSPACE) also cannot, by themselves, separate P from NP. This is a strictly stronger barrier than relativization: a technique that evades relativization is not automatically safe unless it also evades algebrization.
 
-3. **[KNOWN] Karp–Lipton theorem.** If NP ⊆ P/poly then PH collapses to Σ2^p (Karp and Lipton (1980)). A guessed poly-size SAT-circuit is universally checkable via SAT's downward self-reducibility, collapsing any Π2^p statement to two alternations.
+3. **[KNOWN] Karp–Lipton theorem.** If NP ⊆ P/poly, then the polynomial hierarchy collapses to Σ2^p (Karp and Lipton (1980); the Σ2 form is due to Sipser, with a further strengthening by Yap). Proof idea (self-contained): assume NP ⊆ P/poly, so SAT has polynomial-size circuits. A Σ2^p predicate can existentially guess such a circuit C and then, using the downward self-reducibility of SAT, universally verify that C correctly decides SAT on all inputs of the relevant length — a guessed circuit that solves the search problem for satisfying assignments can be checked for correctness by a co-NP-style universal check. Given a correct polynomial-size SAT circuit available under a single existential guess, any Π2^p (equivalently any level-3) statement can be re-expressed with only two alternations, collapsing PH to Σ2^p. This is the standard tool linking nonuniform circuit assumptions to consequences for uniform complexity classes, and it is used in a load-bearing way in item 4.
 
-4. **[KNOWN] Kannan's fixed-polynomial circuit lower bound.** For every constant k, Σ2^p ∩ Π2^p ⊄ SIZE(n^k) (Kannan (1982)). Cited for statement only; the Karp–Lipton case split is not reconstructed here.
+4. **[KNOWN] Kannan's fixed-polynomial circuit lower bound.** For every constant k, there is a language in Σ2^p ∩ Π2^p that is not in SIZE(n^k) (Kannan (1982)). Proof (self-contained; the sole cited ingredient is the Lupanov upper bound, a standard textbook fact):
 
-5. **[KNOWN] Natural proofs barrier.** A property of Boolean functions (a subset of {0,1}^N, N = 2^n, tested on truth tables) is *natural* if it is (a) **constructive** — membership decidable in poly(N) = 2^{O(n)} time from the truth table; (b) **large** — satisfied by a ≥ 1/poly(N) fraction of n-input functions; (c) **useful** — no P/poly family satisfies it for all but finitely many n. Razborov and Rudich (1997): if strong (exponentially hard) pseudorandom function generators exist, then no natural property is useful against P/poly. *This is a meta-theorem about the limits of lower-bound methods; usefulness (5c) asserts that the property's members are hard for P/poly, and places no specific language into the property.*
+   *(i) A hard function trapped in the polynomial window, at log scale.* Fix k. Set **m = ⌈(k+1)·log₂ n⌉**, so n^{k+1} ≤ 2^m < 2n^{k+1}, i.e. 2^m = Θ(n^{k+1}). Work with Boolean functions on m inputs; the key structural fact is that a full m-input truth table has length 2^m = poly(n), so it is itself a polynomial-length object.
 
-6. **[KNOWN] MCSP definition and NP-membership.** Fix a finite complete basis. MCSP[s] takes a truth table T ∈ {0,1}^N (N = 2^n, encoding f : {0,1}^n → {0,1}) and threshold s = s(n) in binary, and asks whether CC(f) ≤ s. **Argument (complete):** a certificate names a circuit C with ≤ s gates — each gate O(log(s+n)) bits for its ≤ 2 input wires among ≤ s+n available, plus O(1) for type — so |cert| = O(s·log(s+n)); the verifier evaluates C on all N inputs in O(N·s) time. Both are poly(N) when s ≤ poly(N). Hence MCSP ∈ NP (Kabanets and Cai (2000), building on Trakhtenbrot–Yablonski circuit minimization).
+   - **(1a) Existence, by counting [proved here, elementary].** Over a fixed finite basis, the number of circuits of size ≤ n^k is at most 2^{O(n^k log n)}. The number of distinct m-input Boolean functions is 2^{2^m} ≥ 2^{n^{k+1}}. Since n^k log n = o(n^{k+1}), we have 2^{O(n^k log n)} < 2^{n^{k+1}} ≤ 2^{2^m} for all large n, so the evaluation map {circuits of size ≤ n^k} → {m-input functions} is not surjective: some m-input function g has circuit complexity C(g) > n^k. (This is the abstract pigeonhole step formalized in Lean Block 1.)
 
-7. **[KNOWN] MCSP's NP-hardness status is open.** Whether MCSP is NP-hard under poly-time many-one reductions is an explicit long-standing open problem (Kabanets and Cai (2000)); standard local/gadget reductions have not been made to work against it.
+   - **(1b) Window membership, by Lupanov [cited ingredient, then elementary].** The Shannon–Lupanov upper bound states that *every* m-input Boolean function has circuit complexity ≤ (1+o(1))·2^m/m (Lupanov (1958); Arora–Barak §6.5). Applied to g:
+     C(g) ≤ (1+o(1))·2^m/m ≤ (1+o(1))·2n^{k+1}/((k+1)·log₂ n) < n^{k+1} for all large n.
+     Combined with (1a), C(g) ∈ (n^k, n^{k+1}]. The window is nonempty because its *width* n^{k+1} − n^k exceeds the Lupanov ceiling gap; no monotonicity-of-counts fact is invoked. (The Step 5 draft's "the number of realizable functions strictly increases between s=n^k and s=n^{k+1}" was circular — logically equivalent to the very claim "some function has complexity in (n^k, n^{k+1}]" — and is removed.)
 
-8. **[KNOWN] Circuit counting; largeness of the high-complexity property.** Over a fixed finite basis the number of circuits on n inputs with ≤ s gates (s ≥ n) is at most s^{O(s)} = 2^{O(s log s)} (each gate: O(log s) wire bits + O(1) type bits). Mapping each function of circuit complexity ≤ s to one witnessing circuit is injective, so at most 2^{O(s log s)} functions have CC ≤ s (Arora and Barak (2009), Ch. 6). Two instances: **(i)** s = n^k gives ≤ 2^{O(n^k log n)} functions of CC ≤ n^k, a fraction → 0 of the 2^{2^n} functions, so "CC > n^k" has density → 1 (large). **(ii)** s = 2^{εn} (ε < 1) gives ≤ 2^{O(εn·2^{εn})} = 2^{o(2^n)} functions of CC ≤ 2^{εn}, so "CC > 2^{εn}" also has density → 1 (large). Both far exceed RR's 1/poly(N) largeness threshold.
+   - **(1c) A definite hard function, and padding to n inputs.** Take g* = the lexicographically first m-input truth table with C(g*) > n^k (well-defined by (1a); it satisfies C(g*) ∈ (n^k, n^{k+1}] by (1b)). Pad g* to an n-input function ĝ that ignores its last n − m inputs. If ĝ had an n-input circuit of size ≤ n^k, fixing the ignored inputs to 0 yields a size-≤ n^k circuit for g*, contradicting C(g*) > n^k. Hence ĝ ∉ SIZE(n^k).
 
-9. **[KNOWN, folklore] Threshold dichotomy for usefulness against P/poly.** For a threshold function s(n), the property H_s = {f : CC(f) > s(n)} is useful against P/poly **if and only if** s(n) is superpolynomial (s = n^{ω(1)}).
-   **Argument (complete).**
-   *(⇐)* If s = n^{ω(1)}, then any P/poly family {g_n} has CC(g_n) ≤ n^c for a fixed c and all large n, so CC(g_n) < s(n) for all but finitely many n; hence {g_n} ∉ H_s for all but finitely many n. Useful.
-   *(⇒, contrapositive)* Suppose s(n) ≤ n^k for a fixed k and infinitely many n. Put m = ⌈(k+2)·log₂ n⌉. By the Shannon–Lupanov counting bound, some function g on m bits has CC(g) = Θ(2^m/m). Let f_n : {0,1}^n → {0,1} depend only on the first m input bits and compute g there. Then CC(f_n) = Θ(2^m/m) = Θ(n^{k+2}/log n) > n^k ≥ s(n) for all large n in that infinite set, while CC(f_n) ≤ 2^m = O(n^{k+2}) = poly(n), so {f_n} ∈ P/poly. Thus a P/poly family lies in H_s infinitely often: not useful.
-   **Consequence.** The fixed-degree route is closed negatively: resolving MCSP[n^k] ∈ P? cannot yield a natural proof against P/poly, because the associated property is not even useful. Only a superpolynomial threshold survives.
+   *(ii) Definability in a fixed level of PH.* Because the truth table T of g* has poly length 2^m = Θ(n^{k+1}), "g* is the lex-first hard table" is a bounded-alternation predicate over poly-size objects. A single output bit ĝ(x) is captured by
+     ∃T [ (∀ size-n^k circuit D, T differs from D on some input) ∧ (∀ T′ < T, ∃ size-n^k circuit computing T′) ∧ T_{x∣ₘ} = 1 (restriction of x to its first m bits) ],
+   whose quantifier prefix (∃T over poly-length tables, then ∀T′ ∃circuit) sits at level Σ3^p; the internal "differs / computes" tests range over poly-length tables, poly-size circuits, and the 2^m = poly domain, hence are poly-time checkable. So the language of ĝ lies in Σ3^p. (Equivalently, one may guess a size-≤ n^{k+1} circuit directly; both witnesses are polynomial. The Step 2 error was guessing at the n-input scale, where the table has exponential length 2^n; at scale m the table is poly, so the guess is legitimate.)
 
-10. **[KNOWN] The superpolynomial-threshold property is large and useful against all P/poly.** Take s = 2^{εn} (0 < ε < 1) and the total set Π = {f : CC(f) > 2^{εn}} = complement of MCSP[2^{εn}]. By item 9(⇐), Π is **useful against all P/poly** (any P/poly family has size ≤ n^{O(1)} < 2^{εn} for large n). By item 8(ii), Π is **large**. Hence Π satisfies RR largeness and usefulness unconditionally; the **only** missing natural-proof ingredient is **constructivity** — whether membership in Π is decidable in poly(N) time from the truth table, equivalently whether MCSP[2^{εn}] ∈ DTIME(poly(N)). This is the standard "high-complexity property as a natural property" observation implicit in Razborov and Rudich (1997) and around Kabanets and Cai (2000). *Note: "CC(f) > 2^{εn} > poly" is literally "f ∉ P/poly," so item 9(⇐) here restates that definition; the content of item 10 is entirely in the constructivity question, i.e. it is a renaming of MCSP[2^{εn}] ∈ P?.*
+   *(iii) Descent from Σ3^p to Σ2^p ∩ Π2^p by a Karp–Lipton win–win.* Split on whether NP is easy for size-n^k circuits.
+   - **Case 1: NP ⊄ SIZE(n^k).** Then some language in NP ⊆ Σ2^p ∩ Π2^p already fails to have size-n^k circuits, and we are done directly.
+   - **Case 2: NP ⊆ SIZE(n^k).** Then NP ⊆ P/poly, so by item 3 (Karp–Lipton) PH collapses to Σ2^p; consequently Σ3^p = Σ2^p = Π2^p, and the Σ3^p-definable hard language ĝ from (ii) lies in the now-flattened Σ2^p ∩ Π2^p, again giving a language in Σ2^p ∩ Π2^p not in SIZE(n^k).
 
-11. **[KNOWN] External consequences of MCSP[2^{εn}] ∈ P (lateral to the grand target).** If MCSP[2^{εn}] ∈ P then Π (item 10) is a natural property useful against P/poly, and therefore:
-    **(a)** by Razborov and Rudich (1997) read contrapositively, strong (exponentially hard) pseudorandom function generators do **not** exist;
-    **(b)** by Carmosino, Impagliazzo, Kabanets, Kolokolova (2016), a natural property useful against P/poly yields a **quasi-polynomial-time learning algorithm** for P/poly under the uniform distribution with membership queries.
-    These are published implications (a cryptographic non-existence result and a learning algorithm). **Neither is a circuit lower bound for any NP language**, and both are directions the field widely believes false; they are payoffs orthogonal to separating P from NP (see item 12).
+   Since one of the two cases must hold, in every case Σ2^p ∩ Π2^p ⊄ SIZE(n^k), for every k. This is an unconditional circuit-size lower bound for a uniform class. Note what it does *not* do: it does not place a single fixed language outside P/poly (the witnessing language depends on k), and it is far short of separating P from NP. **Open point, not asserted as fact:** whether Kannan's argument relativizes is not verified here; the ESTABLISHED claim is only that the *statement* is strictly weaker than P ≠ NP or NP ⊄ P/poly, so its existence is not in tension with items 1–2 regardless of whether its proof relativizes.
 
-12. **[NEW-framing of KNOWN facts] Neither branch of the constructivity question separates P from NP.**
-    **Argument (complete).** *Positive branch.* Suppose MCSP[2^{εn}] ∈ P, so Π is natural and useful against P/poly. Usefulness (item 5c) asserts only that *every function in Π* is hard for P/poly; it says nothing about whether any particular NP language (e.g. SAT's characteristic function at each length) belongs to Π. Membership of SAT in Π would *itself be* the statement NP ⊄ P/poly and is not implied by Π being useful. Thus the positive branch yields items 11(a),(b) and a natural distinguisher between hard and easy truth tables, but **no** lower bound for NP. *Negative branch.* MCSP[2^{εn}] ∉ P (or hardness evidence) isolates constructivity as the obstruction to naturalizing Π but proves no separation. **Conclusion:** the constructivity question has grand-target altitude 0 in both branches. This is not a defect to be repaired but a structural fact: the natural-proofs framework is a barrier meta-theorem, and no barrier-side question about it can, by itself, generate an NP lower bound. Recorded here to prevent any "usefulness ⇒ separation" overclaim.
+   The propositional shape of the case split — "(Case 2 → collapse → conclusion) or (Case 1 → conclusion directly) ⟹ conclusion" — is pure logic independent of what NP, SIZE(n^k), etc. actually are, and is formalized abstractly in Lean Block 2 below.
+
+   *(Correction log: Step 2 used an invalid existentially-guessed truth table at the n-input scale (exponential 2^n witness) — fixed by working at scale m = (k+1)log₂n, where the table is poly-length. Step 3 conflated existence with window-membership; Step 4 separated them but justified the window by a circular count-monotonicity sentence. Step 6 replaces that sentence with the Lupanov upper bound (1b), reconciling item 4, the FAILED log, and the witness framing to the single scale m.)*
+
+```lean
+import Mathlib
+
+/-- Abstract pigeonhole fact underlying ingredient (1a): if there are strictly
+fewer circuits of size ≤ n^k than there are Boolean functions on the input
+domain (here modeled abstractly as a Fintype `Circuit` with an evaluation map
+into functions `Dom → Bool`, where `Dom` stands for the m-input domain), then
+some function is not computed by any such circuit. This captures exactly the
+elementary counting step and nothing about where in the complexity spectrum the
+resulting hard function lies — i.e. it proves (1a) only, not (1b). -/
+theorem exists_hard_function
+    {Circuit : Type*} [Fintype Circuit]
+    {Dom : Type*} [Fintype Dom] [DecidableEq Dom]
+    (eval : Circuit → (Dom → Bool))
+    (h : Fintype.card Circuit < Fintype.card (Dom → Bool)) :
+    ∃ f : Dom → Bool, ∀ c : Circuit, eval c ≠ f := by
+  by_contra hcon
+  push_neg at hcon
+  have hsurj : Function.Surjective eval := hcon
+  have hcard := Fintype.card_le_of_surjective eval hsurj
+  omega
+```
+
+```lean
+import Mathlib
+
+/-- Propositional skeleton of the Karp–Lipton win–win used in ingredient (iii).
+`NPeasy`, `PHcollapse`, `HardLangExists` stand for "NP ⊆ SIZE(n^k)",
+"PH collapses to Σ2^p", and "a language in Σ2^p ∩ Π2^p outside SIZE(n^k)
+exists", respectively. `case2` packages Karp–Lipton (item 3) as a black-box
+hypothesis; `case2'` packages "collapse + the Σ3^p witness from (ii) gives
+the conclusion"; `case1` packages "NP itself already witnesses the conclusion
+directly". Neither Karp–Lipton nor the Σ3^p witness construction is re-proved
+here — only the case-split logic combining them. -/
+theorem karp_lipton_case_split
+    (NPeasy PHcollapse HardLangExists : Prop)
+    (case2 : NPeasy → PHcollapse)
+    (case2' : PHcollapse → HardLangExists)
+    (case1 : ¬ NPeasy → HardLangExists) :
+    HardLangExists := by
+  by_cases h : NPeasy
+  · exact case2' (case2 h)
+  · exact case1 h
+```
+
+5. **[KNOWN] Natural proofs barrier.** Razborov and Rudich (1997) call a circuit-lower-bound strategy against a class C "natural" if it exhibits a combinatorial property of Boolean functions that is (a) *constructive*: decidable in time 2^{O(n)} given the 2^n-bit truth table of an n-input function; (b) *large*: satisfied by at least a 2^{-O(n)} fraction of all n-input Boolean functions (this is the correct threshold — the condition permits an exponentially small, but not doubly-exponentially small, fraction); and (c) *useful*: no function in C (for rich C, e.g. P/poly) satisfies the property for infinitely many n. They show essentially all then-known combinatorial lower-bound techniques (against AC0, AC0[p], formula size) are natural in this sense, and that if strong pseudorandom function generators exist (a standard cryptographic assumption), then no natural proof can establish superpolynomial lower bounds against P/poly — a large, constructive property would serve as a distinguisher breaking the pseudorandom family. Consequence for this attack line: any strategy extending Kannan-style counting/diagonalization into a genuine P/poly (or NP ⊄ P/poly) lower bound must either (i) avoid producing a "natural" property in the technical sense, or (ii) be conditioned on the failure of strong pseudorandom function generators. This is a barrier on lower-bound *methodology*, distinct from and additional to relativization/algebrization.
 
 ## 3. FRONTIER
 
-**Next target (precise).** Decide **MCSP[2^{εn}] ∈ DTIME(poly(N))?** (N = 2^n) — equivalently, whether Π = {f : CC(f) > 2^{εn}} is RR-*constructive*. By item 9's dichotomy the same question at any superpolynomial threshold is the relevant one; 2^{εn} is the canonical, poly(N)-encodable representative.
+**Next target.** Classify Kannan's Σ2^p ∩ Π2^p technique (item 4) against the three Razborov–Rudich conditions — with the correct logical shape, which is two-tier. "Which of constructivity, largeness, usefulness does Kannan's proof fail?" is *ill-posed*: it presupposes the technique exhibits a single combinatorial property of truth tables to test, and it does not. The corrected target is to establish (Tier 1) that no such property is exhibited, and (Tier 2) that the two canonical *forced* reads fail different conditions — so that "which condition fails" provably has no single answer.
 
-**(a) What it would and would not do (no "suffices" claim).** A positive answer completes Π to a *natural property useful against P/poly* and triggers item 11 (no strong PRFs; a P/poly learner under uniform + queries). By item 12 this is a **barrier-plus-payoff outcome, not a separation**: it proves no NP language hard, and is a direction believed false. A negative answer isolates constructivity as the exact obstruction, again with no separation. **This target does not, in either branch, advance the grand target P ≠ NP**; it advances the attack line's stated (lateral) goal of mapping the natural-proofs barrier around P/poly. I state this explicitly rather than claim a bridge that does not exist.
+**Tier 1 (category — the technique is not natural-shaped). [KNOWN].** Kannan's argument reaches its bound by counting (1a), the Lupanov window bound (1b), a lex-least definability step (ii), and a Karp–Lipton win–win case split (iii). At no point does it isolate a property Cₙ ⊆ {0,1}^{2^n} of truth tables that it then tests against P/poly; the case split even reasons about the *global* hypothesis "NP ⊆ SIZE(n^k)" rather than any per-function invariant. Hence the RR classification only becomes well-posed after one artificially reads a property out of the argument. This is folklore (RR 1997; Arora–Barak §22–23).
 
-**(b) Obstacle.** MCSP[2^{εn}]'s relationship to P is as hard as MCSP's generally (items 6–7). The **downward self-reducibility** that powers Karp–Lipton (item 3) — building a small circuit for f incrementally from small circuits for restrictions of f — is **not known to hold for MCSP or its threshold variants**. Without it, neither a poly(N)-time decision procedure nor a hardness proof is available, which is exactly why the constructivity question is open.
+**Tier 2 (under-determination — the two forced reads fail different conditions). [KNOWN] throughout.**
+- **Γ_A = {f : n-input, circuit complexity in (n^k, n^{k+1}]}** — the window the witness targets (after padding to n inputs). It fails **LARGENESS**: |Γ_A|/2^{2^n} ≈ 2^{−2^n(1−o(1))}, doubly-exponentially below RR's 2^{−O(n)} floor, because almost all functions have complexity ≈ Θ(2^n/n), far *above* the window (a one-line cardinality corollary of the Shannon–Lupanov count).
+- **Γ_B = {f : circuit complexity > n^k}** — the property implicitly certified by "∉ SIZE(n^k)". It is **LARGE** (a 1 − 2^{−2^n(1−o(1))} fraction) and useful against SIZE(n^k), but its **CONSTRUCTIVITY** is not known: deciding C(f) > n^k from the 2^n-bit table is the MCSP-style minimum-circuit-size question, not known to lie in 2^{O(n)}. This is the only read that vindicates a "constructivity" focus — and only for Γ_B.
+- **"useful against P/poly" is a category error, not a third read.** Γ_B is *satisfied* by many P/poly functions (any f with C(f) = n^{k+1} ∈ P/poly has C(f) > n^k), so it is not useful against P/poly at all. Kannan targets fixed-polynomial SIZE(n^k), strictly below RR's superpolynomial-P/poly scope. This scope mismatch — not a violated RR condition — is precisely why the natural-proofs barrier does not bite Kannan.
 
-**(c) Candidate strategy — and why it is expected-negative.** One could seek a **self-reducibility lemma**: *a poly(N)-time procedure that, given the truth table of f on n bits together with correct MCSP[2^{εn′}] answers on all restrictions of f to n′ < n bits, decides MCSP[2^{εn}] on f.* Such a lemma would give a bottom-up dynamic program over restriction-arity (poly(N) time, hence constructivity). **However**, by item 11(a) a positive resolution implies strong PRFs do not exist — a breakthrough the field expects to be **false** — so this strategy targets a believed-false statement and should be treated as expected-negative, not as a promising path to a win. The more honest live directions are (i) accumulating *hardness* evidence for MCSP[2^{εn}] (the negative branch), or (ii) **pivoting the attack line** entirely, since item 12 shows neither branch reaches the grand target. The lemma is open and not proved here.
+Since Γ_A fails largeness while Γ_B (at worst) fails constructivity, the "which condition fails" question has no single answer; that is the content of Tier 2.
+
+(a) **Why it suffices (for progress, not resolution):** the two-tier picture converts the folklore "diagonalization/counting evades natural proofs by non-constructivity" into a precise account — (Tier 1) the technique exhibits no property to test, and (Tier 2) the only forced properties either fail largeness (Γ_A) or have unknown constructivity (Γ_B), while neither ranges over the superpolynomial-P/poly regime RR governs. This tells any would-be strengthener exactly what is missing: a property that is simultaneously large, constructive, *and* useful against superpolynomial P/poly — the exact combination RR shows is obstructed under strong PRFs.
+
+(b) **Obstacle:** none of the Tier 1/Tier 2 observations is [NEW] — each is immediate from RR 1997 and the standard exposition (Arora–Barak §22–23); even the quantitative Γ_A fraction is a one-line cardinality corollary. They organize known barriers around a known theorem without clearing one. The deeper obstacle is structural: the attack line is anchored to a fixed-polynomial lower bound *below* the P/poly scope, so by construction it cannot produce a property in RR's governed regime, and no amount of classification yields P-vs-NP progress. Every "constructivity fails" observation here is [KNOWN] folklore (RR 1997), not [NEW].
+
+(c) **Candidate strategy (honestly bounded):** the only route to genuine altitude from here leaves classification and targets a property that is large, constructive, and useful against *superpolynomial* P/poly while evading the PRF distinguisher — e.g., a property explicitly conditioned on the failure of strong PRFs, or a non-natural (non-constructive-by-design) certificate of hardness in the Williams algorithmic-method style (NEXP ⊄ ACC0, Williams (2011)) that certifies hardness without any 2^{O(n)}-time truth-table test. No such property is present in this document; obtaining one means *pivoting the attack line*, and no pivot currently in reach yields verified P-vs-NP progress. This is recorded as the honest ceiling of the present line, not as a [NEW] claim.
 
 ## 4. FAILED
 
-- (Step 1) Reading Kannan (1982) as a non-relativizing *separation* — abandoned: its statement is strictly weaker than P ≠ NP.
-- (Step 2) Self-contained reproof of Kannan — abandoned: case split too intricate to reproduce reliably; demoted to statement-only.
-- (Steps 9–10) Pigeonhole "L_k eventually constant, hence easy," and "one bit per length ⇒ O(n) time" — invalid: conflate existence of a witness / nonuniform advice with uniform time.
-- (Steps 11–12) The unary language L_k = {1^n : ∃C…} as a bridge to RR-constructivity — abandoned as mis-scaled: it is not a subset of {0,1}^N, hence not literally an RR property.
-- (Step 13) Item 8's earlier "matching lower bound follows" clause — removed: non-sequitur; only the upper-bound count is used.
-- (Steps 23–24) FRONTIER "does MCSP[n^k] ∈ Π2^p follow from padding?" — invalid: it is the free inclusion Σ1^p ⊆ Σ2^p ∩ Π2^p, information-free for MCSP.
-- (Steps 27–30) Treating co-MCSP[n^k]'s usefulness against P/poly as open — closed negatively by the threshold dichotomy (item 9): fixed-degree properties are not useful; only superpolynomial thresholds survive.
-- (Step 31) The gap-MCSP promise object with the claimed equivalence "constructivity ⟺ gap-MCSP ∈ P" — abandoned: a two-sided promise-solver need not decide the total set Π, so the equivalence was false; replaced by the single-threshold total object Π = complement of MCSP[2^{εn}].
-- (Step 32) FRONTIER(a)'s claim that a positive answer "hands over a complete natural proof against P/poly" *as progress toward separation* — retracted: a property being useful is not an NP lower bound (item 12); corrected to a barrier-plus-payoff outcome with grand-target altitude 0.
+- (Step 1) Treating "Kannan82 is not blocked by BGS75/AW08" as evidence the technique is non-relativizing — abandoned: the correct reason is that Kannan's statement is strictly weaker than P≠NP / NP⊄P/poly, independent of whether the proof relativizes.
+- (Step 2) Proving Kannan via a Σ2^p machine that existentially guesses a hard truth table at the n-input scale — abandoned: at that scale the table has exponential length 2^n, not a polynomial witness. Fixed by working at scale m = (k+1)log₂n, where the whole table is poly-length (n^{k+1}), so a bounded-alternation (Σ3^p) predicate over poly-size objects suffices.
+- (Step 3) Deriving window-trapping directly from the plain counting bound (1a) — abandoned: (1a) alone yields *some* hard function, generically near Θ(2^n/n). Trapping one inside (n^k, n^{k+1}] follows instead from the Lupanov upper bound at scale m, which caps *every* m-input function's complexity below n^{k+1}.
+- (Step 4/5) Justifying window-nonemptiness by "the count of realizable functions strictly increases between s=n^k and s=n^{k+1}" — abandoned: that statement is circular (logically equivalent to the goal "some function has complexity in the window"). Replaced by the Lupanov ceiling argument (1b), which is elementary at scale m.
+- (Step 4) Framing the natural-proofs frontier as "which single RR condition does Kannan's proof fail?" — abandoned: this presupposes a testable truth-table property (none exists; Tier 1), and the two forced reads fail *different* conditions (Γ_A largeness vs. Γ_B constructivity; Tier 2), so the question is ill-posed. Replaced by the two-tier classification in §3.
