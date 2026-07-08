@@ -2854,3 +2854,897 @@ make[8]: Entering directory '/root/lean4-src/stage0/src'
 [    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Sym/Simp/Telescope.c
 [    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Sym/AbstractS.c
 [    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Sym/AlphaShareCommon.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Sym/Intro.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Sym/Grind.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Sym/SynthInstance.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/AppBuilder.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/WrapInstance.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/IndPredBelow.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/MatcherApp.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/AltTelescopes.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/NamedPatterns.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/MatchEqs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/SimpH.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/SolveOverlap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/CaseValues.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/MVarRenaming.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/Match.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/MatchEqsExt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/MatcherInfo.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/Value.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/CaseArraySizes.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/MatcherApp/Transform.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/MatcherApp/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/Rewrite.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Match/MatchPatternAttr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Order.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/LevelDefEq.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/ACLt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/UnificationHint.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Check.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Sym.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Offset.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Reduce.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/AbstractNestedProofs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/CollectFVars.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Eqns.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/KAbstract.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/DiscrTree.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/MkIffOfInductiveProp.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Instances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Hint.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/HasAssignableMVar.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/CongrTheorems.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/AbstractMVars.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Coe.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Tactic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/ReduceEval.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/NatInstTesters.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/DecLevel.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Structure.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/ExprDefEq.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Transform.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/FunInfo.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Inductive.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/ExprTraverse.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/CheckTactic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/LitValues.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/GeneralizeTelescope.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/DiscrTree/Main.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/DiscrTree/Types.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/DiscrTree/Util.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/DiscrTree/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/NatTable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/HasNotBit.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/SameCtorUtils.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/TransparencyMode.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/HaveTelescope.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Eval.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/MatchUtil.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/PProdN.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/ArgsPacker.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions/SparseCasesOn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions/NoConfusion.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions/BRecOn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions/CasesOn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions/CtorIdx.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions/CasesOnSameCtor.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions/RecOn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions/CtorElim.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions/SparseCasesOnEq.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Constructions.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/GeneralizeVars.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/CompletionName.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/ProdN.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/Closure.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/SynthInstance.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta/CasesInfo.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Server.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/LabelAttribute.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/ToLevel.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/AddDecl.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Language/Lean.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Language/Util.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Language/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Language/Lean/Types.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Meta.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Replay.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Level.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget/Diff.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget/InteractiveDiagnostic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget/InteractiveCode.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget/UserWidget.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget/Types.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget/Commands.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget/TaggedText.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget/InteractiveGoal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Position.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/RBMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/PersistentArray.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/NameMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/PPContext.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/LOption.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/AssocList.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/LBool.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Options.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/RArray.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/EditDistance.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Name.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/PrefixTree.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Json/FromToJson/Extra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Json/FromToJson/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Json/Printer.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Json/Stream.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Json/Elab.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Json/Parser.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Json/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Json/FromToJson.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Format.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Array.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Ipc.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Diagnostics.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/InitShutdown.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Utf16.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/CodeActions.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/TextSync.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Extra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Window.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Client.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/CancelParams.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Workspace.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/LanguageFeatures.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/BasicAux.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Communication.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Internal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp/Capabilities.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/PersistentHashMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/RBTree.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/OpenDecl.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/SSet.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/NameTrie.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Lsp.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/JsonRpc.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Iterators/Producers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Iterators/Producers/PersistentHashMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/PersistentHashSet.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/SMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/NameMap/AdditionalOperations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/NameMap/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Json.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Trie.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/Iterators.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/FuzzyMatching.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/DeclarationRange.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Data/KVMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/PrivateName.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/ToExpr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Elab.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Structure.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/ProjFns.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/EnvExtension.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Command.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Extension.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Do.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Module.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Extra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Tactic/Doc.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Syntax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Types.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Attr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Tactic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Level.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Term.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/StrInterpolation.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Term/Doc.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Term/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser/Module/Syntax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/DeprecatedModule.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Parser.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Runtime.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/LocalContext.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Omit.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/MissingDocs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Deprecated.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/List.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Builtin.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/UnusedSimpArgs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/DocsOnAlt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Extra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/EnvLinter.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/EnvLinter/Builtin.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/EnvLinter/Nolint.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/EnvLinter/Frontend.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/EnvLinter/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Init.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Util.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/ConstructorAsVariable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Extra/UnreachableTactic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Extra/DupNamespace.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Extra/UnnecessarySeqFocus.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Extra/UnusedDecidableInType.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/GlobalAttributeIn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/TacticTypeCheck.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/UnusedVariables.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Coe.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/Sets.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Linter/PersistentLintLog.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Compiler.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/HeadIndex.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Widget.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/ReducibilityAttrs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/AuxRecursor.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Declaration.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/BuiltinDocAttr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/ScopedEnvExtension.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/ParserCompiler.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Exception.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/PrettyPrinter.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/DefEqAttrib.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/DeclarationRange.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/Environment.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/ExtraModUses.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/ReservedNameAction.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean/LibrarySuggestions.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lean.c
+make[8]: Leaving directory '/root/lean4-src/stage0/src'
+make[8]: Entering directory '/root/lean4-src/stage0/src'
+make[8]: Entering directory '/root/lean4-src/stage0/src/lake'
+[    ] Building /root/lean4-src/stage0/src/../stdlib//LeanIR.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Data.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Elab/Expression.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Elab/Value.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Load.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/ParserUtil.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Encode.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Decode.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Data/Value.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Data/DateTime.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Data/Dict.c
+make[8]: Leaving directory '/root/lean4-src/stage0/src'
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Elab.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml/Grammar.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Reservoir.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Attributes.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Config.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Syntax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Targets.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/AttributesCore.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/VerLit.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Key.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Extensions.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Package.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Meta.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Require.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/Script.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL/DeclUtil.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Dependency.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Pattern.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/LeanConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/LeanExe.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/TargetConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/InstallPath.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/LeanLib.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/ConfigTarget.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/ExternLibConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/InputFileConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Module.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Dynlib.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/WorkspaceConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/LeanLibConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Opaque.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/LakefileConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/ExternLib.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/OutFormat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/InputFile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Defaults.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Workspace.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/MetaClasses.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Package.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Lang.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/PackageConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Context.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/LeanExeConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Meta.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Kinds.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Monad.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Script.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Artifact.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Glob.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/ConfigDecl.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/FacetConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/LakeConfig.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Cache.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config/Env.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Config.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/DSL.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/RBArray.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Reservoir.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Cycle.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/OrderedTagAttribute.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Casing.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Cli.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Url.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Lift.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Message.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/EStateT.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Log.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Name.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Opaque.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Exit.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Binder.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/IO.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/EquipT.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Error.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/FilePath.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Family.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/StoreInsts.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Proc.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/NativeLib.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/OpaqueType.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/MainM.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Version.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Task.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Git.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Lock.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/JsonObject.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/OrdHashSet.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Date.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util/Store.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Util.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Version.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Config.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Resolve.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Manifest.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Lean.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Workspace.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Package.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Materialize.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Lean/Elab.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Lean/Eval.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Load/Toml.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Data.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Target.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/ModuleArtifacts.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Common.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Infos.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Module.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Targets.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/ExternLib.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Index.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Key.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Run.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/InputFile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Actions.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Package.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Context.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Facets.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Fetch.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Trace.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Topological.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Store.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Info.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Target/Fetch.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Target/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/InitFacets.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Job/Register.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Job/Monad.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Job/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Executable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Job.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Build/Library.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Main.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Translate/Lean.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Translate/Toml.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Help.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Translate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Error.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Shake.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Init.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Actions.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/BuiltinLint.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Build.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/CLI/Serve.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake/Toml.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Lake.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//LakeMain.c
+make[8]: Leaving directory '/root/lean4-src/stage0/src/lake'
+make[8]: Entering directory '/root/lean4-src/stage0/src'
+[    ] Building /root/lean4-src/stage0/src/../stdlib//LeanChecker.c
+make[8]: Leaving directory '/root/lean4-src/stage0/src'
+make[7]: Leaving directory '/root/lean4-src/stage0/src'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[100%] Built target make_stdlib
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[7]: Entering directory '/root/lean4-src/stage0/src'
+[    ] Building /root/lean4-src/build/release/stage0/lib/lean/libInit_shared.so
+make[7]: Leaving directory '/root/lean4-src/stage0/src'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[100%] Built target Init_shared
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[7]: Entering directory '/root/lean4-src/stage0/src'
+[    ] Building /root/lean4-src/build/release/stage0/lib/lean/libleanshared.so
+make[7]: Leaving directory '/root/lean4-src/stage0/src'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[100%] Built target leanshared
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[7]: Entering directory '/root/lean4-src/build/release/stage0'
+make[7]: Entering directory '/root/lean4-src/stage0/src'
+make[7]: Entering directory '/root/lean4-src/stage0/src'
+[    ] Building /root/lean4-src/build/release/stage0/bin/leanir
+[    ] Building /root/lean4-src/build/release/stage0/bin/lean
+[    ] Building /root/lean4-src/build/release/stage0/lib/lean/libLake_shared.so
+make[7]: Leaving directory '/root/lean4-src/stage0/src'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[100%] Built target lean
+make[7]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[100%] Built target leanir
+make[7]: Leaving directory '/root/lean4-src/stage0/src'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[100%] Built target lake_shared
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[7]: Entering directory '/root/lean4-src/stage0/src'
+make[7]: Entering directory '/root/lean4-src/stage0/src'
+[    ] Building /root/lean4-src/build/release/stage0/bin/leanchecker
+[    ] Building /root/lean4-src/build/release/stage0/bin/lake
+make[7]: Leaving directory '/root/lean4-src/stage0/src'
+make[7]: Leaving directory '/root/lean4-src/stage0/src'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[100%] Built target lake
+[100%] Built target leanchecker
+make[5]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[4]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 45%] No install step for 'stage0'
+[ 50%] Completed 'stage0'
+make[3]: Leaving directory '/root/lean4-src/build/release'
+[ 66%] Built target stage0
+make[3]: Entering directory '/root/lean4-src/build/release'
+make[3]: Leaving directory '/root/lean4-src/build/release'
+make[3]: Entering directory '/root/lean4-src/build/release'
+[ 70%] Creating directories for 'stage1'
+[ 75%] No download step for 'stage1'
+[ 79%] No update step for 'stage1'
+[ 83%] No patch step for 'stage1'
+[ 87%] Performing configure step for 'stage1'
+-- The CXX compiler identification is GNU 13.3.0
+-- The C compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+cc: error: unrecognized command-line option '--print-target-triple'
+cc: fatal error: no input files
+compilation terminated.
+-- No build type selected, default to Release
+-- 64-bit machine detected
+-- Found GMP: /usr/include/x86_64-linux-gnu (Required is at least version "5.0.5") 
+-- Found PkgConfig: /usr/bin/pkg-config (found version "1.8.1") 
+-- Checking for one of the modules 'libuv'
+-- LIBUV_LDFLAGS: -L/usr/lib/x86_64-linux-gnu-luv-lpthread-ldl-lrt
+-- LIBUV_INCLUDE_DIRS: /usr/include
+-- Found LibUV: TRUE (Required is at least version "1.0.0") 
+CMake Warning at CMakeLists.txt:452 (message):
+  Disabling LLVM support
+
+
+-- git commit sha1: 68218e876d2a38b1985b8590fff244a83c321783
+-- Configuring done (0.8s)
+-- Generating done (0.1s)
+-- Build files have been written to: /root/lean4-src/build/release/stage1
+make[3]: Leaving directory '/root/lean4-src/build/release'
+[ 87%] Built target stage1-configure
+make[3]: Entering directory '/root/lean4-src/build/release'
+make[3]: Leaving directory '/root/lean4-src/build/release'
+make[3]: Entering directory '/root/lean4-src/build/release'
+[ 91%] Performing build step for 'stage1'
+make[4]: Entering directory '/root/lean4-src/build/release/stage1'
+make[5]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+[  0%] Building CXX object initialize/CMakeFiles/initialize.dir/init.cpp.o
+[  0%] Building CXX object CMakeFiles/leanshell.dir/util/shell.cpp.o
+[  0%] Building CXX object util/CMakeFiles/util.dir/name.cpp.o
+[  3%] Building CXX object library/constructions/CMakeFiles/constructions.dir/cases_on.cpp.o
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+[  3%] Built target initialize
+[  3%] Building CXX object library/constructions/CMakeFiles/constructions.dir/init_module.cpp.o
+[  3%] Linking CXX static library lib/temp/libleanshell.a
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+[  3%] Built target leanshell
+[  3%] Building CXX object util/CMakeFiles/util.dir/name_set.cpp.o
+[  3%] Building CXX object util/CMakeFiles/util.dir/escaped.cpp.o
+[  6%] Building CXX object util/CMakeFiles/util.dir/bit_tricks.cpp.o
+[  6%] Building CXX object library/constructions/CMakeFiles/constructions.dir/util.cpp.o
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+[  6%] Building CXX object kernel/CMakeFiles/kernel.dir/level.cpp.o
+[  6%] Building CXX object util/CMakeFiles/util.dir/ascii.cpp.o
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+[  9%] Building CXX object library/CMakeFiles/library.dir/expr_lt.cpp.o
+[  9%] Building CXX object util/CMakeFiles/util.dir/path.cpp.o
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+[  9%] Built target constructions
+[ 12%] Building CXX object kernel/CMakeFiles/kernel.dir/expr.cpp.o
+[ 12%] Building CXX object util/CMakeFiles/util.dir/lbool.cpp.o
+[ 12%] Building CXX object library/CMakeFiles/library.dir/bin_app.cpp.o
+[ 16%] Building CXX object util/CMakeFiles/util.dir/init_module.cpp.o
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+[ 16%] Built target copy-cadical
+[ 16%] Building CXX object library/CMakeFiles/library.dir/constants.cpp.o
+[ 16%] Building CXX object util/CMakeFiles/util.dir/list_fn.cpp.o
+[ 16%] Building CXX object kernel/CMakeFiles/kernel.dir/expr_eq_fn.cpp.o
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+[ 16%] Built target copy-leantar
+[ 16%] Building CXX object kernel/CMakeFiles/kernel.dir/for_each_fn.cpp.o
+[ 16%] Building CXX object library/CMakeFiles/library.dir/max_sharing.cpp.o
+[ 16%] Building CXX object util/CMakeFiles/util.dir/timeit.cpp.o
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[7]: Entering directory '/root/lean4-src/src'
+info: lean4: no previous manifest, creating one from scratch
+info: toolchain not updated; already up-to-date
+[ 16%] Building CXX object util/CMakeFiles/util.dir/timer.cpp.o
+[ 16%] Building CXX object library/CMakeFiles/library.dir/module.cpp.o
+[ 16%] Building CXX object kernel/CMakeFiles/kernel.dir/replace_fn.cpp.o
+[ 16%] Building CXX object util/CMakeFiles/util.dir/name_generator.cpp.o
+[ 19%] Building CXX object kernel/CMakeFiles/kernel.dir/abstract.cpp.o
+/root/lean4-src/src/library/module.cpp: In function 'lean::object* lean::lean_compacted_region_save(b_obj_arg, b_obj_arg, b_obj_arg, b_obj_arg, obj_arg, object*)':
+/root/lean4-src/src/library/module.cpp:237:16: warning: 'char* __builtin_strncpy(char*, const char*, long unsigned int)' output truncated before terminating nul copying 40 bytes from a string of the same length [-Wstringop-truncation]
+  237 |         strncpy(header.githash, LEAN_GITHASH, sizeof(header.githash));
+      |                ^
+/root/lean4-src/src/library/module.cpp:236:16: warning: 'char* __builtin_strncpy(char*, const char*, long unsigned int)' specified bound 33 equals destination size [-Wstringop-truncation]
+  236 |         strncpy(header.lean_version, get_short_version_string().c_str(), sizeof(header.lean_version));
+      |                ^
+[ 22%] Building CXX object library/CMakeFiles/library.dir/dynlib.cpp.o
+[ 25%] Building CXX object util/CMakeFiles/util.dir/kvmap.cpp.o
+[ 25%] Building CXX object library/CMakeFiles/library.dir/replace_visitor.cpp.o
+✔ [2/4863] Built Init.Prelude (5.7s)
+✔ [3/4863] Built Lean.Server.Test.Refs (201ms)
+✔ [4/4863] Built Lake.Config.Kinds (317ms)
+✔ [5/4863] Built Lake.Util.Store (348ms)
+✔ [6/4863] Built Lean.Runtime (211ms)
+✔ [7/4863] Built Lean.Server.Test.Refs:c.o (161ms)
+✔ [8/4863] Built Init.MethodSpecsSimp (305ms)
+✔ [9/4863] Built Lake.Config.Kinds:c.o (204ms)
+[ 25%] Building CXX object kernel/CMakeFiles/kernel.dir/instantiate.cpp.o
+✔ [10/4863] Built Init.Coe (568ms)
+✔ [11/4863] Built Lean.Runtime:c.o (161ms)
+✔ [12/4863] Built Init.MethodSpecsSimp:c.o (139ms)
+✔ [13/4863] Built Lake.Util.Store:c.o (386ms)
+[ 25%] Building CXX object util/CMakeFiles/util.dir/map_foreach.cpp.o
+✔ [14/4863] Built Init.Data.Option.Coe (176ms)
+✔ [15/4863] Built Init.Coe:c.o (364ms)
+✔ [16/4863] Built Init.Data.Cast (181ms)
+✔ [17/4863] Built Init.Data.Option.Coe:c.o (120ms)
+✔ [18/4863] Built Init.Data.Cast:c.o (205ms)
+[ 25%] Building CXX object library/CMakeFiles/library.dir/num.cpp.o
+[ 25%] Building CXX object util/CMakeFiles/util.dir/options.cpp.o
+[ 25%] Building CXX object kernel/CMakeFiles/kernel.dir/local_ctx.cpp.o
+[ 25%] Building CXX object library/CMakeFiles/library.dir/util.cpp.o
+[ 25%] Building CXX object util/CMakeFiles/util.dir/option_declarations.cpp.o
+✔ [19/4863] Built Init.Prelude:c.o (6.0s)
+[ 25%] Building CXX object kernel/CMakeFiles/kernel.dir/declaration.cpp.o
+[ 29%] Building CXX object util/CMakeFiles/util.dir/ffi.cpp.o
+In file included from /root/lean4-src/build/release/stage1/util/ffi.cpp:8:
+/root/lean4-src/build/release/stage1/include/lean/lean.h:75:21: warning: attributes are not permitted in this position [-Wattributes]
+   75 | #define LEAN_EXPORT __attribute__((visibility("default")))
+      |                     ^~~~~~~~~~~~~
+/root/lean4-src/build/release/stage1/util/ffi.cpp:12:1: note: in expansion of macro 'LEAN_EXPORT'
+   12 | LEAN_EXPORT extern "C" object * lean_get_leanc_extra_flags(object *) {
+      | ^~~~~~~~~~~
+/root/lean4-src/build/release/stage1/util/ffi.cpp:12:23: note: attributes may be inserted here
+   12 | LEAN_EXPORT extern "C" object * lean_get_leanc_extra_flags(object *) {
+      |                       ^
+/root/lean4-src/build/release/stage1/include/lean/lean.h:75:21: warning: attributes are not permitted in this position [-Wattributes]
+   75 | #define LEAN_EXPORT __attribute__((visibility("default")))
+      |                     ^~~~~~~~~~~~~
+/root/lean4-src/build/release/stage1/util/ffi.cpp:16:1: note: in expansion of macro 'LEAN_EXPORT'
+   16 | LEAN_EXPORT extern "C" object * lean_get_leanc_internal_flags(object *) {
+      | ^~~~~~~~~~~
+/root/lean4-src/build/release/stage1/util/ffi.cpp:16:23: note: attributes may be inserted here
+   16 | LEAN_EXPORT extern "C" object * lean_get_leanc_internal_flags(object *) {
+      |                       ^
+/root/lean4-src/build/release/stage1/include/lean/lean.h:75:21: warning: attributes are not permitted in this position [-Wattributes]
+   75 | #define LEAN_EXPORT __attribute__((visibility("default")))
+      |                     ^~~~~~~~~~~~~
+/root/lean4-src/build/release/stage1/util/ffi.cpp:20:1: note: in expansion of macro 'LEAN_EXPORT'
+   20 | LEAN_EXPORT extern "C" object * lean_get_linker_flags(uint8 link_static) {
+      | ^~~~~~~~~~~
+/root/lean4-src/build/release/stage1/util/ffi.cpp:20:23: note: attributes may be inserted here
+   20 | LEAN_EXPORT extern "C" object * lean_get_linker_flags(uint8 link_static) {
+      |                       ^
+/root/lean4-src/build/release/stage1/include/lean/lean.h:75:21: warning: attributes are not permitted in this position [-Wattributes]
+   75 | #define LEAN_EXPORT __attribute__((visibility("default")))
+      |                     ^~~~~~~~~~~~~
+/root/lean4-src/build/release/stage1/util/ffi.cpp:24:1: note: in expansion of macro 'LEAN_EXPORT'
+   24 | LEAN_EXPORT extern "C" object * lean_get_internal_linker_flags(object *) {
+      | ^~~~~~~~~~~
+/root/lean4-src/build/release/stage1/util/ffi.cpp:24:23: note: attributes may be inserted here
+   24 | LEAN_EXPORT extern "C" object * lean_get_internal_linker_flags(object *) {
+      |                       ^
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+[ 29%] Built target util
+[ 32%] Building CXX object library/CMakeFiles/library.dir/print.cpp.o
+[ 32%] Building CXX object kernel/CMakeFiles/kernel.dir/environment.cpp.o
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage1'
+make[6]: Entering directory '/root/lean4-src/build/release/stage1'
+[ 32%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/debug.cpp.o
+✔ [20/4863] Built Init.Notation (9.4s)
+✔ [21/4863] Built Init.Linter (188ms)
+✔ [22/4863] Built Lean.PrivateName (258ms)
+✔ [23/4863] Built Init.Internal.Order.Tactic (190ms)
+✔ [24/4863] Built Lean.Elab.ConfigEval.Commands (361ms)
+✔ [25/4863] Built Init.Grind.Annotated (217ms)
+✔ [26/4863] Built Init.Control.Lawful.MonadLift.Basic (201ms)
+✔ [27/4863] Built Init.Linter:c.o (146ms)
+✔ [28/4863] Built Lean.Elab.ConfigEval.Commands:c.o (166ms)
+✔ [29/4863] Built Init.Internal.Order.Tactic:c.o (120ms)
+✔ [30/4863] Built Lean.PrivateName:c.o (315ms)
+✔ [31/4863] Built Init.Control.Lawful.MonadLift.Basic:c.o (69ms)
+✔ [32/4863] Built Init.Grind.Annotated:c.o (160ms)
+[ 35%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/thread.cpp.o
+[ 35%] Building CXX object library/CMakeFiles/library.dir/annotation.cpp.o
+[ 38%] Building CXX object kernel/CMakeFiles/kernel.dir/type_checker.cpp.o
+[ 38%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/mpz.cpp.o
+[ 38%] Building CXX object library/CMakeFiles/library.dir/init_module.cpp.o
+✔ [33/4863] Built Init.Notation:c.o (5.9s)
+[ 38%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/utf8.cpp.o
+[ 38%] Building CXX object library/CMakeFiles/library.dir/profiling.cpp.o
+✔ [34/4863] Built Init.Tactics (6.7s)
+✔ [35/4863] Built Init.BinderNameHint (190ms)
+✔ [36/4863] Built Lake.Util.Opaque (314ms)
+✔ [37/4863] Built Init.Sym.DSimp.DSimprocDSL (363ms)
+✔ [38/4863] Built Init.SizeOf (728ms)
+✔ [39/4863] Built Init.Try (529ms)
+✔ [40/4863] Built Init.Grind.Lint (179ms)
+✔ [41/4863] Built Init.Data.Array.Set (315ms)
+✔ [42/4863] Built Init.Data.Zero (332ms)
+✔ [43/4863] Built Init.Sym.Simp.SimprocDSL (624ms)
+✔ [44/4863] Built Init.BinderNameHint:c.o (255ms)
+✔ [45/4863] Built Lake.Util.Opaque:c.o (239ms)
+✔ [46/4863] Built Init.Grind.Attr (658ms)
+✔ [47/4863] Built Init.Sym.DSimp.DSimprocDSL:c.o (204ms)
+[ 38%] Building CXX object kernel/CMakeFiles/kernel.dir/init_module.cpp.o
+[ 38%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/object.cpp.o
+✔ [48/4863] Built Init.SizeOf:c.o (197ms)
+✔ [49/4863] Built Init.Grind.Lint:c.o (348ms)
+✔ [50/4863] Built Init.Try:c.o (534ms)
+✔ [51/4863] Built Init.Data.Array.Set:c.o (326ms)
+✔ [52/4863] Built Init.Sym.Simp.SimprocDSL:c.o (184ms)
+✔ [53/4863] Built Init.Data.Zero:c.o (360ms)
+✔ [54/4863] Built Init.Grind.Attr:c.o (601ms)
+✔ [55/4863] Built Init.Syntax (373ms)
+✔ [56/4863] Built Init.Syntax:c.o (241ms)
+[ 38%] Building CXX object library/CMakeFiles/library.dir/time_task.cpp.o
+✔ [57/4863] Built Init.Grind.Interactive (2.1s)
+✔ [58/4863] Built Init.Grind.Interactive:c.o (1.4s)
+[ 38%] Building CXX object kernel/CMakeFiles/kernel.dir/expr_cache.cpp.o
+✔ [59/4863] Built Init.Tactics:c.o (6.6s)
+[ 41%] Building CXX object library/CMakeFiles/library.dir/formatter.cpp.o
+✔ [60/4863] Built Init.Core (6.4s)
+[ 41%] Building CXX object kernel/CMakeFiles/kernel.dir/equiv_manager.cpp.o
+✔ [61/4863] Built Init.Dynamic (359ms)
+✔ [62/4863] Built Lean.Compiler.LCNF.Simp.Config (293ms)
+✔ [63/4863] Built Lean.Meta.Tactic.Grind.Arith.Types (359ms)
+✔ [64/4863] Built Init.Data.NeZero (524ms)
+✔ [65/4863] Built Std.Do.Internal.Ensures.Def (219ms)
+✔ [66/4863] Built Lean.Compiler.LCNF.Simp.Config:c.o (159ms)
+✔ [67/4863] Built Init.Data.Slice.Basic (217ms)
+✔ [68/4863] Built Init.Data.ULift (272ms)
+✔ [69/4863] Built Init.Data.PLift (237ms)
+✔ [70/4863] Built Init.Data.Order.Classes (325ms)
+✔ [71/4863] Built Init.Data.LawfulHashable (317ms)
+/root/lean4-src/src/runtime/object.cpp:2698:1: warning: attributes are not permitted in this position [-Wattributes]
+ 2698 | __attribute__((noinline))
+      | ^~~~~~~~~~~~~
+/root/lean4-src/src/runtime/object.cpp:2699:11: note: attributes may be inserted here
+ 2699 | extern "C" LEAN_EXPORT obj_res lean_copy_expand_array_nonlinear(obj_arg a, bool expand) {
+      |           ^
+[ 45%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/apply.cpp.o
+✔ [72/4863] Built Init.Grind.Config (1.2s)
+✔ [73/4863] Built Init.MetaTypes (1.2s)
+✔ [74/4863] Built Init.Grind.Tactics (447ms)
+✔ [75/4863] Built Init.SimpLemmas (1.4s)
+[ 45%] Building CXX object library/CMakeFiles/library.dir/elab_environment.cpp.o
+✔ [76/4863] Built Init.Control.MonadAttach (476ms)
+✔ [77/4863] Built Lean.Meta.Tactic.Grind.Arith.Types:c.o (75ms)
+✔ [78/4863] Built Init.Data.NeZero:c.o (100ms)
+✔ [79/4863] Built Init.Dynamic:c.o (313ms)
+✔ [80/4863] Built Std.Do.Internal.Ensures.Def:c.o (89ms)
+✔ [81/4863] Built Init.Data.Slice.Basic:c.o (136ms)
+✔ [82/4863] Built Init.Data.ULift:c.o (80ms)
+✔ [83/4863] Built Init.Data.PLift:c.o (161ms)
+✔ [84/4863] Built Init.Data.Order.Classes:c.o (138ms)
+✔ [85/4863] Built Init.Data.LawfulHashable:c.o (149ms)
+✔ [86/4863] Built Init.Grind.Config:c.o (360ms)
+✔ [87/4863] Built Init.MetaTypes:c.o (660ms)
+[ 48%] Building CXX object kernel/CMakeFiles/kernel.dir/quot.cpp.o
+✔ [88/4863] Built Init.Grind.Tactics:c.o (411ms)
+✔ [89/4863] Built Init.SimpLemmas:c.o (106ms)
+✔ [90/4863] Built Init.Control.MonadAttach:c.o (171ms)
+✔ [91/4863] Built Init.Control.Basic (1.9s)
+✔ [92/4863] Built Init.Grind.Cases (332ms)
+✔ [93/4863] Built Init.Data.BitVec.BasicAux (338ms)
+✔ [94/4863] Built Init.Core:c.o (4.4s)
+✔ [95/4863] Built Init.Data.Function (594ms)
+✔ [96/4863] Built Init.Data.List.Notation (529ms)
+✔ [97/4863] Built Std.Tactic.BVDecide.Normalize.Prop (274ms)
+✔ [98/4863] Built Init.ByCases (584ms)
+✔ [99/4863] Built Init.Control.Id (516ms)
+✔ [100/4863] Built Init.Grind.Cases:c.o (231ms)
+✔ [101/4863] Built Init.Data.Function:c.o (204ms)
+✔ [102/4863] Built Init.Data.BitVec.BasicAux:c.o (295ms)
+✔ [103/4863] Built Std.Tactic.BVDecide.Normalize.Prop:c.o (141ms)
+✔ [104/4863] Built Init.Control.Basic:c.o (1.1s)
+✔ [105/4863] Built Init.Data.List.Notation:c.o (444ms)
+✔ [106/4863] Built Init.ByCases:c.o (481ms)
+✔ [107/4863] Built Init.Control.Id:c.o (467ms)
+[ 48%] Building CXX object library/CMakeFiles/library.dir/init_attribute.cpp.o
+✔ [108/4863] Built Init.Control.Except (966ms)
+✔ [109/4863] Built Init.Data.Option.Basic (1.7s)
+✔ [110/4863] Built Std.Do.SPred.SVal (996ms)
+✔ [111/4863] Built Init.Data.Option.Instances (625ms)
+✔ [112/4863] Built Init.Control.Option (792ms)
+✔ [113/4863] Built Std.Do.SPred.SVal:c.o (485ms)
+✔ [114/4863] Built Init.Data.Nat.Basic (4.3s)
+✔ [115/4863] Built Init.Control.Reader (243ms)
+✔ [116/4863] Built Lake.Util.EquipT (588ms)
+[ 48%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/exception.cpp.o
+✔ [117/4863] Built Init.Data.Option.Basic:c.o (2.4s)
+✔ [118/4863] Built Init.Data.Option.Instances:c.o (523ms)
+✔ [119/4863] Built Init.Control.State (756ms)
+✔ [120/4863] Built Init.Data.Nat.Basic:c.o (568ms)
+✔ [121/4863] Built Init.Control.Reader:c.o (463ms)
+✔ [122/4863] Built Init.Control.Except:c.o (2.5s)
+✔ [123/4863] Built Init.Control.Option:c.o (816ms)
+✔ [124/4863] Built Init.Control.Do (365ms)
+[ 48%] Building CXX object library/CMakeFiles/library.dir/llvm.cpp.o
+✔ [125/4863] Built Lake.Util.Task (397ms)
+✔ [126/4863] Built Lake.Util.EquipT:c.o (684ms)
+[ 48%] Building CXX object kernel/CMakeFiles/kernel.dir/inductive.cpp.o
+✔ [127/4863] Built Init.Data.Int.Basic (1.2s)
+✔ [128/4863] Built Init.WF (1.3s)
+✔ [129/4863] Built Init.Control.State:c.o (1.2s)
+✔ [130/4863] Built Lake.Util.Task:c.o (298ms)
+✔ [131/4863] Built Init.Control.Do:c.o (467ms)
+✔ [132/4863] Built Lean.Util.MonadBacktrack (714ms)
+✔ [133/4863] Built Init.Data.Int.Basic:c.o (1.0s)
+✔ [134/4863] Built Lake.Util.EStateT (1.1s)
+[ 51%] Building CXX object library/CMakeFiles/library.dir/ir_interpreter.cpp.o
+[ 51%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/interrupt.cpp.o
+✔ [135/4863] Built Init.WF:c.o (490ms)
+✔ [136/4863] Built Lean.Util.MonadBacktrack:c.o (833ms)
+✔ [137/4863] Built Init.WFTactics (1.1s)
+✔ [138/4863] Built Init.WFTactics:c.o (1.5s)
+✔ [139/4863] Built Init.Data.Nat.Div.Basic (1.7s)
+✔ [140/4863] Built Lake.Util.EStateT:c.o (3.0s)
+✔ [141/4863] Built Init.Data.Nat.Bitwise.Basic (797ms)
+✔ [142/4863] Built Init.Data.Int.DivMod.Basic (740ms)
+✔ [143/4863] Built Init.Data.Nat.Div.Basic:c.o (473ms)
+✔ [144/4863] Built Init.Data.Nat.Bitwise.Basic:c.o (461ms)
+✔ [145/4863] Built Init.Data.Int.Bitwise.Basic (401ms)
+[ 51%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/memory.cpp.o
+✔ [146/4863] Built Init.Data.Int.Bitwise.Basic:c.o (481ms)
+✔ [147/4863] Built Init.Data.Int.DivMod.Basic:c.o (1.2s)
+✔ [148/4863] Built Init.Data.Fin.Basic (1.0s)
+✔ [149/4863] Built Init.Data.List.Basic (8.2s)
+✔ [150/4863] Built Init.Task (352ms)
+✔ [151/4863] Built Init.Data.UInt.BasicAux (675ms)
+✔ [152/4863] Built Init.Data.List.ToArrayImpl (308ms)
+✔ [153/4863] Built Init.Data.List.Scan.Basic (240ms)
+✔ [154/4863] Built Init.Data.Fin.Basic:c.o (1.1s)
+✔ [155/4863] Built Init.Task:c.o (258ms)
+✔ [156/4863] Built Init.Data.ByteArray.Bootstrap (560ms)
+✔ [157/4863] Built Init.Data.List.Scan.Basic:c.o (423ms)
+✔ [158/4863] Built Init.Data.List.ToArrayImpl:c.o (279ms)
+✔ [159/4863] Built Init.Data.UInt.BasicAux:c.o (837ms)
+✔ [160/4863] Built Lake.Util.Exit (373ms)
+✔ [161/4863] Built Init.Data.ByteArray.Bootstrap:c.o (219ms)
+✔ [162/4863] Built Lake.Util.Exit:c.o (383ms)
+✔ [163/4863] Built Init.Data.Char.Basic (841ms)
+[ 51%] Building CXX object kernel/CMakeFiles/kernel.dir/trace.cpp.o
+[ 51%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/stackinfo.cpp.o
+✔ [164/4863] Built Init.Data.Char.Basic:c.o (180ms)
+✔ [165/4863] Built Init.Data.String.Bootstrap (384ms)
+✔ [166/4863] Built Init.Data.String.Bootstrap:c.o (375ms)
+✔ [167/4863] Built Init.System.Platform (435ms)
+✔ [168/4863] Built Init.System.Platform:c.o (186ms)
+In static member function 'static lean::object* lean::ir::interpreter::stub_m_aux(lean::object**)',
+    inlined from 'static lean::object* lean::ir::interpreter::stub_1_aux(lean::object*)' at /root/lean4-src/src/library/ir_interpreter.cpp:1006:105:
+/root/lean4-src/src/library/ir_interpreter.cpp:999:29: warning: array subscript 1 is outside array bounds of 'lean::object* [1]' {aka 'lean_object* [1]'} [-Warray-bounds=]
+  999 |         options opts(args[1]);
+      |                             ^
+/root/lean4-src/src/library/ir_interpreter.cpp: In static member function 'static lean::object* lean::ir::interpreter::stub_1_aux(lean::object*)':
+/root/lean4-src/src/library/ir_interpreter.cpp:1006:57: note: at offset 8 into object 'args' of size 8
+ 1006 |     static object * stub_1_aux(object * x_1) { object * args[] = { x_1 }; return interpreter::stub_m_aux(args); }
+      |                                                         ^~~~
+In file included from /root/lean4-src/src/runtime/string_ref.h:10,
+                 from /root/lean4-src/src/util/name.h:14,
+                 from /root/lean4-src/src/util/name_set.h:9,
+                 from /root/lean4-src/src/kernel/environment.h:15,
+                 from /root/lean4-src/src/library/elab_environment.h:8,
+                 from /root/lean4-src/src/library/ir_interpreter.h:8,
+                 from /root/lean4-src/src/library/ir_interpreter.cpp:38:
+In member function 'lean::object* lean::object_ref::raw() const',
+    inlined from 'const T& lean::cnstr_get_ref_t(const object_ref&, unsigned int) [with T = name]' at /root/lean4-src/src/runtime/object_ref.h:146:48,
+    inlined from 'const lean::ir::fun_id& lean::ir::decl_fun_id(const decl&)' at /root/lean4-src/src/library/ir_interpreter.cpp:180:76,
+    inlined from 'static lean::object* lean::ir::interpreter::stub_m_aux(lean::object**)' at /root/lean4-src/src/library/ir_interpreter.cpp:1000:65,
+    inlined from 'static lean::object* lean::ir::interpreter::stub_1_aux(lean::object*)' at /root/lean4-src/src/library/ir_interpreter.cpp:1006:105:
+/root/lean4-src/src/runtime/object_ref.h:42:35: warning: array subscript 2 is outside array bounds of 'lean::object* [1]' {aka 'lean_object* [1]'} [-Warray-bounds=]
+   42 |     object * raw() const { return m_obj; }
+      |                                   ^~~~~
+/root/lean4-src/src/library/ir_interpreter.cpp: In static member function 'static lean::object* lean::ir::interpreter::stub_1_aux(lean::object*)':
+/root/lean4-src/src/library/ir_interpreter.cpp:1006:57: note: at offset 16 into object 'args' of size 8
+ 1006 |     static object * stub_1_aux(object * x_1) { object * args[] = { x_1 }; return interpreter::stub_m_aux(args); }
+      |                                                         ^~~~
+In member function 'lean::object* lean::object_ref::raw() const',
+    inlined from 'const T& lean::cnstr_get_ref_t(const object_ref&, unsigned int) [with T = name]' at /root/lean4-src/src/runtime/object_ref.h:146:48,
+    inlined from 'const lean::ir::fun_id& lean::ir::decl_fun_id(const decl&)' at /root/lean4-src/src/library/ir_interpreter.cpp:180:76,
+    inlined from 'static lean::object* lean::ir::interpreter::stub_m_aux(lean::object**)' at /root/lean4-src/src/library/ir_interpreter.cpp:1000:65,
+    inlined from 'static lean::object* lean::ir::interpreter::stub_2_aux(lean::object*, lean::object*)' at /root/lean4-src/src/library/ir_interpreter.cpp:1007:124:
+/root/lean4-src/src/runtime/object_ref.h:42:35: warning: array subscript 2 is outside array bounds of 'lean::object* [2]' {aka 'lean_object* [2]'} [-Warray-bounds=]
+   42 |     object * raw() const { return m_obj; }
+      |                                   ^~~~~
+/root/lean4-src/src/library/ir_interpreter.cpp: In static member function 'static lean::object* lean::ir::interpreter::stub_2_aux(lean::object*, lean::object*)':
+/root/lean4-src/src/library/ir_interpreter.cpp:1007:71: note: at offset 16 into object 'args' of size 16
+ 1007 |     static object * stub_2_aux(object * x_1, object * x_2) { object * args[] = { x_1, x_2 }; return interpreter::stub_m_aux(args); }
+      |                                                                       ^~~~
+[ 51%] Building CXX object library/CMakeFiles/library.dir/instantiate_mvars.cpp.o
+✔ [169/4863] Built Init.Data.Format.Basic (1.2s)
+✔ [170/4863] Built Init.Data.Repr (1.1s)
+[ 54%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/compact.cpp.o

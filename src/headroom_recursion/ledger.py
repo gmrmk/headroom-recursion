@@ -44,11 +44,19 @@ def seed_for(path: str, problem: str) -> str:
     return f"{header}\n{entry['answer']}"
 
 
+# A judged (non-verified) entry must beat the incumbent by this margin to be
+# recorded. Judged scores are noisy; a zero-margin ratchet "improves" forever
+# on judge variance alone and defeats any dry-stop rule built on ledger
+# movement. Verified entries carry no margin — mechanical verdicts don't drift.
+JUDGED_EPSILON = 0.05
+
+
 def record(path: str, problem: str, trace) -> bool:
     """Persist the run's outcome if it beats what the ledger already holds.
 
-    Verified beats judged; higher ``best_halt_prob`` breaks ties. Returns True
-    when the ledger was updated.
+    Verified beats judged; a verified score must merely exceed the incumbent,
+    a judged score must exceed it by ``JUDGED_EPSILON``. Returns True when the
+    ledger was updated.
     """
 
     verified = trace.stop_reason == "validated"
@@ -63,8 +71,10 @@ def record(path: str, problem: str, trace) -> bool:
     if old is not None:
         if old.get("verified") and not verified:
             return False
-        if old.get("verified") == verified and float(old.get("best_halt_prob", 0)) >= score:
-            return False
+        if old.get("verified") == verified:
+            margin = 0.0 if verified else JUDGED_EPSILON
+            if score <= float(old.get("best_halt_prob", 0)) + margin:
+                return False
 
     data[key] = {
         "problem": problem.strip()[:300],
