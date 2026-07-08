@@ -1,0 +1,61 @@
+{
+  "generated": "2026-07-08T13:07:12Z",
+  "toolchain": "leanprover/lean4:v4.31.0",
+  "checkers": {
+    "leanchecker": "distributed with the pinned toolchain (kernel replay, --fresh)",
+    "lean4export": "leanprover/lean4export @ v4.31.0 (NDJSON format 3.1.0)",
+    "nanoda": "ammkrn/nanoda_lib @ master f58f2f6 (independent Rust kernel)"
+  },
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "artifacts": [
+    {
+      "artifact": "gate-01c5cb588f9f.lean",
+      "sha256": "58abeb7d4e7f308940d1a7dad635e39cbd8011de748495e4855e20eac31a4312",
+      "module": "A58abeb7d4e7f",
+      "decls": [
+        "relativization_barrier"
+      ],
+      "compile": true,
+      "tier1_leanchecker": true,
+      "tier2_nanoda": true,
+      "decls_checked": 7,
+      "error": "",
+      "tier1_mode": "fresh",
+      "export_sha256": "6928bc6c5695c1cb610139666f630d7b8fa9ed87d107bf258271553112ad78c7"
+    },
+    {
+      "artifact": "gate-1b7d5fc9b679.lean",
+      "sha256": "02da226664201355095b2e7b0645a5a122cf5ed3d7ac0dd2b0298999e1778043",
+      "module": "A02da22666420",
+      "decls": [
+        "karp_lipton_applied"
+      ],
+      "compile": true,
+      "tier1_leanchecker": true,
+      "tier2_nanoda": true,
+      "decls_checked": 1,
+      "error": "",
+      "tier1_mode": "fresh",
+      "export_sha256": "30d15bddae3bf2170badabcdfd635fd0fe023bb5eadd1a55e77f91386d247894"
+    },
+    {
+      "artifact": "gate-403a9b0c80bd.lean",
+      "sha256": "653496082f4a97b9f48d53f9eae9f372b47ac6825023600134b8cdf837f10ecb",
+      "module": "A653496082f4a",
+      "decls": [
+        "exists_hard_function"
+      ],
+      "compile": true,
+      "tier1_leanchecker": true,
+      "tier2_nanoda": true,
+      "decls_checked": 3611,
+      "error": "",
+      "tier1_mode": "incremental",
+      "export_sha256": "f0b370670399ac32c02045ff013a0b0959f85c51de5d45eacc36675a894e028f"
+    }
+  ]
+}
