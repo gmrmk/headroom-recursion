@@ -20,7 +20,11 @@ from typing import Callable, Optional
 
 OK, WARN, FAIL = "ok", "warn", "fail"
 
-CANARY_PROMPT = "Reply with exactly the single word: CANARY"
+# Deliberately mundane: terse "reply with exactly X" probes have been measured
+# to trip per-message safeguards on some tiers that answer real prompts fine —
+# a canary must test the transport, not the safeguard's opinion of canaries.
+CANARY_PROMPT = "What is two plus two? Answer with only the digit."
+CANARY_EXPECTED = "4"
 
 
 @dataclass
@@ -83,7 +87,7 @@ def check_cli_transport(
     for model in models:
         try:
             res = client.complete(
-                model=model, system="You are a canary check.", user=CANARY_PROMPT,
+                model=model, system="You are a quick arithmetic check.", user=CANARY_PROMPT,
                 use_headroom=False,
             )
         except TransportRefused as exc:
@@ -92,7 +96,7 @@ def check_cli_transport(
         except Exception as exc:
             out.append(Check(f"model: {model}", FAIL, f"{type(exc).__name__}: {str(exc)[:120]}"))
             continue
-        if res.text.strip() == "CANARY":
+        if res.text.strip() == CANARY_EXPECTED:
             out.append(Check(f"model: {model}", OK, f"exact compliance (${res.cost_usd:.3f})"))
         else:
             out.append(Check(f"model: {model}", WARN, f"answered but not exact: {res.text[:60]!r}"))
