@@ -51,8 +51,19 @@ container was reclaimed overnight. **Finding: the durability doctrine held** —
 exactly "at most one in-flight run"; ledger, traces, toolchain, and KB all survived via
 commit-per-run.
 
-### Finale — pure Fable (fable:8, seeded, ~90 min)
-<!-- FINALE RESULTS PENDING -->
+### Finale — pure Fable (fable:8, seeded, wall 72 min, $20.77)
+Trajectory: **0.30 | 0.12 | 0.05** (3 of 8 steps; run ended when one answer-update call
+exceeded the transport's full retry budget — a single-tier ladder has no tier to escalate
+to, so the run finalized with its best answer, as designed).
+**Findings:** (a) the most capable tier, alone, seeded with the incumbent and given
+maximal runway, *matched* 0.30 immediately and then drifted down — the judges' rationale
+was identical at every step: all-[KNOWN] content, zero verifiable novelty, band ceiling
+0.10–0.39; (b) Fable's two [NEW] attempts per step were prior-art-flagged by the corpus
+triage and not credited; (c) **zero unsourced citations in any Fable step** — the
+strongest tier fabricated nothing, it simply could not manufacture novelty that survived
+verification, which is the correct outcome on this benchmark; (d) refinement is not
+monotone even at the top tier — the best-answer rail (kept 0.30) matters most exactly
+where the model is strongest.
 
 ## Machinery findings (the actual product)
 
@@ -77,6 +88,11 @@ commit-per-run.
    and judged "trivially true" rather than credited; unresolvable citations were surfaced
    as unsourced rather than laundered — the firewall converts fabrication from a judgment
    call into a lookup.
+7. **Top-tier calls are the reliability tail.** The only transport death in four
+   generations was a Fable answer-update (a full-document rewrite) exceeding 3 × 420 s of
+   retries. Single-tier ladders turn one such death into a run death; multi-tier ladders
+   absorb it by escalation. Long-document rewrites need either longer per-attempt budgets
+   or a smaller rewrite unit.
 
 ## Authority statement
 
