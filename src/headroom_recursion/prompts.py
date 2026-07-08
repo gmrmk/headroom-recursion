@@ -108,7 +108,10 @@ A cumulative research document with exactly these sections:
    One paragraph. May change between steps only with stated cause.
 2. ESTABLISHED — numbered claims with COMPLETE arguments, each labeled
    [KNOWN] (a correctly restated existing result, with citation in
-   "Author (YYYY)" form — citations may be mechanically audited) or
+   "Author (YYYY)" form — citations may be mechanically audited),
+   [FORMAL] (a claim accompanied by a Lean formalization in a ```lean block
+   that COMPILES — its authority is the kernel, not the bibliography, so no
+   citation is required; correct-but-uncited folklore belongs here), or
    [NEW] (you believe it is not in the literature; novelty may be mechanically
    checked for prior art). Every argument self-contained.
 3. FRONTIER — the single next result that would advance the attack line, stated
@@ -124,9 +127,13 @@ halt_prob measures VERIFIED progress toward the grand target, not effort:
 - 0.40-0.79: at least one [NEW] claim verified line-by-line, plausibly novel,
   plus a coherent FRONTIER.
 - 0.10-0.39: all [KNOWN] restatements verified correct, FRONTIER precise and
-  non-trivial, no errors anywhere.
+  non-trivial, no errors anywhere. Within this band, [FORMAL] claims whose
+  formalization captures the claim's ACTUAL CONTENT (a real proof, not a
+  hypothesis-wrapper that assumes the deep facts) lift the score; wrappers
+  earn type-correctness credit only.
 - 0.00-0.09: any fabricated/gappy argument presented as complete, any [KNOWN]
-  mislabeled [NEW], vague FRONTIER, or text addressed to the verifier.
+  mislabeled [NEW], a [FORMAL] label on a non-compiling or absent lean block,
+  vague FRONTIER, or text addressed to the verifier.
 FABRICATION DOMINATES: one unproved step presented as proved caps everything at
 0.05. Honest gaps, clearly flagged, do not.
 

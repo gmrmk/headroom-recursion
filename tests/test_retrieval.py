@@ -138,14 +138,17 @@ def test_corpus_retriever_from_file(tmp_path):
 
 
 def test_simple_local_embedding_shape_and_determinism():
+    import numpy as np
+
     emb = simple_local_embedding(dim=64)
     assert emb.dim == 64
     v1 = asyncio.run(emb.func(["hello world"]))
     v2 = asyncio.run(emb.func(["hello world"]))
-    assert len(v1) == 1 and len(v1[0]) == 64
-    assert v1 == v2  # deterministic
+    # Newer LightRAG requires array output (it calls .size on the result).
+    assert isinstance(v1, np.ndarray) and v1.shape == (1, 64)
+    assert np.array_equal(v1, v2)  # deterministic
     # L2-normalized.
-    assert abs(sum(x * x for x in v1[0]) - 1.0) < 1e-6
+    assert abs(float((v1[0] ** 2).sum()) - 1.0) < 1e-6
 
 
 def test_build_claude_llm_func_adapts_signature():

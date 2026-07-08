@@ -260,3 +260,21 @@ def test_lean_verify_project_dir_routes_through_lake_env():
     assert ok is True
     assert seen["argv"][:3] == ["lake", "env", "lean"]  # Mathlib imports resolve
     assert seen["cwd"] == "/proj"
+
+
+def test_formal_claims_parsed_and_exempt_from_citation_firewall():
+    """[FORMAL]'s authority is the kernel (rung 1), not the corpus (rung 4)."""
+
+    from headroom_recursion import claims as claims_mod
+
+    class NothingResolves:
+        def retrieve(self, query, *, k):
+            return []
+
+    answer = (
+        "1. [FORMAL] Counting: fewer circuits than functions implies a hard function.\n"
+        "2. [KNOWN] Karp-Lipton collapse, see Fakename (2031).\n"
+    )
+    audited = claims_mod.audit_claims(claims_mod.parse_claims(answer), NothingResolves())
+    labels = [c.label for c in audited]
+    assert labels == ["FORMAL", "UNSOURCED"]  # formal untouched; fake citation demoted

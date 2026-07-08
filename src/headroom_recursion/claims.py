@@ -24,7 +24,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-_CLAIM_RE = re.compile(r"\[(KNOWN|NEW)\]", re.IGNORECASE)
+_CLAIM_RE = re.compile(r"\[(KNOWN|NEW|FORMAL)\]", re.IGNORECASE)
 # "Karp, R., Lipton, R. (1980)" / "Williams (2010)" / "Aaronson–Wigderson, 2008"
 _CITATION_RE = re.compile(r"([A-Z][A-Za-zÀ-ɏ'’\-]+(?:[,\s]+[A-Z]\.)?(?:[\s,]+(?:and|&|–|-)?\s*[A-Z][A-Za-zÀ-ɏ'’\-]+)*)[\s,(]+\(?(\d{4})\)?")
 
@@ -76,6 +76,10 @@ def audit_claims(
         elif claim.label == "NEW":
             hits = _lookup(retriever, claim.statement, k=k)
             claim.prior_art = [h[:max_snippet_chars] for h in hits[:k]]
+        # [FORMAL] claims are deliberately not audited here: their authority is
+        # the Lean gate (rung 1), not the corpus (rung 4). A [FORMAL] label on a
+        # block that doesn't compile is the GATE's mechanical rejection to make,
+        # and the rubric prices false [FORMAL] labels at the fabrication cap.
     return claims
 
 
