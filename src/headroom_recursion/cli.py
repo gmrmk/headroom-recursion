@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from typing import Callable, Optional
@@ -154,6 +155,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--oracle-model", dest="oracle_model", help="model that compiles the oracle (default: strongest ladder model)")
     p.add_argument("--claim-audit", dest="claim_audit", action="store_true", help="audit [KNOWN]/[NEW] claims against the retrieval corpus (needs --lightrag or --corpus)")
     p.add_argument("--ledger", metavar="PATH", help="run ledger: seed from prior verified results, record this run's outcome")
+    p.add_argument("--campaign", type=int, metavar="N", help="campaign mode: up to N ledger-seeded runs of the same problem (requires --ledger); traces, summary, and heartbeat land in --trace-dir")
+    p.add_argument("--stop-after-dry", dest="stop_after_dry", type=int, default=2, help="campaign: stop after this many consecutive runs without ledger improvement (default 2)")
+    p.add_argument("--max-cost-usd", dest="max_cost_usd", type=float, help="campaign: dollar fuse — stop starting new calls once the summed per-call cost crosses this")
+    p.add_argument("--heartbeat", metavar="FILE", help="campaign: heartbeat JSON path (default <trace-dir>/heartbeat.json)")
     p.add_argument("--corpus", metavar="FILE", help="curated corpus (one entry per line) for CorpusRetriever — rung-4 lookups without LightRAG")
     p.add_argument("--research", action="store_true", help="research mode: wrap the problem in the proven graded-rubric template, default the ladder to Sonnet+, auto-enable --claim-audit when a corpus/retriever is configured")
     p.add_argument("--client", choices=("claude", "openai"), default="claude", help="model backend; 'openai' also covers OpenAI-compatible servers (Ollama, vLLM, ...) via --base-url")
@@ -254,13 +259,11 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Rung-1 Lean oracle: a decider (pinned statement) or a gate (compile-only).
     if getattr(args, "lean_statement", None) or getattr(args, "lean_gate", False):
-        import os as _os
-
         from headroom_recursion import lean_oracle
 
-        project = args.lean_project or ("lean" if _os.path.isdir("lean") else None)
+        project = args.lean_project or ("lean" if os.path.isdir("lean") else None)
         lean_artifacts = (
-            _os.path.join(args.trace_dir, "lean") if getattr(args, "trace_dir", None) else None
+            os.path.join(args.trace_dir, "lean") if getattr(args, "trace_dir", None) else None
         )
         try:
             if args.lean_statement:
@@ -282,6 +285,44 @@ def main(argv: Optional[list[str]] = None) -> int:
         cfg.oracle_note = oracle_obj.note
         cfg.oracle_rung = oracle_obj.rung
 
+    # A toothless audit looks like diligence — say so before anything runs.
+    if cfg.claim_audit and cfg.retriever is None:
+        print(
+            "note: --claim-audit has no retriever (add --corpus or --lightrag) — "
+            "citations cannot be resolved and the audit will be toothless",
+            file=sys.stderr,
+        )
+
+    # Campaign mode: the loop owns per-run seeding, budgets, and artifacts.
+    if args.campaign is not None:
+        if not args.ledger:
+            p.error("--campaign requires --ledger (the stop rule is ledger movement)")
+        from headroom_recursion import campaign as campaign_mod
+
+        result = campaign_mod.run_campaign(
+            problem,
+            client=client,
+            base_config=cfg,
+            runs=args.campaign,
+            ledger_path=args.ledger,
+            trace_dir=args.trace_dir or "runs",
+            heartbeat_path=args.heartbeat,
+            dry_stop=args.stop_after_dry,
+            max_cost_usd=args.max_cost_usd,
+        )
+        report = campaign_mod.campaign_report(args.trace_dir or "runs", args.ledger)
+        report_path = os.path.join(args.trace_dir or "runs", "campaign_report.md")
+        with open(report_path, "w", encoding="utf-8") as fh:
+            fh.write(report)
+        print(report)
+        print(
+            f"campaign: stopped={result.stopped} runs={result.runs_completed} "
+            f"calls={result.total_calls} cost=${result.total_cost_usd:.2f} "
+            f"(report: {report_path})",
+            file=sys.stderr,
+        )
+        return 0 if result.validated else 2
+
     # Run ledger: start from settled ground, never re-derive it.
     if args.ledger:
         from headroom_recursion import ledger as ledger_mod
@@ -290,14 +331,6 @@ def main(argv: Optional[list[str]] = None) -> int:
         if seed:
             cfg.seed_scratchpad = seed
             print(f"note: seeded from ledger ({args.ledger})", file=sys.stderr)
-
-    # A toothless audit looks like diligence — say so up front instead.
-    if cfg.claim_audit and cfg.retriever is None:
-        print(
-            "note: --claim-audit has no retriever (add --corpus or --lightrag) — "
-            "citations cannot be resolved and the audit will be toothless",
-            file=sys.stderr,
-        )
 
     def emit(trace, *, to_stderr: bool = False) -> None:
         out = json.dumps(trace.to_dict(), indent=2) if args.json else trace.summary()
