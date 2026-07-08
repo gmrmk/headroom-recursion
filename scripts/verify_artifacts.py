@@ -140,7 +140,7 @@ def main() -> int:
         "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "toolchain": open(os.path.join(LEAN_PROJECT, "lean-toolchain")).read().strip(),
         "checkers": {
-            "leanchecker": "distributed with the pinned toolchain (kernel replay, --fresh)",
+            "leanchecker": "distributed with the pinned toolchain; Lean's own kernel (not implementation-independent). Kernel replay: --fresh for self-contained artifacts, incremental for Mathlib imports — see per-artifact tier1_mode",
             "lean4export": "leanprover/lean4export @ v4.31.0 (NDJSON format 3.1.0)",
             "nanoda": "ammkrn/nanoda_lib @ master f58f2f6 (independent Rust kernel)",
         },

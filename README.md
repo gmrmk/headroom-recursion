@@ -153,19 +153,27 @@ trust. `scripts/verify_artifacts.py` re-checks every persisted Lean artifact
 *independently*:
 
 1. **Kernel replay** — `leanchecker` (shipped inside Lean ≥ 4.28) re-runs each
-   proof through the kernel from a fresh environment, catching any
-   elaborator/metaprogram circumvention.
+   proof's declarations through the kernel, catching elaborator/metaprogram
+   circumvention. This is Lean's *own* kernel, so it does not reduce trust in
+   the kernel itself — only in the elaboration around it. Self-contained
+   artifacts get a full `--fresh` replay of their transitive environment;
+   `import Mathlib` artifacts get an incremental replay of the module (trusting
+   the prebuilt Mathlib environment), with their used Mathlib dependencies
+   re-checked instead by tier 2's export closure. `runs/verify/report.json`
+   records which mode ran per artifact.
 2. **Second, independent kernel** — the proof is serialized with
    [`lean4export`](https://github.com/leanprover/lean4export) (v4.31.0) to Lean's
    NDJSON export format and re-typechecked by
-   [`nanoda`](https://github.com/ammkrn/nanoda_lib), an independently written Rust
+   [`nanoda`](https://github.com/ammkrn/nanoda_lib), a from-scratch Rust
    reimplementation of the Lean kernel, with the axiom set audited against
-   `{propext, Classical.choice, Quot.sound}`. The export file is published, so a
-   third party can re-verify **without trusting our toolchain at all**.
+   `{propext, Classical.choice, Quot.sound}`. This is the *only*
+   implementation-independent tier — and the export file is published, so a
+   third party can run it without trusting our toolchain.
 
-`runs/verify/report.json` records the outcome and the checker versions. What this
-buys, stated honestly: a *sound* proof, re-checked by two independent
-implementations. It does **not** buy novelty — see below.
+`runs/verify/report.json` records the outcome and checker versions. What this
+buys, stated honestly: a *sound* proof, replayed by Lean's own kernel and
+re-checked by one genuinely independent kernel implementation. It does **not**
+buy novelty — see below.
 
 ## Case study: the P vs NP campaign
 
@@ -178,8 +186,9 @@ the system awards must be manufactured by its own verification machinery, and a
 The honest result: **no novel mathematics.** Across every configuration, the
 best judged score was 0.30 (all-`[KNOWN]` restatements; the rubric caps
 fabrication at 0.05 and no run cleared it). The Lean artifacts that *were*
-independently verified — a Shannon-style counting argument, formalized skeletons
-of the relativization and Karp–Lipton barriers — are **classical folklore, not
+independently verified — a Shannon-style counting argument, and
+hypothesis-conditional shells that *assume* (rather than establish) the
+relativization and Karp–Lipton barriers — are **classical folklore, not
 new results**; what the kernels confirm is that they are *sound*, and what the
 campaign demonstrates is the *methodology* (verification-gated refinement with
 mechanically-audited credit), not progress on the problem. The value here is a

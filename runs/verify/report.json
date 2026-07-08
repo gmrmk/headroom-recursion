@@ -2,7 +2,7 @@
   "generated": "2026-07-08T14:19:05Z",
   "toolchain": "leanprover/lean4:v4.31.0",
   "checkers": {
-    "leanchecker": "distributed with the pinned toolchain (kernel replay, --fresh)",
+    "leanchecker": "distributed with the pinned toolchain; Lean's own kernel (not implementation-independent). Kernel replay: --fresh for self-contained artifacts, incremental for Mathlib imports \u2014 see per-artifact tier1_mode",
     "lean4export": "leanprover/lean4export @ v4.31.0 (NDJSON format 3.1.0)",
     "nanoda": "ammkrn/nanoda_lib @ master f58f2f6 (independent Rust kernel)"
   },
