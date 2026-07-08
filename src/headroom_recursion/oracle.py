@@ -414,15 +414,20 @@ def lean_verify(
     if runner is None:
         return False, "lean not installed"
 
-    # Two rung-1 false positives, rejected before compiling: `sorry` (Lean treats
-    # proof holes as a WARNING — exit 0) and custom `axiom`s (an arbitrary axiom
-    # "proves" anything, silently). A proof carrying either is not a proof.
+    # Rung-1 false positives, rejected before compiling: `sorry`/`admit` (Lean
+    # treats proof holes as a WARNING — exit 0), `sorryAx` (the underlying
+    # constant, which a word-boundary `sorry` regex misses), custom `axiom`s
+    # (an arbitrary axiom "proves" anything, silently), and `native_decide`
+    # (shifts trust from the kernel to the compiled evaluator). A proof
+    # carrying any of them is not a kernel-checked proof.
     import re as _re
 
-    if _re.search(r"\b(sorry|admit)\b", code):
-        return False, "rejected: proof contains sorry/admit (holes are not proofs)"
+    if _re.search(r"\b(sorry|admit|sorryAx)\b", code):
+        return False, "rejected: proof contains sorry/admit/sorryAx (holes are not proofs)"
     if _re.search(r"^\s*axiom\b", code, _re.MULTILINE):
         return False, "rejected: proof declares a custom axiom"
+    if _re.search(r"\bnative_decide\b", code):
+        return False, "rejected: native_decide trusts the compiler, not the kernel"
 
     with tempfile.NamedTemporaryFile("w", suffix=".lean", delete=False) as fh:
         fh.write(code)

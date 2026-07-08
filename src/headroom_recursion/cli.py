@@ -137,6 +137,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--index", action="append", metavar="FILE", help="index a text file into LightRAG before running (repeatable; runs on every invocation — LightRAG dedupes identical content)")
     p.add_argument("--retrieval-k", type=int, help="snippets to retrieve per step (default 4)")
     p.add_argument("--retrieval-max-chars", dest="retrieval_max_chars", type=int, help="cap on injected knowledge per step (default 8000 chars)")
+    p.add_argument("--lean-gate", dest="lean_gate", action="store_true", help="rung-1 gate: any ```lean blocks in answers must compile; failures are mechanical rejections with compiler errors fed back")
+    p.add_argument("--lean-statement", dest="lean_statement", metavar="FILE", help="rung-1 DECIDER: trusted skeleton pinning the theorem statement (one 'sorry' line + LEAN-ORACLE-TARGET marker); a kernel-checked, axiom-audited proof halts as validated")
+    p.add_argument("--lean-project", dest="lean_project", metavar="DIR", help="Lake project for lean compiles (default: ./lean when present); enables Mathlib imports")
+    p.add_argument("--lean-timeout", dest="lean_timeout", type=float, default=300.0, help="seconds per lean compile (default 300; first Mathlib import is slow)")
     p.add_argument("--auto-oracle", dest="auto_oracle", action="store_true", help="compile + calibrate a mechanical verifier for the problem before solving (oracle compiler)")
     p.add_argument("--oracle-model", dest="oracle_model", help="model that compiles the oracle (default: strongest ladder model)")
     p.add_argument("--claim-audit", dest="claim_audit", action="store_true", help="audit [KNOWN]/[NEW] claims against the retrieval corpus (needs --lightrag or --corpus)")
@@ -221,6 +225,30 @@ def main(argv: Optional[list[str]] = None) -> int:
             except OSError as exc:
                 p.error(f"--index {path}: {exc}")
         cfg.retriever = retriever
+
+    # Rung-1 Lean oracle: a decider (pinned statement) or a gate (compile-only).
+    if getattr(args, "lean_statement", None) or getattr(args, "lean_gate", False):
+        import os as _os
+
+        from headroom_recursion import lean_oracle
+
+        project = args.lean_project or ("lean" if _os.path.isdir("lean") else None)
+        try:
+            if args.lean_statement:
+                oracle_obj = lean_oracle.make_decider_oracle(
+                    args.lean_statement, project_dir=project, timeout_s=args.lean_timeout
+                )
+            else:
+                oracle_obj = lean_oracle.make_gate_oracle(
+                    project_dir=project, timeout_s=args.lean_timeout
+                )
+        except (OSError, ValueError) as exc:
+            p.error(f"lean oracle: {exc}")
+        cfg.validator = oracle_obj.validator
+        cfg.feedback = oracle_obj.feedback
+        cfg.oracle_sufficient = oracle_obj.sufficient
+        cfg.oracle_note = oracle_obj.note
+        cfg.oracle_rung = oracle_obj.rung
 
     # Run ledger: start from settled ground, never re-derive it.
     if args.ledger:

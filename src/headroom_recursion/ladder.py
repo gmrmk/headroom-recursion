@@ -77,6 +77,12 @@ def recurse(
         ) or (reason == "validated" and trace.validated_confidence < 1.0)
         return trace
 
+    # A hand-wired oracle (e.g. the Lean gate/decider) reports its rung and
+    # authority in the trace, same as a compiled one would.
+    if cfg.validator is not None and cfg.oracle_rung:
+        trace.oracle_rung = cfg.oracle_rung
+        trace.oracle_gate_only = not cfg.oracle_sufficient
+
     # --- step zero: compile an oracle if asked and none was hand-supplied ---
     if cfg.oracle_auto and cfg.validator is None and cfg.ladder:
         from headroom_recursion import oracle as _oracle
