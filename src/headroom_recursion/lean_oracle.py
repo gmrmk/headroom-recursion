@@ -305,8 +305,24 @@ def make_gate_oracle(
     project_dir: Optional[str] = None,
     timeout_s: float = 300.0,
     runner: Optional[Callable] = None,
+    artifact_dir: Optional[str] = None,
 ) -> LeanOracle:
     memo = _Memo()
+
+    def _persist(block: str, output: str, ok) -> None:
+        # Every compiled gate block is an artifact: independent checkers
+        # (leanchecker/lean4export/nanoda) re-verify from these files alone.
+        if not artifact_dir:
+            return
+        try:
+            os.makedirs(artifact_dir, exist_ok=True)
+            stem = os.path.join(artifact_dir, f"gate-{_key(block)[:12]}")
+            with open(stem + ".lean", "w", encoding="utf-8") as fh:
+                fh.write(block if block.endswith("\n") else block + "\n")
+            with open(stem + ".out", "w", encoding="utf-8") as fh:
+                fh.write(f"compile ok: {ok}\n\n{output}")
+        except OSError:
+            pass
 
     def check(answer: str) -> tuple["bool | Verdict", str]:
         blocks = extract_lean_blocks(answer)
@@ -327,6 +343,7 @@ def make_gate_oracle(
                     Verdict(passed=True, note=f"lean gate could not run ({output}); nothing mechanically checked"),
                     "",
                 )
+            _persist(block, output, ok)
             if not ok:
                 failures.append(f"lean block {i} failed to compile:\n{output.strip()[:2000]}")
             elif "sorry" in output:
