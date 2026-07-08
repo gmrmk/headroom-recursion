@@ -195,7 +195,11 @@ def simple_local_embedding(dim: int = 256, max_token_size: int = 8192) -> Embedd
     replace it with a real model (OpenAI, sentence-transformers) for real retrieval.
     """
 
-    async def embed(texts: list[str]) -> list[list[float]]:
+    async def embed(texts: list[str]):
+        # numpy ships with LightRAG (whose newer builds require array output —
+        # they call .size on it); this helper only runs alongside LightRAG.
+        import numpy as np
+
         out: list[list[float]] = []
         for text in texts:
             vec = [0.0] * dim
@@ -204,7 +208,7 @@ def simple_local_embedding(dim: int = 256, max_token_size: int = 8192) -> Embedd
                 vec[h % dim] += 1.0
             norm = math.sqrt(sum(v * v for v in vec)) or 1.0
             out.append([v / norm for v in vec])
-        return out
+        return np.asarray(out, dtype=np.float32)
 
     return Embedding(func=embed, dim=dim, max_token_size=max_token_size)
 
@@ -272,7 +276,18 @@ class LightRAGRetriever:
         # Everything runs on the retriever's single persistent loop — LightRAG's
         # loop-bound state (locks, sessions) must live and die on one loop.
         self._runner.run(self._rag.initialize_storages())
-        self._runner.run(self._rag.initialize_pipeline_status())
+        # API drift: older builds expose initialize_pipeline_status as a method,
+        # newer ones as a module-level function in kg.shared_storage.
+        init_pipeline = getattr(self._rag, "initialize_pipeline_status", None)
+        if init_pipeline is None:
+            try:
+                from lightrag.kg.shared_storage import (  # type: ignore
+                    initialize_pipeline_status as init_pipeline,
+                )
+            except Exception:
+                init_pipeline = None
+        if init_pipeline is not None:
+            self._runner.run(init_pipeline())
         self._initialized = True
 
     def index(self, docs) -> None:
