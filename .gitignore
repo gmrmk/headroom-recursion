@@ -24,3 +24,4 @@ venv/
 runs/install-lean.log
 runs/heartbeat.json
 kb/
+kb/
