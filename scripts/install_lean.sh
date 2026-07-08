@@ -71,6 +71,17 @@ fi
 
 if ! have_toolchain; then
     log "falling back to FROM-SOURCE build of lean4 @ $TAG (sanctioned git route; ~1-2h)"
+    # leantar is normally a GitHub-release download (often egress-blocked) but is a
+    # Rust crate: build it via git + crates.io and put it on PATH so CMake's
+    # find_program(LEANTAR leantar) skips the download. lake exe cache get needs it too.
+    export PATH="$HOME/.cargo/bin:$PATH"
+    if ! command -v leantar >/dev/null 2>&1; then
+        log "building leantar from source (cargo)"
+        run cargo install --git https://github.com/digama0/leangz --tag v0.1.19 \
+            || run cargo install --git https://github.com/digama0/leangz \
+            || log "WARNING: leantar build failed; cmake will attempt the download"
+        ln -sf "$HOME/.cargo/bin/leantar" /usr/local/bin/leantar 2>/dev/null || true
+    fi
     if [ ! -d "$SRC_DIR/.git" ]; then
         run git clone --depth 1 --branch "$TAG" https://github.com/leanprover/lean4 "$SRC_DIR" \
             || { log "FATAL: git clone of lean4 failed. Level: $(status)"; exit 1; }

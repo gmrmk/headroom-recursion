@@ -335,3 +335,1578 @@ make[1]: Leaving directory '/root/lean4-src/build/release'
 make: *** [Makefile:195: stage1] Error 2
 make: Leaving directory '/root/lean4-src/build/release'
 [01:12:49] FATAL: lean4 source build failed. Level: none
+[01:15:48] === install_lean.sh start (current level: none) ===
+[01:15:48] installing elan
+[01:15:48] + sh -c curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+info: downloading installer
+curl: (22) The requested URL returned error: 403
+elan: command failed: curl -sSfL https://github.com/leanprover/elan/releases/latest/download/elan-x86_64-unknown-linux-gnu.tar.gz
+[01:15:49] elan install failed (release downloads may be egress-blocked)
+[01:15:49] falling back to FROM-SOURCE build of lean4 @ v4.31.0 (sanctioned git route; ~1-2h)
+[01:15:49] building leantar from source (cargo)
+[01:15:49] + cargo install --git https://github.com/digama0/leangz --tag v0.1.19
+    Updating git repository `https://github.com/digama0/leangz`
+  Installing leangz v0.1.19 (https://github.com/digama0/leangz?tag=v0.1.19#bc36c619)
+    Updating crates.io index
+     Locking 46 packages to latest compatible versions
+      Adding hashbrown v0.15.5 (available: v0.17.1)
+ Downloading crates ...
+  Downloaded errno v0.3.14
+  Downloaded crossbeam-deque v0.8.7
+  Downloaded fastrand v2.4.1
+  Downloaded cfg-if v1.0.4
+  Downloaded byteorder v1.5.0
+  Downloaded equivalent v1.0.2
+  Downloaded itoa v1.0.18
+  Downloaded find-msvc-tools v0.1.9
+  Downloaded either v1.16.0
+  Downloaded pkg-config v0.3.33
+  Downloaded jobserver v0.1.35
+  Downloaded zstd-safe v7.2.4
+  Downloaded foldhash v0.1.5
+  Downloaded zstd v0.13.3
+  Downloaded zmij v1.0.21
+  Downloaded tempfile v3.27.0
+  Downloaded unicode-ident v1.0.24
+  Downloaded proc-macro2 v1.0.106
+  Downloaded serde_core v1.0.228
+  Downloaded getrandom v0.4.3
+  Downloaded serde_derive v1.0.228
+  Downloaded cc v1.2.66
+  Downloaded crossbeam-epoch v0.9.20
+  Downloaded bitflags v2.13.0
+  Downloaded rayon-core v1.13.0
+  Downloaded zerocopy-derive v0.8.53
+  Downloaded memchr v2.8.3
+  Downloaded serde v1.0.228
+  Downloaded hashbrown v0.15.5
+  Downloaded serde_json v1.0.150
+  Downloaded rayon v1.12.0
+  Downloaded libc v0.2.186
+  Downloaded allocator-api2 v0.2.21
+  Downloaded shlex v2.0.1
+  Downloaded quote v1.0.46
+  Downloaded once_cell v1.21.4
+  Downloaded zerocopy v0.8.53
+  Downloaded syn v2.0.118
+  Downloaded memmap2 v0.9.11
+  Downloaded crossbeam-utils v0.8.22
+  Downloaded rustix v1.1.4
+  Downloaded zstd-sys v2.0.16+zstd.1.5.7
+  Downloaded linux-raw-sys v0.12.1
+   Compiling libc v0.2.186
+   Compiling proc-macro2 v1.0.106
+   Compiling shlex v2.0.1
+   Compiling unicode-ident v1.0.24
+   Compiling find-msvc-tools v0.1.9
+   Compiling quote v1.0.46
+   Compiling pkg-config v0.3.33
+   Compiling crossbeam-utils v0.8.22
+   Compiling crossbeam-epoch v0.9.20
+   Compiling crossbeam-deque v0.8.7
+   Compiling serde_core v1.0.228
+   Compiling jobserver v0.1.35
+   Compiling rustix v1.1.4
+   Compiling cc v1.2.66
+   Compiling syn v2.0.118
+   Compiling zmij v1.0.21
+   Compiling zstd-safe v7.2.4
+   Compiling rayon-core v1.13.0
+   Compiling getrandom v0.4.3
+   Compiling serde_json v1.0.150
+   Compiling zerocopy v0.8.53
+   Compiling cfg-if v1.0.4
+   Compiling linux-raw-sys v0.12.1
+   Compiling bitflags v2.13.0
+   Compiling zstd-sys v2.0.16+zstd.1.5.7
+   Compiling serde v1.0.228
+   Compiling serde_derive v1.0.228
+   Compiling zerocopy-derive v0.8.53
+   Compiling fastrand v2.4.1
+   Compiling equivalent v1.0.2
+   Compiling itoa v1.0.18
+   Compiling foldhash v0.1.5
+   Compiling once_cell v1.21.4
+   Compiling either v1.16.0
+   Compiling memchr v2.8.3
+   Compiling allocator-api2 v0.2.21
+   Compiling hashbrown v0.15.5
+   Compiling rayon v1.12.0
+   Compiling tempfile v3.27.0
+   Compiling memmap2 v0.9.11
+   Compiling byteorder v1.5.0
+   Compiling zstd v0.13.3
+   Compiling leangz v0.1.19 (/root/.cargo/git/checkouts/leangz-12f7084a267b7e65/bc36c61)
+    Finished `release` profile [optimized] target(s) in 37.52s
+  Installing /root/.cargo/bin/leangz
+  Installing /root/.cargo/bin/leantar
+   Installed package `leangz v0.1.19 (https://github.com/digama0/leangz?tag=v0.1.19#bc36c619)` (executables `leangz`, `leantar`)
+[01:16:27] + cmake --preset release
+-- 
+-- No build type selected, default to 'Release'
+-- Architecture: x64
+-- Override standard malloc (MI_OVERRIDE=ON)
+-- 
+-- Library name     : mimalloc
+-- Version          : 2.2.3
+-- Build type       : release
+-- C Compiler       : /usr/bin/cc
+-- Compiler flags   : -Wall;-Wextra;-Wno-unknown-pragmas;-fvisibility=hidden;-Wstrict-prototypes;-ftls-model=initial-exec;-fno-builtin-malloc
+-- Compiler defines : MI_CMAKE_BUILD_TYPE=release;MI_BUILD_RELEASE
+-- Link libraries   : pthread;rt;atomic
+-- Build targets    : shared;static;object;tests
+-- 
+-- Configuring done (0.4s)
+-- Generating done (0.0s)
+-- Build files have been written to: /root/lean4-src/build/release
+[01:16:27] + make -C build/release -j4 stage1
+make: Entering directory '/root/lean4-src/build/release'
+make[1]: Entering directory '/root/lean4-src/build/release'
+make[2]: Entering directory '/root/lean4-src/build/release'
+make[3]: Entering directory '/root/lean4-src/build/release'
+make[3]: Leaving directory '/root/lean4-src/build/release'
+make[3]: Entering directory '/root/lean4-src/build/release'
+[  4%] Performing update step for 'cadical'
+[  8%] No patch step for 'cadical'
+[ 12%] No configure step for 'cadical'
+[ 16%] Performing build step for 'cadical'
+make[4]: Entering directory '/root/lean4-src/build/release/cadical/src/cadical'
+make[4]: Leaving directory '/root/lean4-src/build/release/cadical/src/cadical'
+[ 20%] No install step for 'cadical'
+[ 25%] Completed 'cadical'
+make[3]: Leaving directory '/root/lean4-src/build/release'
+[ 33%] Built target cadical
+make[3]: Entering directory '/root/lean4-src/build/release'
+make[3]: Leaving directory '/root/lean4-src/build/release'
+make[3]: Entering directory '/root/lean4-src/build/release'
+[ 37%] Performing configure step for 'stage0'
+cc: error: unrecognized command-line option '--print-target-triple'
+cc: fatal error: no input files
+compilation terminated.
+-- No build type selected, default to Release
+-- 64-bit machine detected
+-- LIBUV_LDFLAGS: -L/usr/lib/x86_64-linux-gnu-luv-lpthread-ldl-lrt
+-- LIBUV_INCLUDE_DIRS: /usr/include
+CMake Warning at CMakeLists.txt:452 (message):
+  Disabling LLVM support
+
+
+-- stage0 sha1: ac979599759bc90431d943fb8c2b2faba2ee8ef9
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_INSTALL_BINDIR
+    CMAKE_INSTALL_DATADIR
+    CMAKE_INSTALL_DATAROOTDIR
+    CMAKE_INSTALL_DOCDIR
+    CMAKE_INSTALL_INCLUDEDIR
+    CMAKE_INSTALL_INFODIR
+    CMAKE_INSTALL_LIBDIR
+    CMAKE_INSTALL_LIBEXECDIR
+    CMAKE_INSTALL_LOCALEDIR
+    CMAKE_INSTALL_LOCALSTATEDIR
+    CMAKE_INSTALL_MANDIR
+    CMAKE_INSTALL_OLDINCLUDEDIR
+    CMAKE_INSTALL_RUNSTATEDIR
+    CMAKE_INSTALL_SBINDIR
+    CMAKE_INSTALL_SHAREDSTATEDIR
+    CMAKE_INSTALL_SYSCONFDIR
+    _GNUInstallDirs_LAST_CMAKE_INSTALL_PREFIX
+
+
+-- Build files have been written to: /root/lean4-src/build/release/stage0
+[ 41%] Performing build step for 'stage0'
+make[4]: Entering directory '/root/lean4-src/build/release/stage0'
+make[5]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[  0%] Built target initialize
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[  1%] Built target leanshell
+[  3%] Built target constructions
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[ 16%] Built target util
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[7]: Entering directory '/root/lean4-src/stage0/src'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 16%] Built target copy-leantar
+make[8]: Entering directory '/root/lean4-src/stage0/src'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[ 29%] Built target kernel
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 44%] Built target library
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[ 45%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/debug.cpp.o
+[ 46%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/thread.cpp.o
+[ 47%] Building CXX object shell/CMakeFiles/leanmain.dir/lean.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data.c
+[ 47%] Linking CXX static library ../lib/temp/libleanmain.a
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 47%] Built target leanmain
+[ 48%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/mpz.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/PropLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GetElem.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Conv.c
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[ 49%] Building C object shell/CMakeFiles/leanmanifest.dir/__/temp/empty.c.o
+[ 50%] Linking C static library ../lib/lean/libleanmanifest.a
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 50%] Built target leanmanifest
+[ 50%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/utf8.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Omega/Constraint.c
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[ 51%] Building CXX object runtime/CMakeFiles/leanrt.dir/debug.cpp.o
+[ 52%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/object.cpp.o
+[ 52%] Building CXX object runtime/CMakeFiles/leanrt.dir/thread.cpp.o
+[ 53%] Building CXX object runtime/CMakeFiles/leanrt.dir/mpz.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Omega/Logic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Omega/IntList.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Omega/Coeffs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Omega/LinearCombo.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Omega/Int.c
+[ 54%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/apply.cpp.o
+[ 55%] Building CXX object runtime/CMakeFiles/leanrt.dir/utf8.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/WFTactics.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Try.c
+[ 56%] Building CXX object runtime/CMakeFiles/leanrt.dir/object.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Linter.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/NotationExtra.c
+/root/lean4-src/stage0/src/runtime/object.cpp:2680:1: warning: attributes are not permitted in this position [-Wattributes]
+ 2680 | __attribute__((noinline))
+      | ^~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/object.cpp:2681:11: note: attributes may be inserted here
+ 2681 | extern "C" LEAN_EXPORT obj_res lean_copy_expand_array_nonlinear(obj_arg a, bool expand) {
+      |           ^
+[ 56%] Building CXX object runtime/CMakeFiles/leanrt.dir/apply.cpp.o
+[ 57%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/exception.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/SizeOf.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/RCases.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Syntax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/System.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/WFExtrinsicFix.c
+[ 57%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/interrupt.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/SizeOfLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Notation.c
+/root/lean4-src/stage0/src/runtime/object.cpp:2680:1: warning: attributes are not permitted in this position [-Wattributes]
+ 2680 | __attribute__((noinline))
+      | ^~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/object.cpp:2681:11: note: attributes may be inserted here
+ 2681 | extern "C" LEAN_EXPORT obj_res lean_copy_expand_array_nonlinear(obj_arg a, bool expand) {
+      |           ^
+[ 58%] Building CXX object runtime/CMakeFiles/leanrt.dir/exception.cpp.o
+[ 59%] Building CXX object runtime/CMakeFiles/leanrt.dir/interrupt.cpp.o
+[ 60%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/memory.cpp.o
+[ 61%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/stackinfo.cpp.o
+[ 62%] Building CXX object runtime/CMakeFiles/leanrt.dir/memory.cpp.o
+[ 62%] Building CXX object runtime/CMakeFiles/leanrt.dir/stackinfo.cpp.o
+[ 63%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/compact.cpp.o
+[ 64%] Building CXX object runtime/CMakeFiles/leanrt.dir/compact.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Simproc.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/BinderNameHint.c
+[ 64%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/init_module.cpp.o
+[ 65%] Building CXX object runtime/CMakeFiles/leanrt.dir/init_module.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Prelude.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Hints.c
+[ 66%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/io.cpp.o
+[ 66%] Building CXX object runtime/CMakeFiles/leanrt.dir/io.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Core.c
+/root/lean4-src/stage0/src/runtime/io.cpp: In function 'lean::object* lean::lean_io_prim_handle_mk(b_obj_arg, uint8)':
+/root/lean4-src/stage0/src/runtime/io.cpp:419:23: warning: 'fp_mode' may be used uninitialized [-Wmaybe-uninitialized]
+  419 |     FILE * fp = fdopen(fd, fp_mode);
+      |                 ~~~~~~^~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/io.cpp:411:18: note: 'fp_mode' was declared here
+  411 |     char const * fp_mode;
+      |                  ^~~~~~~
+[ 67%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/hash.cpp.o
+/root/lean4-src/stage0/src/runtime/io.cpp: In function 'lean::object* lean::lean_io_prim_handle_mk(b_obj_arg, uint8)':
+/root/lean4-src/stage0/src/runtime/io.cpp:419:23: warning: 'fp_mode' may be used uninitialized [-Wmaybe-uninitialized]
+  419 |     FILE * fp = fdopen(fd, fp_mode);
+      |                 ~~~~~~^~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/io.cpp:411:18: note: 'fp_mode' was declared here
+  411 |     char const * fp_mode;
+      |                  ^~~~~~~
+[ 68%] Building CXX object runtime/CMakeFiles/leanrt.dir/hash.cpp.o
+[ 68%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/byteslice.cpp.o
+/root/lean4-src/stage0/src/runtime/hash.cpp: In function 'lean::uint64 lean::MurmurHash64A(const void*, size_t, uint64)':
+/root/lean4-src/stage0/src/runtime/hash.cpp:40:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   40 |     case 7: h ^= uint64(data2[6]) << 48;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:41:5: note: here
+   41 |     case 6: h ^= uint64(data2[5]) << 40;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:41:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   41 |     case 6: h ^= uint64(data2[5]) << 40;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:42:5: note: here
+   42 |     case 5: h ^= uint64(data2[4]) << 32;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:42:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   42 |     case 5: h ^= uint64(data2[4]) << 32;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:43:5: note: here
+   43 |     case 4: h ^= uint64(data2[3]) << 24;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:43:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   43 |     case 4: h ^= uint64(data2[3]) << 24;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:44:5: note: here
+   44 |     case 3: h ^= uint64(data2[2]) << 16;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:44:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   44 |     case 3: h ^= uint64(data2[2]) << 16;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:45:5: note: here
+   45 |     case 2: h ^= uint64(data2[1]) << 8;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:45:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   45 |     case 2: h ^= uint64(data2[1]) << 8;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:46:5: note: here
+   46 |     case 1: h ^= uint64(data2[0]);
+      |     ^~~~
+[ 69%] Building CXX object runtime/CMakeFiles/leanrt.dir/byteslice.cpp.o
+/root/lean4-src/stage0/src/runtime/hash.cpp: In function 'lean::uint64 lean::MurmurHash64A(const void*, size_t, uint64)':
+/root/lean4-src/stage0/src/runtime/hash.cpp:40:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   40 |     case 7: h ^= uint64(data2[6]) << 48;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:41:5: note: here
+   41 |     case 6: h ^= uint64(data2[5]) << 40;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:41:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   41 |     case 6: h ^= uint64(data2[5]) << 40;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:42:5: note: here
+   42 |     case 5: h ^= uint64(data2[4]) << 32;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:42:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   42 |     case 5: h ^= uint64(data2[4]) << 32;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:43:5: note: here
+   43 |     case 4: h ^= uint64(data2[3]) << 24;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:43:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   43 |     case 4: h ^= uint64(data2[3]) << 24;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:44:5: note: here
+   44 |     case 3: h ^= uint64(data2[2]) << 16;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:44:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   44 |     case 3: h ^= uint64(data2[2]) << 16;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:45:5: note: here
+   45 |     case 2: h ^= uint64(data2[1]) << 8;
+      |     ^~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:45:15: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   45 |     case 2: h ^= uint64(data2[1]) << 8;
+      |             ~~^~~~~~~~~~~~~~~~~~~~~~~~
+/root/lean4-src/stage0/src/runtime/hash.cpp:46:5: note: here
+   46 |     case 1: h ^= uint64(data2[0]);
+      |     ^~~~
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Sym/DSimp/DSimprocDSL.c
+[ 70%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/platform.cpp.o
+[ 71%] Building CXX object runtime/CMakeFiles/leanrt.dir/platform.cpp.o
+[ 72%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/alloc.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Sym/Simp/SimprocDSL.c
+[ 73%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/allocprof.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Sym/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/ByCases.c
+[ 73%] Building CXX object runtime/CMakeFiles/leanrt.dir/alloc.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Propagator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Interactive.c
+[ 74%] Building CXX object runtime/CMakeFiles/leanrt.dir/allocprof.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/FieldNormNum.c
+[ 74%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/sharecommon.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Cases.c
+[ 75%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/stack_overflow.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/ToIntLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Config.c
+[ 76%] Building CXX object runtime/CMakeFiles/leanrt.dir/sharecommon.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ring.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Module.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/AC.c
+/root/lean4-src/stage0/src/runtime/stack_overflow.cpp: In function 'void lean::segv_handler(int, siginfo_t*, void*)':
+/root/lean4-src/stage0/src/runtime/stack_overflow.cpp:74:14: warning: ignoring return value of 'ssize_t write(int, const void*, size_t)' declared with attribute 'warn_unused_result' [-Wunused-result]
+   74 |         write(STDERR_FILENO, msg, sizeof(msg) - 1);
+      |         ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 77%] Building CXX object runtime/CMakeFiles/leanrt.dir/stack_overflow.cpp.o
+/root/lean4-src/stage0/src/runtime/stack_overflow.cpp: In function 'void lean::segv_handler(int, siginfo_t*, void*)':
+/root/lean4-src/stage0/src/runtime/stack_overflow.cpp:74:14: warning: ignoring return value of 'ssize_t write(int, const void*, size_t)' declared with attribute 'warn_unused_result' [-Wunused-result]
+   74 |         write(STDERR_FILENO, msg, sizeof(msg) - 1);
+      |         ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Lint.c
+[ 78%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/process.cpp.o
+[ 78%] Building CXX object runtime/CMakeFiles/leanrt.dir/process.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Injective.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Annotated.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Order.c
+[ 79%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/object_ref.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Offset.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Util.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/ToInt.c
+[ 80%] Building CXX object runtime/CMakeFiles/leanrt.dir/object_ref.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Attr.c
+[ 80%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/mpn.cpp.o
+[ 81%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/mutex.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ext.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Tactics.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/PP.c
+[ 82%] Building CXX object runtime/CMakeFiles/leanrt.dir/mpn.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Norm.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ordered/Ring.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ordered/Module.c
+In file included from /usr/include/c++/13/string:51,
+                 from /usr/include/c++/13/bits/locale_classes.h:40,
+                 from /usr/include/c++/13/bits/ios_base.h:41,
+                 from /usr/include/c++/13/ios:44,
+                 from /usr/include/c++/13/ostream:40,
+                 from /usr/include/c++/13/iostream:41,
+                 from /root/lean4-src/stage0/src/runtime/debug.h:8,
+                 from /root/lean4-src/stage0/src/runtime/mpn.cpp:21:
+In static member function 'static constexpr _Up* std::__copy_move<_IsMove, true, std::random_access_iterator_tag>::__copy_m(_Tp*, _Tp*, _Up*) [with _Tp = unsigned int; _Up = unsigned int; bool _IsMove = false]',
+    inlined from 'constexpr _OI std::__copy_move_a2(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:506:30,
+    inlined from 'constexpr _OI std::__copy_move_a1(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:533:42,
+    inlined from 'constexpr _OI std::__copy_move_a(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:540:31,
+    inlined from 'constexpr _OI std::copy(_II, _II, _OI) [with _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:633:7,
+    inlined from 'static _ForwardIterator std::__uninitialized_copy<true>::__uninit_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:147:27,
+    inlined from '_ForwardIterator std::uninitialized_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:185:15,
+    inlined from 'void lean::buffer<T, INITIAL_SIZE>::set_capacity(size_t) [with T = unsigned int; long unsigned int INITIAL_SIZE = 16]' at /root/lean4-src/stage0/src/runtime/buffer.h:41:32,
+    inlined from 'void lean::buffer<T, INITIAL_SIZE>::ensure_capacity(size_t) [with T = unsigned int; long unsigned int INITIAL_SIZE = 16]' at /root/lean4-src/stage0/src/runtime/buffer.h:80:25,
+    inlined from 'void lean::buffer<T, INITIAL_SIZE>::resize(size_t, const T&) [with T = unsigned int; long unsigned int INITIAL_SIZE = 16]' at /root/lean4-src/stage0/src/runtime/buffer.h:157:28,
+    inlined from 'void lean::mpn_buffer::resize(size_t, const lean::mpn_digit&)' at /root/lean4-src/stage0/src/runtime/mpn.cpp:139:34,
+    inlined from 'size_t lean::div_normalize(const mpn_digit*, size_t, const mpn_digit*, size_t, mpn_buffer&, mpn_buffer&)' at /root/lean4-src/stage0/src/runtime/mpn.cpp:160:19,
+    inlined from 'char* lean::mpn_to_string(const mpn_digit*, size_t, char*, size_t)' at /root/lean4-src/stage0/src/runtime/mpn.cpp:340:37:
+/usr/include/c++/13/bits/stl_algobase.h:437:30: warning: 'void* __builtin_memmove(void*, const void*, long unsigned int)' forming offset 4 is out of the bounds [0, 4] [-Warray-bounds=]
+  437 |             __builtin_memmove(__result, __first, sizeof(_Tp) * _Num);
+      |             ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 82%] Building CXX object runtime/CMakeFiles/leanrt.dir/mutex.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ordered/Rat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ordered/Order.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ordered/Field.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ordered/Linarith.c
+In file included from /usr/include/c++/13/string:51,
+                 from /usr/include/c++/13/bits/locale_classes.h:40,
+                 from /usr/include/c++/13/bits/ios_base.h:41,
+                 from /usr/include/c++/13/ios:44,
+                 from /usr/include/c++/13/ostream:40,
+                 from /usr/include/c++/13/iostream:41,
+                 from /root/lean4-src/stage0/src/runtime/debug.h:8,
+                 from /root/lean4-src/stage0/src/runtime/mpn.cpp:21:
+In static member function 'static constexpr _Up* std::__copy_move<_IsMove, true, std::random_access_iterator_tag>::__copy_m(_Tp*, _Tp*, _Up*) [with _Tp = unsigned int; _Up = unsigned int; bool _IsMove = false]',
+    inlined from 'constexpr _OI std::__copy_move_a2(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:506:30,
+    inlined from 'constexpr _OI std::__copy_move_a1(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:533:42,
+    inlined from 'constexpr _OI std::__copy_move_a(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:540:31,
+    inlined from 'constexpr _OI std::copy(_II, _II, _OI) [with _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:633:7,
+    inlined from 'static _ForwardIterator std::__uninitialized_copy<true>::__uninit_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:147:27,
+    inlined from '_ForwardIterator std::uninitialized_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:185:15,
+    inlined from 'void lean::buffer<T, INITIAL_SIZE>::set_capacity(size_t) [with T = unsigned int; long unsigned int INITIAL_SIZE = 16]' at /root/lean4-src/stage0/src/runtime/buffer.h:41:32,
+    inlined from 'void lean::buffer<T, INITIAL_SIZE>::ensure_capacity(size_t) [with T = unsigned int; long unsigned int INITIAL_SIZE = 16]' at /root/lean4-src/stage0/src/runtime/buffer.h:80:25,
+    inlined from 'void lean::buffer<T, INITIAL_SIZE>::resize(size_t, const T&) [with T = unsigned int; long unsigned int INITIAL_SIZE = 16]' at /root/lean4-src/stage0/src/runtime/buffer.h:157:28,
+    inlined from 'void lean::mpn_buffer::resize(size_t, const lean::mpn_digit&)' at /root/lean4-src/stage0/src/runtime/mpn.cpp:139:34,
+    inlined from 'size_t lean::div_normalize(const mpn_digit*, size_t, const mpn_digit*, size_t, mpn_buffer&, mpn_buffer&)' at /root/lean4-src/stage0/src/runtime/mpn.cpp:160:19,
+    inlined from 'char* lean::mpn_to_string(const mpn_digit*, size_t, char*, size_t)' at /root/lean4-src/stage0/src/runtime/mpn.cpp:340:37:
+/usr/include/c++/13/bits/stl_algobase.h:437:30: warning: 'void* __builtin_memmove(void*, const void*, long unsigned int)' forming offset 4 is out of the bounds [0, 4] [-Warray-bounds=]
+  437 |             __builtin_memmove(__result, __first, sizeof(_Tp) * _Num);
+      |             ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 83%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/libuv.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ordered/Int.c
+[ 84%] Building CXX object runtime/CMakeFiles/leanrt.dir/libuv.cpp.o
+[ 84%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/uv/net_addr.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ordered.c
+[ 85%] Building CXX object runtime/CMakeFiles/leanrt.dir/uv/net_addr.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Module/OfNatModule.c
+[ 86%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/uv/event_loop.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Module/Basic.c
+[ 87%] Building CXX object runtime/CMakeFiles/leanrt.dir/uv/event_loop.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Module/Envelope.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Module/NatModuleNorm.c
+[ 88%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/uv/timer.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ring/CommSemiringAdapter.c
+[ 88%] Building CXX object runtime/CMakeFiles/leanrt.dir/uv/timer.cpp.o
+[ 89%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/uv/tcp.cpp.o
+/root/lean4-src/stage0/src/runtime/uv/timer.cpp: In function 'lean_object* lean::lean_uv_timer_next(b_obj_arg)':
+/root/lean4-src/stage0/src/runtime/uv/timer.cpp:203:1: warning: control reaches end of non-void function [-Wreturn-type]
+  203 | }
+      | ^
+[ 90%] Building CXX object runtime/CMakeFiles/leanrt.dir/uv/tcp.cpp.o
+/root/lean4-src/stage0/src/runtime/uv/timer.cpp: In function 'lean_object* lean::lean_uv_timer_next(b_obj_arg)':
+/root/lean4-src/stage0/src/runtime/uv/timer.cpp:203:1: warning: control reaches end of non-void function [-Wreturn-type]
+  203 | }
+      | ^
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ring/CommSolver.c
+[ 90%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/uv/udp.cpp.o
+[ 91%] Building CXX object runtime/CMakeFiles/leanrt.dir/uv/udp.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ring/ToInt.c
+[ 92%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/uv/dns.cpp.o
+[ 93%] Building CXX object runtime/CMakeFiles/leanrt.dir/uv/dns.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ring/OfScientific.c
+[ 94%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/uv/system.cpp.o
+[ 94%] Building CXX object runtime/CMakeFiles/leanrt.dir/uv/system.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ring/Field.c
+[ 95%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/uv/signal.cpp.o
+[ 96%] Building CXX object runtime/CMakeFiles/leanrt.dir/uv/signal.cpp.o
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ring/Basic.c
+/root/lean4-src/stage0/src/runtime/uv/signal.cpp: In function 'lean_object* lean::lean_uv_signal_next(b_obj_arg)':
+/root/lean4-src/stage0/src/runtime/uv/signal.cpp:225:1: warning: control reaches end of non-void function [-Wreturn-type]
+  225 | }
+      | ^
+[ 96%] Building CXX object runtime/CMakeFiles/leanrt_initial-exec.dir/root/lean4-src/build/release/mimalloc/src/mimalloc/src/static.c.o
+[ 97%] Building CXX object runtime/CMakeFiles/leanrt.dir/root/lean4-src/build/release/mimalloc/src/mimalloc/src/static.c.o
+/root/lean4-src/stage0/src/runtime/uv/signal.cpp: In function 'lean_object* lean::lean_uv_signal_next(b_obj_arg)':
+/root/lean4-src/stage0/src/runtime/uv/signal.cpp:225:1: warning: control reaches end of non-void function [-Wreturn-type]
+  225 | }
+      | ^
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind/Ring/Envelope.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Sym.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Util.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Classical.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Meta/Defs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Internal/Order.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Internal/Order/MonadTail.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Internal/Order/Tactic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Internal/Order/While.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Internal/Order/Basic.c
+[ 98%] Linking CXX static library libleanrt_initial-exec.a
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Internal/Order/Lemmas.c
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 98%] Built target leanrt_initial-exec
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/MethodSpecsSimp.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Do.c
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[ 99%] Linking CXX static library lib/temp/libleaninitialize.a
+[ 99%] Linking CXX static library ../lib/lean/libleanrt.a
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[ 99%] Built target leaninitialize
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful.c
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[ 99%] Built target leanrt
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Except.c
+[ 99%] Linking CXX static library lib/temp/libleancpp_1.a
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+make[6]: Entering directory '/root/lean4-src/build/release/stage0'
+[100%] Linking CXX static library lib/lean/libleancpp.a
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[100%] Built target leancpp_1
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Option.c
+make[6]: Leaving directory '/root/lean4-src/build/release/stage0'
+[100%] Built target leancpp
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/ExceptCps.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/State.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/MonadAttach/Instances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/MonadAttach/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/MonadLift/Instances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/MonadLift/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/MonadLift/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/MonadLift.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/Instances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/MonadAttach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Lawful/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/StateCps.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/MonadAttach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/EState.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Id.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/StateRef.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Control/Reader.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/TacticsExtra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Task.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/LawfulBEqTactics.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/MetaTypes.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Meta.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Ext.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/Ring.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/ToInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/Nat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/Ring/SInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/Ring/Rat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/Ring/BitVec.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/Ring/Fin.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/Ring/UInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/Ring/Int.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances/Ring/Nat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/System/ST.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/System/CancelToken.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/System/IO.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/System/FilePath.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/System/IOError.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/System/Promise.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/System/Uri.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/System/Platform.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Coe.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Guard.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ByteArray.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/SInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ULift.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Float32.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/BEq.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Hashable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Function.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Substring.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Pattern.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/ToSlice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Hashable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Modify.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Iter.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/TakeDrop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Termination.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Pattern/Pred.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Pattern/Char.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Pattern/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Pattern/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Extra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Hashable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Modify.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Iter.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/TakeDrop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Memcmp.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Split/Pred.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Split/Char.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Split/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/String/ForwardPattern.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/String/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/String/ForwardSearcher.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Find.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/TakeDrop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Split.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Find/Pred.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Find/Char.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Find/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Find/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Pred.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Char.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/TakeDrop/Pred.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/TakeDrop/Char.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/TakeDrop/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/TakeDrop/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Pattern/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/StringOrder.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/IsEmpty.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Splits.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Order.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Length.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/FindPos.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Iterate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Intercalate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Search.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Defs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Legacy.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Iter/Intercalate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Iter/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Length.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/FindPos.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Bootstrap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Stream.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Iterate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Decode.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Search.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/OrderInstances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/PosRaw.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Subslice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/LawfulHashable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Bitwise.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Lcm.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Power2.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Div.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Fold.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Div/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Div/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Mod.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/ToString.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Dvd.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Power2/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Power2/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Linear.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Simproc.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Log2.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Control.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/MinMax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/SOM.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Order.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Compare.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Bitwise/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Bitwise/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Coprime.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Gcd.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Fin/Bitwise.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Fin/Fold.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Fin/Log2.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Fin/OverflowAware.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Fin/Iterate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Fin/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Fin/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/RArray.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Ord.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Float.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ToString.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Rat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/BitVec/Folds.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/BitVec/Bitblast.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/BitVec/Bootstrap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/BitVec/Decidable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/BitVec/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/BitVec/BasicAux.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/BitVec/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/AC.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Attach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Sort/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Sort/Impl.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Sort/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Scan/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Scan/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/ControlImpl.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/SplitOn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Scan.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Find.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/TakeDrop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/ToArrayImpl.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/BEq.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Modify.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Find.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/TakeDrop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Pairwise.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/InsertIdx.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Prod.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Perm.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Range.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Erase.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Count.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Sum.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat/Sublist.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/MinMaxIdx.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/SplitOn/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/SplitOn/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/MinMaxOn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Notation.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Pairwise.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Control.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/ToArray.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/MinMax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/FinRange.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Zip.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Perm.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Range.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Erase.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Lex.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Sort.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/MapIdx.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Count.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/OfFn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Sublist.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/BasicAux.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Impl.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Int.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Nat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Int/Prod.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/List/Int/Sum.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/FloatArray.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/NeZero.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Zero.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/PLift.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Dyadic/Round.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Dyadic/Instances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Dyadic/Inv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Dyadic/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Dyadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Format.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/UInt/Bitwise.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/UInt/Log2.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/UInt/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/UInt/BasicAux.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/UInt/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/BitVec.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Bool.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ByteArray/Extra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ByteArray/Bootstrap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ByteArray/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ByteArray/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Sum/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Sum/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Char.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Format/Macro.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Format/Syntax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Format/Instances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Format/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Fin.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Ord/SInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Ord/Vector.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Ord/BitVec.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Ord/Array.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Ord/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Ord/UInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Ord/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/DecidableEq.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Attach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Find.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/FinRange.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Zip.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/InsertIdx.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Perm.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Range.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Stream.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Erase.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Lex.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Algebra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/MapIdx.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Count.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/OfFn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Int.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Nat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Vector/Extract.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Char/Order.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Char/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Char/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Char/Ordinal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Prod.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/OfScientific.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Stream.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Subtype.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Random.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/UInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Producers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Attach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/ULift.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Append.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Take.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/FilterMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/FlatMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Monadic/Attach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Monadic/ULift.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Monadic/Append.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Monadic/Take.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Monadic/FilterMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators/Monadic/FlatMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Producers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Consumers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Attach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/ULift.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Append.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Take.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/FilterMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/FlatMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Monadic/Attach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Monadic/ULift.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Monadic/Append.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Monadic/Take.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Monadic/FilterMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators/Monadic/FlatMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Combinators.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Monadic/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Consumers/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Consumers/Access.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Consumers/Loop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Consumers/Monadic/Loop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Consumers/Monadic/Collect.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Consumers/Collect.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Producers/List.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Producers/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas/Producers/Monadic/List.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Internal/LawfulMonadLiftFunction.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/PostconditionMonad.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Combinators.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/ToIterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Partial.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Access.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Loop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Stream.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Total.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Monadic/Partial.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Monadic/Access.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Monadic/Loop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Monadic/Total.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Monadic/Collect.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Consumers/Collect.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Internal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Producers/List.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Producers/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators/Producers/Monadic/List.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Repr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Rat/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Rat/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/List.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/List/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/List/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/List/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/Notation.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/Array.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/InternalLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/Array/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/Array/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/Array/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Slice/Operations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Sum.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Cast.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/Attach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/Function.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/List.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/Array.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/Instances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/Coe.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/BasicAux.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Option/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ToString/Macro.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ToString/Extra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ToString/Name.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/ToString/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/IntLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/SInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/RangeIterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/PRange.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/GetElemTactic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/BitVec.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Char.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Fin.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Internal/SignedBitVec.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Instances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Stream.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/UInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/NatLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/UpwardEnumerable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Map.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Iterators.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Int.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Polymorphic/Nat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Range/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/DecidableEq.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Attach.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Sort/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Sort/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Lex/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Lex/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Subarray/Split.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Subarray.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/BinSearch.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Find.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/TakeDrop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Mem.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/MinMax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/FinRange.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Zip.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/InsertIdx.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/InsertionSort.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Set.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Bootstrap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/QSort.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Perm.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Range.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/QSort/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Erase.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Lex.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Sort.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/MapIdx.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Count.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/OfFn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/BasicAux.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/GetLit.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Int.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Nat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Array/Extract.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/SInt/Bitwise.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/SInt/Float32.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/SInt/Float.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/SInt/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/SInt/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/Classes.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/LemmasExtra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/Ord.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/MinMaxOn.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/Factories.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/FactoriesExtra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/PackageFactories.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/Opposite.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Order/ClassesExtra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/FloatArray/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Iterators.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Subtype/Order.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Subtype/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Subtype/OrderExtra.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Nat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Queue.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Bitwise.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Cooper.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/ToString.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Linear.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/LemmasAux.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Order.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Compare.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Repr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Bitwise/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Bitwise/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/OfNat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/DivMod.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Pow.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Gcd.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/DivMod/Bootstrap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/DivMod/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/DivMod/Pow.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Data/Int/DivMod/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/MacroTrace.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/ShareCommon.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/GrindInstances.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/CbvSimproc.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/While.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/BinderPredicates.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/WFComputable.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Tactics.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/SimpLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Omega.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/WF.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Internal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Dynamic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init/Grind.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Init.c
+make[8]: Leaving directory '/root/lean4-src/stage0/src'
+make[8]: Entering directory '/root/lean4-src/stage0/src'
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Net/Addr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Net.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/Do.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Reflect.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Normalize.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Syntax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Actions.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Entails.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Assignment.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Convert.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/CNF.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Formula.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/PosFin.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Actions.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Clause.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/CompactLRATCheckerSound.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/LRATCheckerSound.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/LRATChecker.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/CompactLRATChecker.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Formula/Instance.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Formula/RatAddResult.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Formula/RatAddSound.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Formula/RupAddResult.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Formula/Class.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Formula/Implementation.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Formula/RupAddSound.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Internal/Formula/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Checker.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT/Parser.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BoolExpr/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BoolExpr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Expr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Pred.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Const.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Carry.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Var.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/RotateLeft.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Sub.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Append.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Udiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/ZeroExtend.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/RotateRight.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/GetLsbD.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Umod.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Replicate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Clz.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Mul.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Add.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/ShiftLeft.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Cpop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Not.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Eq.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/ShiftRight.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Neg.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Reverse.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Ult.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Operations/Extract.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Expr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Pred.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Const.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Carry.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Substructure.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Var.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/RotateLeft.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Sub.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Append.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Udiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/ZeroExtend.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/RotateRight.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/GetLsbD.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Umod.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Replicate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Clz.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Mul.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Add.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/ShiftLeft.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Cpop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Not.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Eq.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/ShiftRight.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Neg.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Reverse.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Ult.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl/Operations/Extract.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Impl.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Circuit.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Bitblast/BVExpr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/LRAT.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Normalize/Prop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Normalize/BitVec.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Normalize/Bool.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Normalize/Equal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/BVDecide/Normalize/Canonicalize.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/Do/ProofMode.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic/Do/Syntax.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/CancellationContext.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/Mutex.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/RecursiveMutex.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/Broadcast.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/CancellationToken.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/StreamMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/Semaphore.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/Notify.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/Barrier.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/SharedMutex.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sync/Channel.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/DNS.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/UDP.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/System.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/TCP.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/IO.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/Timer.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/Process.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/Signal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/Select.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async/ContextAsync.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Async.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/UV/DNS.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/UV/UDP.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/UV/System.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/UV/TCP.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/UV/Loop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/UV/Timer.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/UV/Signal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Parsec/ByteArray.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Parsec/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Parsec/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Parsec.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/Triple.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/WP.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/WP/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/WP/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/Assertion.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/Frame.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/Triple/SpecLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/Triple/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/Triple/Gadget.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/PredTrans.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/Do/ExceptPost.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal/UV.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/CNF/Literal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/CNF/Dimacs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/CNF/RelabelFin.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/CNF/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/CNF/Relabel.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/CNF.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/LawfulOperator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/Cached.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/RefVecOperator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/CNF.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/CachedGates.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/LawfulVecOperator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/RelabelNat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/RefVec.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/CachedGatesLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/If.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/RefVecOperator/Fold.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/RefVecOperator/Zip.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/RefVecOperator/Map.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/CachedLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/Relabel.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Sat/AIG.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Transport.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Server/Config.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Server/Connection.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Server/Handler.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Protocol/H1/Config.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Protocol/H1/Message.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Protocol/H1/Error.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Protocol/H1/Event.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Protocol/H1/Parser.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Protocol/H1/Writer.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Protocol/H1/Reader.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Protocol/H1.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Test/Helpers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Internal/ChunkedBuffer.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Internal/IndexMultiMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Internal/Char.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Internal/Encode.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Internal/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Internal/LowerCase.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Server.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/URI/Config.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/URI/Parser.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/URI/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/URI/Encoding.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Method.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Response.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Headers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Body/Any.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Body/Full.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Body/Length.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Body/Stream.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Body/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Body/Empty.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Request.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Extensions.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Version.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Status.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Headers/Name.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Headers/Value.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Headers/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/URI.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Chunk.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Data/Body.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Http/Internal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Tactic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/AdditionalOperations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Raw/DecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Raw/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Raw/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Raw/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Raw/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Raw/WF.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/DecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet/Raw.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtDTreeMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/String/ToInt.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/String/ToNat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtDHashMap/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtDHashMap/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtTreeMap/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtTreeMap/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtTreeSet.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/AdditionalOperations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Raw/AdditionalOperations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Raw/DecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Raw/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Raw/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Raw/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Raw/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Raw/WF.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/DecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeMap/Raw.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap/AdditionalOperations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap/RawLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap/DecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap/RawDecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap/IteratorLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap/Raw.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/AdditionalOperations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/RawLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/DecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/RawLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/Defs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/Index.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/Model.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/HashesTo.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/AssocList/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/AssocList/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/AssocList/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/WF.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Internal/Raw.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/RawDef.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/RawDecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/IteratorLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap/Raw.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtHashMap/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtHashMap/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtDTreeMap/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtDTreeMap/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashSet/RawLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashSet/DecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashSet/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashSet/RawDecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashSet/IteratorLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashSet/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashSet/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashSet/Raw.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/TreeSet.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/AdditionalOperations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Raw/AdditionalOperations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Raw/DecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Raw/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Raw/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Raw/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Raw/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Raw/WF.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/DecidableEquiv.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Iterator.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Cell.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Def.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/WF/Defs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/WF/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Balancing.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Queries.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Zipper.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Balanced.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Model.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Ordered.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Internal/Operations.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap/Raw.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtTreeSet/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtTreeSet/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Internal/Cut.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Internal/List/Defs.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Internal/List/Associative.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashSet.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/String.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtHashMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/HashMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DTreeMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/DHashMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ByteSlice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtTreeMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Consumers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/Drop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/Zip.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/DropWhile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/StepSize.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/TakeWhile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/Monadic/Drop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/Monadic/Zip.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/Monadic/DropWhile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/Monadic/StepSize.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators/Monadic/TakeWhile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Equivalence.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Consumers.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/Drop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/Zip.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/DropWhile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/TakeWhile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/Monadic/Drop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/Monadic/Zip.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/Monadic/DropWhile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/Monadic/FilterMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators/Monadic/TakeWhile.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Combinators.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Consumers/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Consumers/Loop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Consumers/Set.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Consumers/Monadic/Loop.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Consumers/Monadic/Set.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Consumers/Monadic/Collect.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Consumers/Collect.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Equivalence/HetT.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Equivalence/StepCongr.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Equivalence/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Vector.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Array.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Range.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Monadic/List.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Monadic/Vector.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Monadic/Array.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Monadic/Empty.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Empty.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas/Producers/Repeat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Combinators.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Consumers/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Consumers/Set.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Consumers/Monadic/Set.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Monadic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Slice.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Vector.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Array.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Range.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Monadic/Vector.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Monadic/Array.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Monadic/Empty.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Empty.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators/Producers/Repeat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtHashSet/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtHashSet/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtDHashMap.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/ExtHashSet.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Data/Iterators.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/Triple.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/WP.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/WP/Monad.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/WP/Adequate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/WP/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/WP/SimpLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/SPred.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/Internal/Ensures/Def.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/Internal/Ensures/Lemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/Internal/Ensures.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/Triple/SpecLemmas.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/Triple/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/SPred/DerivedLaws.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/SPred/SPred.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/SPred/Notation/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/SPred/Notation.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/SPred/SVal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/SPred/Laws.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/PostCond.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/PredTrans.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Do/Internal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/DateTime/PlainDateTime.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/DateTime/Timestamp.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/DateTime/WallTime.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Duration.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Notation/Spec.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Notation.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Format.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Format/DateFormat.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Format/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Internal/UnitVal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Internal/Bounded.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/DateTime.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/Database/TzIf.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/Database/Windows.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/Database/TZdb.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/Database/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/TimeZone.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/ZoneRules.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/ZonedDateTime.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/Offset.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/DateTime.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned/Database.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Zoned.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time/Unit/Minute.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time/Unit/Nanosecond.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time/Unit/Millisecond.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time/Unit/Hour.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time/Unit/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time/Unit/Second.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time/PlainTime.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Time/HourMarker.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date/Unit/Day.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date/Unit/Year.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date/Unit/Week.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date/Unit/Weekday.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date/Unit/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date/Unit/Month.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date/ValidDate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date/Basic.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Date/PlainDate.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Time/Internal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std/Internal.c
+[    ] Building /root/lean4-src/stage0/src/../stdlib//Std.c

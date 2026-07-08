@@ -27,6 +27,9 @@ class CallResult:
     # The API's stop reason (e.g. "end_turn", "max_tokens"). "max_tokens" means the
     # output was cut off mid-thought — the loop flags such steps as truncated.
     stop_reason: str = ""
+    # Real dollar cost of the call when the backend reports one (the claude CLI's
+    # JSON envelope does); 0.0 when unknown. Summed by cost meters, never billed from.
+    cost_usd: float = 0.0
 
 
 class ClaudeClient:

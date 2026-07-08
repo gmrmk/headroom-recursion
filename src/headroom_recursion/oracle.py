@@ -156,11 +156,36 @@ _HARNESS = textwrap.dedent(
 )
 
 
+def _sandbox_preexec(timeout_s: float, mem_bytes: int) -> Optional[Callable[[], None]]:
+    """Resource limits for the validator subprocess (POSIX only, else None).
+
+    Accident isolation, same doctrine as the env-stripping below: a validator
+    that spins, allocates without bound, or floods the disk dies cleanly inside
+    its own process instead of taking the run's host down with it. NOT a
+    security boundary against a malicious model.
+    """
+
+    try:
+        import resource
+    except ImportError:  # non-POSIX
+        return None
+
+    def limits() -> None:
+        cpu = max(1, int(timeout_s) + 2)
+        resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
+        resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+        resource.setrlimit(resource.RLIMIT_FSIZE, (1_000_000, 1_000_000))
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+
+    return limits
+
+
 def run_validator(
     source: str,
     answer: str,
     *,
     timeout_s: float = 10.0,
+    mem_limit_bytes: int = 512 * 1024 * 1024,
     runner: Optional[Callable] = None,
 ) -> tuple[Optional[bool], str]:
     """Run validator ``source`` against ``answer`` in a subprocess sandbox.
@@ -177,6 +202,7 @@ def run_validator(
     try:
         # -I: isolated mode (no site, no env-var injection into sys.path).
         # Stripped env: no proxy variables, no credentials — accident isolation.
+        # rlimits (POSIX): CPU/memory/file-size fences for the same reason.
         out = runner(
             [sys.executable, "-I", path],
             input=answer,
@@ -184,6 +210,7 @@ def run_validator(
             text=True,
             timeout=timeout_s,
             env={"PATH": os.environ.get("PATH", "")},
+            preexec_fn=_sandbox_preexec(timeout_s, mem_limit_bytes),
         )
     except subprocess.TimeoutExpired:
         return None, f"validator timed out after {timeout_s}s"
