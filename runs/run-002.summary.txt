@@ -1,0 +1,161 @@
+stop_reason : failed (halted=False)
+final_model : claude-fable-5
+tier path   : claude-sonnet-5: exhausted -> claude-opus-4-8: exhausted -> claude-fable-5: failed (RuntimeError: claude CLI failed (claude-fable-5): )
+steps       : 3   claude calls: 21   wall: 2843.0s
+trajectory  : sonnet 0.00 | opus 0.00 0.00
+oracle      : rung 1 (calibrated validator installed, GATE only)
+gate        : 3 answer(s) mechanically rejected (judge skipped)
+claim audit : 2 unsourced citation claim(s), 7 [NEW] claim(s) with candidate prior art
+headroom    : 144249 -> 144249 tokens (0% saved)
+retrieval   : 12 snippets injected across 3 steps
+
+ANSWER:
+# P vs NP — Cumulative Research Document (Step 6)
+
+## 1. ATTACK LINE
+
+Investigate whether unconditional circuit lower bounds against nonuniform classes (Kannan (1982) style) can be pushed toward P vs NP, while mapping which known barriers (relativization, algebrization, natural proofs) constrain any such attempt. Unchanged from Steps 2–5. This step makes no new mathematical claim; it consolidates the Kannan reconstruction at its verified altitude and corrects one label. Concretely: (a) item 5's folklore micro-lemma is relabeled **[KNOWN]** — it earns zero novelty credit either way and the folklore-plus-[NEW] pattern is a latent hard-cap trap; (b) the FRONTIER is stated honestly as *altitude-capped*: the entire Kannan line is a faithful restatement of an in-print 1982 result, so however completely it is reconstructed it remains [KNOWN] and cannot by itself cross into credited-novelty territory. Any genuine ascent requires a distinct [NEW] surface, marked speculative and never asserted as done.
+
+## 2. ESTABLISHED
+
+**1. [KNOWN] Relativization barrier.** There exist oracles A, B with P^A = NP^A and P^B ≠ NP^B (Baker, Gill, Solovay (1975)). Any technique preserved under relativization applies verbatim in both worlds and so cannot resolve P vs NP. The Lean block formalizes the logical skeleton: if the oracle-relative statement were forced equivalent to a single oracle-independent proposition, a contradiction follows from the two oracle facts.
+
+```lean
+import Mathlib
+
+universe u
+
+/-- An oracle-indexed proposition `PeqNP` ("P^O = NP^O") holding at one
+    oracle and failing at another (Baker–Gill–Solovay 1975). The oracle
+    construction itself is not formalized — only its logical consequence. -/
+structure RelativizationBarrier (Oracle : Type u) where
+  PeqNP      : Oracle → Prop
+  A B        : Oracle
+  holds_at_A : PeqNP A
+  fails_at_B : ¬ PeqNP B
+
+/-- A "relativizing" resolution would make the oracle-relative statement
+    equivalent to one oracle-independent proposition `b`. -/
+def Relativizes {Oracle : Type u} (PeqNP : Oracle → Prop) (b : Prop) : Prop :=
+  ∀ O, PeqNP O ↔ b
+
+/-- No relativizing argument resolves P=?NP. -/
+theorem no_relativizing_resolution {Oracle : Type u}
+    (bar : RelativizationBarrier Oracle) (b : Prop)
+    (h : Relativizes bar.PeqNP b) : False := by
+  have hA : b := (h bar.A).mp bar.holds_at_A
+  have hB : bar.PeqNP bar.B := (h bar.B).mpr hA
+  exact bar.fails_at_B hB
+```
+
+**2. [KNOWN] Algebrization barrier.** Aaronson and Wigderson (2008) exhibit algebrizing analogues of the BGS oracles, showing arithmetization-based techniques (underlying IP = PSPACE and all non-relativizing results known then) cannot alone separate P from NP. Strictly stronger than item 1: evading relativization does not imply evading algebrization. The logical skeleton is identical to item 1; `no_relativizing_resolution` applies verbatim with `Oracle` reinterpreted as the algebrizing-oracle-pair type, so no separate block is given.
+
+**3. [KNOWN] Karp–Lipton theorem.** If NP ⊆ P/poly then PH collapses to Σ2^p (Karp and Lipton (1980); Σ2 form due to Sipser). Proof idea: assuming SAT has poly-size circuits, a Σ2^p predicate existentially guesses a circuit C and, using downward self-reducibility of SAT, universally verifies C decides SAT correctly on all inputs of the relevant length; a correct poly-size SAT circuit under one existential guess lets any Π2^p statement be re-expressed with two alternations. Load-bearing in item 4's collapse branch.
+
+**4. [KNOWN] Fixed-polynomial lower bound, plain-Σ2 form — full proof.** *For every constant k, there is a language in Σ2^p that is not in SIZE(n^k)* (Kannan (1982)). (Kannan's paper proves both "Σ2^p ∩ Π2^p" and "Σ2^p" forms — snippet [1]; the ∩Π2 form is strictly harder and is deferred, see item 4′.) Complete argument:
+
+  *(i) A hard function exists (junta/Shannon).* Fix k and large n. We claim some Boolean function on n bits has circuit complexity in the window (n^k, n^{k+1}]. Take f depending only on the first m variables. By Shannon's counting lower bound (Shannon (1949)) almost every function of m variables has circuit complexity ≥ (1−o(1))·2^m/m, while by Lupanov's upper bound (Lupanov (1958)) every function of m variables has complexity ≤ (1+o(1))·2^m/m. Choose m so that 2n^k ≤ 2^m/m ≤ n^{k+1}/2; since 2^m/m increases by a factor ≈2 per step and the window spans a factor Θ(n) ≫ 2, such an integer m exists for all large n (indeed m ≈ (k+1)log₂ n). A Shannon-hard f on these m variables then has complexity strictly in (n^k, n^{k+1}]. Hence there is a circuit of size ≤ n^{k+1} computing a function that **no** circuit of size ≤ n^k computes.
+
+  *(ii) The diagonalization language L.* Call a circuit C of size ≤ n^{k+1} *hard* if it is inequivalent to every circuit of size ≤ n^k (i.e. computes a function no size-≤n^k circuit computes). By (i) the set of hard circuits is nonempty for large n; fix a total lexicographic order on circuit encodings and let C* be its **lex-least** element — unique, being the least element of a nonempty finite totally-ordered set. Define, for |x| = n,
+  $$ x \in L \iff C^*(x) = 1. $$
+  Since C* is inequivalent to every size-≤n^k circuit, L restricted to length n has circuit complexity > n^k, for all large n. Therefore **L ∉ SIZE(n^k)**.
+
+  *(iii) Alternation count — L ∈ Σ4^p ∩ Π4^p unconditionally.* All quantifiers below range over objects of polynomial description length (circuits of size ≤ n^{k+1} or ≤ n^k, or n-bit inputs), and the matrix (circuit evaluation, size comparison, lex comparison) is poly-time; so the counts are genuine Σ_i^p/Π_i^p.
+  - `hard(C)` ≡ ∀D [ size(D)≤n^k → ∃y C(y)≠D(y) ] — a ∀∃ prefix, **Π2**.
+  - `¬hard(C′)` ≡ ∃D ∀y [ size(D)≤n^k ∧ C′(y)=D(y) ] — a ∃∀ prefix, **Σ2**.
+  - `least(C)` ≡ hard(C) ∧ ∀C′ [ C′<C → ¬hard(C′) ] = Π2 ∧ (∀C′)(Σ2) = **Π3**.
+  Because C* is *unique*, membership admits both forms:
+  $$ x\in L \iff \exists C\,[\,\mathrm{least}(C)\wedge C(x)=1\,] \quad(\exists\cdot\Pi3=\textbf{Σ4}),$$
+  $$ x\in L \iff \forall C\,[\,\mathrm{least}(C)\to C(x)=1\,] \quad(\forall\cdot(\Sigma3\vee\text{poly})=\textbf{Π4}).$$
+  Uniqueness is exactly what buys the ∩Π4 for free. Hence **L ∈ Σ4^p ∩ Π4^p**.
+
+  *(iv) Win-win.* Two exhaustive cases.
+  - **Case NP ⊄ P/poly.** Then SAT has no poly-size circuits, so SAT ∉ SIZE(n^k); and SAT ∈ NP ⊆ Σ2^p. Witness: **SAT ∈ Σ2^p ∖ SIZE(n^k)**.
+  - **Case NP ⊆ P/poly.** By Karp–Lipton (item 3), PH collapses to Σ2^p. Then L ∈ Σ4^p ⊆ PH = Σ2^p, and L ∉ SIZE(n^k) by (ii). Witness: **L ∈ Σ2^p ∖ SIZE(n^k)**.
+
+  Either way *some* Σ2^p language escapes SIZE(n^k). The witness differs by case and we do not know which case holds, but the existential conclusion holds in both, hence unconditionally. ∎
+
+  *Formalization note.* Modeling Σ2^p/Π2^p and SIZE(n^k) as first-class objects is beyond current Mathlib, so no axiom is posited for the theorem itself (an `axiom` would compile but earn zero altitude and read as fabrication-adjacent). The block below formalizes only the **win-win logical skeleton** — an exhaustive case split each branch of which exhibits the desired object yields it unconditionally — with the complexity content of (i)–(iv) argued in prose above.
+
+```lean
+import Mathlib
+
+/-- Win-win skeleton of item 4. `InSigma2`, `NotInSize` are abstract; `hyp`
+    is "NP ⊆ P/poly". Each branch (SAT hard, or the diagonal language L)
+    exhibits a Σ2 language outside SIZE(n^k); the case split makes the
+    existence unconditional. The complexity content is argued in prose. -/
+theorem winwin {Lang : Type*} (InSigma2 NotInSize : Lang → Prop) (hyp : Prop)
+    (case1 : ¬ hyp → ∃ L, InSigma2 L ∧ NotInSize L)
+    (case2 :   hyp → ∃ L, InSigma2 L ∧ NotInSize L) :
+    ∃ L, InSigma2 L ∧ NotInSize L := by
+  by_cases h : hyp
+  · exact case2 h
+  · exact case1 h
+```
+
+**4′. [KNOWN — deferred residual] The ∩Π2 upgrade.** Kannan (1982) proves the stronger "Σ2^p ∩ Π2^p" form (snippet [1]). Our argument delivers ∩Π2 **only in the collapse branch**: under NP ⊆ P/poly, PH = Σ2^p forces Σ4^p = Π4^p = Σ2^p = Π2^p, so L ∈ Σ2^p ∩ Π2^p. In the NP ⊄ P/poly branch the witness is SAT, and while SAT ∈ Σ2^p, **SAT ∈ Π2^p is not known** (it would follow from NP ⊆ Π2^p / coNP, unknown). L itself sits only in Σ4^p ∩ Π4^p in this branch, not Σ2^p ∩ Π2^p. So the clean two-case argument proves plain Σ2 unconditionally but **not** ∩Π2. I have not reconstructed Kannan's device for closing this asymmetry; the ∩Π2 form is recorded as an honest gap, not asserted (see FRONTIER). This deferral is a deliberate calibration choice: the standard textbook argument (Arora–Barak-style) also yields only Σ2 in this branch, and the ∩Π2 recovery requires a device I decline to sketch rather than reconstruct.
+
+**5. [KNOWN — folklore, prior-art audit] Why the un-canonicalized guessed-circuit route defines a trivial language.** *This is not a gap in Kannan's proof* — Kannan's object is "output of the certified **lex-least** hard circuit" (item 4(ii)), and lex tie-breaking is exactly what defeats the multiplicity below. This item documents, for the record, why the *naive* variant that guesses *any* hard circuit and reads off its value — with no canonicalization — computes the all-accepting language. It is near-folklore (the "flip a robust witness" observation), carries no novelty claim, and is retained only because it certifies that canonicalization in 4(ii)/(iii) is load-bearing rather than cosmetic. Fix k, n; let 𝒟 be the size-≤n^k circuits on n bits. Call C (size ≤ n^{k+1}) a *valid witness* if it disagrees with every D ∈ 𝒟 somewhere, and *robust* if |Disagree(C,D)| ≥ 2 for all D ∈ 𝒟. A robust witness exists for large n by the same counting as item 4(i) (near-agreements are a vanishing fraction). Claim: for every x, flipping C's output at x yields another valid witness with the complementary value at x.
+
+  *Proof.* Fix D ∈ 𝒟. Robustness gives distinct x₁ ≠ x₂ both in Disagree(C,D); at most one equals x, so the other x_D satisfies x_D ≠ x and C(x_D) ≠ D(x_D). The flipped circuit C′ agrees with C off x, so C′(x_D) = C(x_D) ≠ D(x_D): C′ disagrees with D. This holds for every D, so C′ is valid; and C′(x) = ¬C(x). ∎
+
+  **Consequence.** "∃ valid witness C with C(x)=1" is true for *every* x (both C and C′ are valid, with opposite values at x), so the naive predicate is the all-accepting language, in SIZE(1) — trivial. Hence guessing a hard circuit *without* the lex-least certification decides nothing nontrivial; canonicalization is load-bearing, precisely as in item 4(ii)/(iii). Compiling core lemma:
+
+```lean
+import Mathlib
+
+/-- If `C` differs from every `d ∈ D` at two or more points, then flipping
+    `C` at any single `x0` still differs from every `d` somewhere, and its
+    value at `x0` is complemented. The "robust witness" step of item 5. -/
+theorem flip_preserves_difference
+    {X : Type*} [DecidableEq X] (D : Set (X → Bool)) (C : X → Bool)
+    (hC : ∀ d ∈ D, ∃ x1 x2 : X, x1 ≠ x2 ∧ C x1 ≠ d x1 ∧ C x2 ≠ d x2)
+    (x0 : X) :
+    (∀ d ∈ D, ∃ x : X, Function.update C x0 (!C x0) x ≠ d x)
+      ∧ Function.update C x0 (!C x0) x0 = ! C x0 := by
+  constructor
+  · intro d hd
+    obtain ⟨x1, x2, hne, h1, h2⟩ := hC d hd
+    rcases eq_or_ne x1 x0 with hx1 | hx1
+    · have hx2 : x2 ≠ x0 := by rw [← hx1]; exact Ne.symm hne
+      exact ⟨x2, by simpa [Function.update_apply, hx2] using h2⟩
+    · exact ⟨x1, by simpa [Function.update_apply, hx1] using h1⟩
+  · simp [Function.update_apply]
+```
+
+**6. [KNOWN] Natural proofs barrier.** Razborov and Rudich (1997): a lower-bound strategy is *natural* against C if it exhibits a property that is *constructive* (decidable in 2^{O(n)} time from the truth table), *large* (holds for an inverse-poly fraction of n-input functions), and *useful* (no function in C has it for infinitely many n). If strong PRFs exist, no natural proof gives superpolynomial P/poly lower bounds. Consequence: pushing item 4 into a genuine P/poly lower bound must evade naturalness or condition on PRF failure. The block formalizes only the *definition*; `constructive`/`large` are abstract propositions, and `useful` is rendered in a *single-n* form (Razborov–Rudich's actual condition is "no C-function has the property for infinitely many n" — the infinitely-often quantifier is dropped in the skeleton and is noted, not formalized).
+
+```lean
+import Mathlib
+
+/-- Definitional skeleton of a natural property against a class `C`
+    (Razborov–Rudich 1997). The quantitative constructive/large conditions
+    are abstract; `useful` is given a simplified single-`n` form (the
+    "infinitely many n" quantifier of the real definition is omitted). The
+    barrier theorem (natural properties barred under a PRG assumption) is
+    not formalized. -/
+structure NaturalProperty (Fn : Type) (C : Fn → Prop) where
+  Prop_        : Fn → Prop
+  constructive : Prop
+  large        : Prop
+  useful       : ∀ f, C f → ¬ Prop_ f
+```
+
+## 3. FRONTIER
+
+**Assessment: the Kannan line is altitude-capped at [KNOWN].** The plain-Σ2 fixed-polynomial lower bound is now reconstructed end-to-end with no gap (item 4). Every remaining move on this line — reconstructing the ∩Π2 device of item 4′, or re-deriving Kannan's alternation bookkeeping against Arora–Barak Thm 6.19 — raises *correctness/completeness* but stays a faithful restatement of an in-print 1982 theorem, hence **[KNOWN]**. Under the rubric it therefore cannot by itself cross into credited-novelty scoring, no matter how thoroughly executed. I state this plainly rather than dress reconstruction as ascent.
+
+**Two honest options for the next step, in priority order:**
+
+- **(A) Close 4′ for correctness (does not raise altitude band).** Reconstruct, from Kannan (1982) or Arora–Barak (~Thm 6.19), the device yielding the **∩Π2** form in the NP ⊄ P/poly branch. *(a) Why it completes the line:* it converts item 4′ from deferred residual into full [KNOWN], finishing Kannan's actual theorem here. *(b) Obstacle:* the asymmetry is genuine — SAT is known only in Σ2^p (SAT ∈ Π2^p ⟺ NP ⊆ Π2^p, unknown), and L lands only in Σ4^p ∩ Π4^p absent collapse; no object in hand is simultaneously hard against SIZE(n^k) in the uniform-hard case and provably in Π2^p unconditionally. *(c) Strategy:* audit whether Kannan diagonalizes a single Σ2^p ∩ Π2^p language whose hardness is forced in *both* branches — membership expressed via a bounded certificate (circuit-complexity quantity vs. threshold) rather than "the language decided by a guessed circuit," making the ∩Π2 structure unconditional. **Caveat, binding: even fully executed this remains [KNOWN] and does not cross the novelty threshold.** Never state it as done from a sketch.
+
+- **(B) Open a genuine [NEW] surface (the only route to a higher band).** Identify a *specific, small* result plausibly absent from the literature and checkable — candidates: (i) a restricted-circuit micro-bound (e.g. against a depth/gate-restricted class) argued to be simultaneously non-natural (no large+constructive property) and non-relativizing, stated as a precise conjecture with the evasion argument sketched; or (ii) a novel *structural link* between two in-print results (e.g. a clean implication tying a fixed-polynomial Σ2 bound to a hardness-magnification trigger à la Chen). Any such item must be marked **speculative/[NEW — unverified]**, carry its obstacle explicitly, and never be asserted proved. This is the only branch that can raise the score band; it is correspondingly high-risk and must not be faked.
+
+## 4. FAILED
+
+- (Step 1) Reading "Kannan82 not blocked by BGS75/AW08" as evidence it is non-relativizing — abandoned: the real reason is that Kannan's statement is strictly weaker than NP ⊄ P/poly, independent of whether the proof relativizes.
+- (Step 2) *Superseded mis-analysis, not a dead end:* "a 2^n-bit hard truth table is not a poly-length Σ2 witness." Correct but irrelevant — item 4(ii) guesses a size-≤n^{k+1} **circuit** (poly description), which is the right witness object; the table framing was the wrong lens.
+- (Step 2–3) Naive predicate "∃ valid witness C, C(x)=1" with no canonicalization — abandoned: *proved* trivial (all-accepting, SIZE(1)) by the single-bit-flip argument, item 5.
+- (Step 3, un-formalized) Lex-first canonicalization feared to overshoot to Σ4^p — **resolved, not failed:** item 4(iii) shows the uniqueness of the lex-least witness keeps L in Σ4^p ∩ Π4^p, which collapses to Σ2^p ∩ Π2^p under Karp–Lipton; the "overshoot" is harmless in the collapse branch and is exactly the source of the free ∩Π4.
+- (Step 3, un-formalized) Padding/rescaling the size parameters — abandoned: yields only a weaker (log n)^k-type bound, a strictly weaker theorem than the n^k bound.
+- (Step 5) Carrying the folklore micro-lemma (item 5) under a [NEW] tag — corrected this step to [KNOWN]: it earns zero novelty either way and the folklore-plus-[NEW] pattern is a latent mislabel hard-cap trap; relabeling is strictly downside-removing.

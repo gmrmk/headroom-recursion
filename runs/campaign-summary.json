@@ -25,6 +25,20 @@
       "calls": 47,
       "cost_usd_cumulative": 62.5779,
       "needs_human_review": false
+    },
+    {
+      "run": 2,
+      "stem": "run-002",
+      "stop_reason": "failed",
+      "halted": false,
+      "best_halt_prob": 0.0,
+      "ledger_improved": false,
+      "calls": 21,
+      "cost_usd_cumulative": 73.8442,
+      "needs_human_review": false
     }
-  ]
+  ],
+  "stopped": "dry",
+  "total_cost_usd": 73.8442,
+  "total_calls": 148
 }

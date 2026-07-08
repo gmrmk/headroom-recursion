@@ -1,7 +1,7 @@
 # Campaign report
 
-- problem key: `6c2293f54c8418a6`
-- stopped: **exhausted** after 1 run(s), 36 model calls, $20.77
+- problem key: `6bf0a5a237edddcb`
+- stopped: **dry** after 3 run(s), 148 model calls, $73.84
 
 ## Authority of the outcome
 
@@ -13,7 +13,9 @@ Nothing here is a verified result; treat the answer as a draft whose grading rub
 
 | run | stop | best | ledger | calls | $cum |
 |---|---|---|---|---|---|
-| 0 | failed | 0.30 | = | 30 | 20.77 |
+| 0 | budget | 0.30 | = | 67 | 35.24 |
+| 1 | failed | 0.32 | = | 47 | 62.58 |
+| 2 | failed | 0.00 | = | 21 | 73.84 |
 
 ## Provenance
 
