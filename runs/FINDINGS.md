@@ -103,9 +103,15 @@ Reference ("Validating a Lean Proof"): kernel replay via `leanchecker`
 then export to Lean's specified NDJSON format (`lean4export` @ v4.31.0) and
 re-typechecking by `nanoda` — an independently implemented Rust kernel — with
 the axiom whitelist {propext, Classical.choice, Quot.sound} enforced.
-Result: 3/3 artifacts verified at both tiers, including the counting theorem's
-full used-Mathlib closure (3,611 declarations) re-checked without our
-toolchain. The NDJSON exports in `runs/verify/` are the objects of record: a
+Result across the full campaign: **7 of 9 Lean artifacts verified at both
+tiers**; the 2 failures were non-compiling blocks from run 2's gate-rejected
+document — the independent checker independently confirming the gate's own
+rejection, i.e. the fail-closed rule demonstrated on real data. Verified
+theorems include the counting theorem's full used-Mathlib closure (up to 4,096
+declarations) re-checked without our toolchain, plus formalized case-split
+skeletons of the Kannan win–win (`winwin`, `karp_lipton_case_split`) and a
+`flip_preserves_difference` lemma (140 decls) — every one re-typechecked by the
+independent Rust kernel. The NDJSON exports in `runs/verify/` are the objects of record: a
 third party needs only those files and any conforming checker. Residuals,
 stated: consistency of Lean's type theory + the three axioms, the export-format
 spec, nanoda's correctness (mitigable by a second export-consuming checker),

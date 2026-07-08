@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-08T13:30:28Z",
+  "generated": "2026-07-08T14:19:05Z",
   "toolchain": "leanprover/lean4:v4.31.0",
   "checkers": {
     "leanchecker": "distributed with the pinned toolchain (kernel replay, --fresh)",
@@ -28,6 +28,21 @@
       "export_sha256": "6928bc6c5695c1cb610139666f630d7b8fa9ed87d107bf258271553112ad78c7"
     },
     {
+      "artifact": "gate-03abfb9fc59b.lean",
+      "sha256": "b7f46b551dc2d5358b60a8a113bd239dcd952729f5bb59cfb3df106495319115",
+      "module": "Ab7f46b551dc2",
+      "decls": [
+        "winwin"
+      ],
+      "compile": true,
+      "tier1_leanchecker": true,
+      "tier2_nanoda": true,
+      "decls_checked": 113,
+      "error": "",
+      "tier1_mode": "incremental",
+      "export_sha256": "f469565d3cfa3003cc722e7705570f992ecffadee0772c6937f4233b59918691"
+    },
+    {
       "artifact": "gate-1b7d5fc9b679.lean",
       "sha256": "02da226664201355095b2e7b0645a5a122cf5ed3d7ac0dd2b0298999e1778043",
       "module": "A02da22666420",
@@ -41,6 +56,19 @@
       "error": "",
       "tier1_mode": "fresh",
       "export_sha256": "30d15bddae3bf2170badabcdfd635fd0fe023bb5eadd1a55e77f91386d247894"
+    },
+    {
+      "artifact": "gate-264ea5cb8bc0.lean",
+      "sha256": "b46e639d911a0996a0db511f7a2ab89fbb7260065c6b01d1bb9446ffb2f7124b",
+      "module": "Ab46e639d911a",
+      "decls": [
+        "no_relativizing_resolution"
+      ],
+      "compile": false,
+      "tier1_leanchecker": false,
+      "tier2_nanoda": false,
+      "decls_checked": 0,
+      "error": "compile: .artifacts/Ab46e639d911a.lean:11:21: error: Application type mismatch: The argument\n  A\nhas type\n  ?m.1 \u2192 Oracle\nbut is expected to have type\n  Oracle\nin the application\n  PeqNP A\n.artifacts/Ab46e639d911a.lean:21:11: error: Function expected at\n  RelativizationBarrier\nbut this term has type\n  ?m.1\n\nNote: Expected a function because this term is being applied to the argument\n  Oracle\n\nHint: The ide"
     },
     {
       "artifact": "gate-3e4d9e66a8db.lean",
@@ -86,6 +114,32 @@
       "error": "",
       "tier1_mode": "incremental",
       "export_sha256": "ba95032d5966166049411943289941fb91c5c5666de21bd59fd6b22718e1dd3e"
+    },
+    {
+      "artifact": "gate-7d507510cd5e.lean",
+      "sha256": "5ac45280fcb2c0d07cfdb8c5f57be9f948ced13744de9d318422c142d2294b0d",
+      "module": "A5ac45280fcb2",
+      "decls": [],
+      "compile": false,
+      "tier1_leanchecker": false,
+      "tier2_nanoda": false,
+      "decls_checked": 0,
+      "error": "scan: no top-level theorem/lemma declarations found"
+    },
+    {
+      "artifact": "gate-d70b594e9151.lean",
+      "sha256": "d49ca6bb55cff255f16ae31833066d5de0574c3f18f6550004d26c54b8e99ed3",
+      "module": "Ad49ca6bb55cf",
+      "decls": [
+        "flip_preserves_difference"
+      ],
+      "compile": true,
+      "tier1_leanchecker": true,
+      "tier2_nanoda": true,
+      "decls_checked": 140,
+      "error": "",
+      "tier1_mode": "incremental",
+      "export_sha256": "786586a5b6167fdca82246c29398ee4fb33a62735ae5120a4f2e920f45625134"
     }
   ]
 }
